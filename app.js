@@ -134,7 +134,7 @@ function nav(page) {
   else if(page==='students')renderTeacherStudents();
   else {
     $('scheduleHeading').textContent=isAdmin()?'授業管理':'今日の時間割';
-    $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'自分と他の教師の授業を切り替えて確認・編集できます。';
+    $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'全教師の時間割を確認し、伝達事項を共有できます。';
     renderLessons();
   }
 }
@@ -495,7 +495,7 @@ $('cancelStudentDeletion').addEventListener('click',()=>closeDialog('deleteStude
 
 function selectOptions(select, array, labelFn){select.replaceChildren();for(const o of array){const option=make('option','',labelFn(o));option.value=o.id;select.append(option);}}
 function openLessonForm(id=''){
-  if(!isAdmin()&&!id)return;
+  if(!isAdmin())return;
   if(!state.students.length||!state.people.length){showMessage('先に生徒と担当教師のアカウントを登録してください。');return;}
   const lesson=lessonById(id);
   if(!isAdmin()&&!lesson)return;
@@ -520,7 +520,7 @@ async function sendNotifications(uids,message,date,batch=null){
   if(!batch)await targetBatch.commit();
 }
 $('lessonForm').addEventListener('submit',async event=>{
-  event.preventDefault();if(!isAdmin()&&!$('lessonId').value)return;
+  event.preventDefault();if(!isAdmin())return;
   const id=$('lessonId').value||doc(collection(db,'timetableEntries')).id;
   const old=lessonById(id);
   if(!isAdmin()&&!old){showMessage('既存授業のみ編集できます。');return;}
@@ -568,9 +568,9 @@ function openLessonDetail(id){
   const upcoming=futureDatesForLesson(lesson);
   if(upcoming.length){upcoming.forEach((date,i)=>dates.append(make('div','future-date',`${i===0?'次回':'次々回'}：${prettyDate(date)}`)));}
   else dates.append(make('div','future-date','今後の来塾予定はまだ登録されていません。'));
-  $('memoContent').value=lesson.memo||'';$('editLesson').hidden=false;showDialog('detailDialog');
+  $('memoContent').value=lesson.memo||'';$('editLesson').hidden=!isAdmin();showDialog('detailDialog');
 }
-$('editLesson').addEventListener('click',()=>{const id=state.activeLesson;closeDialog('detailDialog');openLessonForm(id);});
+$('editLesson').addEventListener('click',()=>{if(!isAdmin())return;const id=state.activeLesson;closeDialog('detailDialog');openLessonForm(id);});
 $('memoForm').addEventListener('submit',async event=>{
   event.preventDefault();const lesson=lessonById(state.activeLesson);if(!lesson)return;
   const content=$('memoContent').value.trim();const button=event.submitter;button.disabled=true;
