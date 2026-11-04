@@ -104,109 +104,43 @@ function lessonById(id){
   const occurrenceDate=/^rec_.+_(\d{4}-\d{2}-\d{2})$/.exec(id||'')?.[1];
   return lessonsOnDate(occurrenceDate||state.date).find(e=>e.id===id);
 }
-function futureDatesForLesson(lesson){
-  const dates=new Set(state.entries.filter(e=>e.studentId===lesson.studentId && e.date>lesson.date && e.status!=='cancelled' && isVisibleEntry(e)).map(e=>e.date));
-  // 16 weeks is enough for recurring lessons; one-off distant dates are included above.
-  for(let offset=1;offset<=112;offset++){
-    const date=datePlus(lesson.date,offset);
-    if(lessonsOnDate(date).some(e=>e.studentId===lesson.studentId && e.status!=='cancelled'))dates.add(date);
+function timeMinutes(time){
+  const [hours,minutes]=time.split(':').map(Number);
+  return hours*60+minutes;
+}
+function periodCount(entry){
+  const first=CLASS_PERIODS.findIndex(p=>p.start===entry.start);
+  const last=CLASS_PERIODS.findIndex(p=>p.end===entry.end);
+  return first>=0 && last>=first ? last-first+1 : 1;
+}
+// The next three visits after this lesson's date. Consecutive periods count as one visit.
+function futureVisitsForLesson(lesson){
+  const dates=new Set(state.entries
+    .filter(e=>e.studentId===lesson.studentId && e.date>lesson.date && e.status!=='cancelled' && isVisibleEntry(e))
+    .map(e=>e.date));
+  for(let offset=1;offset<=112;offset++)dates.add(datePlus(lesson.date,offset));
+  const visits=[];
+  for(const date of [...dates].sort()){
+    const lessons=lessonsOnDate(date)
+      .filter(e=>e.studentId===lesson.studentId && e.status!=='cancelled' && e.start && e.end)
+      .sort((a,b)=>a.start.localeCompare(b.start)||a.end.localeCompare(b.end));
+    let current=null;
+    for(const entry of lessons){
+      if(!current){current={date,start:entry.start,end:entry.end,periods:periodCount(entry)};continue;}
+      const gap=timeMinutes(entry.start)-timeMinutes(current.end);
+      if(gap<=5){
+        if(entry.end>current.end){current.periods+=periodCount(entry);current.end=entry.end;}
+      }else{
+        visits.push(current);
+        current={date,start:entry.start,end:entry.end,periods:periodCount(entry)};
+      }
+    }
+    if(current)visits.push(current);
+    if(visits.length>=3)break;
   }
-  return [...dates].sort().slice(0,2);
+  return visits.slice(0,3);
 }
 
-let messageTimer;
-function showMessage(message) { $('message').textContent=message; clearTimeout(messageTimer); if(message) messageTimer=setTimeout(()=>$('message').textContent='',7000); }
-function trapError(e, fallback='処理に失敗しました') { console.error(e); showMessage(`${fallback}${e?.code ? '（'+e.code+'）' : ''}`); }
-function make(tag, className='', text='') { const node=document.createElement(tag); if(className) node.className=className; if(text!==undefined && text!==null) node.textContent=String(text); return node; }
-function cell(row,value,className='') { const td=make('td',className,value); row.append(td); return td; }
-function showDialog(id) { $(id).showModal(); }
-function closeDialog(id) { $(id).close(); }
-document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>closeDialog(button.dataset.close)));
-document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
-
-// iPad Safari: when an input/textarea still has focus, the first tap on a
-// dialog's Save button can be consumed by the virtual keyboard dismissing.
-// Treat that touch as an explicit form submission while retaining native
-// required-field validation and the existing Firebase save handlers.
-function enableOneTapSave(formId) {
-  const form = $(formId);
-  const save = form.querySelector('button[type="submit"]');
-  if (!save) return;
-
-  function submitFromFocusedField(event) {
-    const active = document.activeElement;
-    // Do not intercept mouse/keyboard clicks or touches unrelated to an
-    // active input in this form. Native form submission remains the default.
-    if (event.type === 'pointerdown' && event.pointerType !== 'touch') return;
-    if (event.isPrimary === false || save.disabled || !active || active === save ||
-        !form.contains(active) || !['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) ||
-        active.type === 'hidden') return;
-    if (event.cancelable) event.preventDefault();
-    // reportValidity() highlights the first missing field as usual.
-    if (!form.reportValidity()) return;
-    // Blurring commits Japanese IME input before collecting form values.
-    active.blur();
-    form.requestSubmit(save);
-  }
-
-  if (window.PointerEvent) {
-    save.addEventListener('pointerdown', submitFromFocusedField, {passive:false});
-  } else {
-    save.addEventListener('touchstart', submitFromFocusedField, {passive:false});
-  }
-}
-['studentForm', 'lessonForm', 'memoForm'].forEach(enableOneTapSave);
-
-function resetSubscriptions(){state.unsub.forEach(fn=>fn());state.unsub=[];}
-function nav(page) {
-  state.page=page;
-  $('adminCountPage').hidden=page!=='count';
-  $('teacherStudentsPage').hidden=page!=='students';
-  $('lessonsPage').hidden=page==='count'||page==='students';
-  for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students']]) $(''+id).classList.toggle('active',page===p);
-  if(page==='count')renderCount();
-  else if(page==='students')renderTeacherStudents();
-  else {
-    $('scheduleHeading').textContent=isAdmin()?'授業管理':'今日の時間割';
-    $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'全教師の時間割と伝達事項を閲覧できます。';
-    renderLessons();
-  }
-}
-$('navCount').addEventListener('click',()=>nav('count'));
-$('navAdminLessons').addEventListener('click',()=>nav('adminLessons'));
-$('navTeacherLessons').addEventListener('click',()=>nav('teacherLessons'));
-$('navTeacherStudents').addEventListener('click',()=>nav('students'));
-$('teacherFilter').addEventListener('change',renderLessons);
-$('teacherStudentSearch').addEventListener('input',renderTeacherStudents);
-$('teacherStudentLevel').addEventListener('change',renderTeacherStudents);
-$('teacherStudentSort').addEventListener('change',renderTeacherStudents);
-// Day / week / month select both the displayed range and arrow navigation step.
-const jsDate = value => { const [year,month,day]=value.split('-').map(Number); return new Date(year,month-1,day); };
-const startOfWeek = value => datePlus(value,-((jsDate(value).getDay()+6)%7)); // Monday first
-function shiftMonth(value,delta){
-  const [year,month,day]=value.split('-').map(Number);
-  const target=new Date(year,month-1+delta,1);
-  const last=new Date(target.getFullYear(),target.getMonth()+1,0).getDate();
-  return dateKey(new Date(target.getFullYear(),target.getMonth(),Math.min(day,last)));
-}
-function moveSchedule(direction){
-  state.date=state.scheduleView==='month'?shiftMonth(state.date,direction):datePlus(state.date,direction*(state.scheduleView==='week'?7:1));
-  renderLessons();
-}
-function selectScheduleView(view){
-  if(!['day','week','month'].includes(view))return;
-  state.scheduleView=view;
-  document.querySelectorAll('[data-schedule-view]').forEach(button=>{
-    const active=button.dataset.scheduleView===view;
-    button.classList.toggle('active',active);
-    button.setAttribute('aria-pressed',String(active));
-  });
-  renderLessons();
-}
-document.querySelectorAll('[data-schedule-view]').forEach(button=>button.addEventListener('click',()=>selectScheduleView(button.dataset.scheduleView)));
-$('prevDay').addEventListener('click',()=>moveSchedule(-1));
-$('nextDay').addEventListener('click',()=>moveSchedule(1));
-$('today').addEventListener('click',()=>{state.date=todayKey();renderLessons();});
 $('studentLevel').addEventListener('change',renderCount);
 $('studentSort').addEventListener('change',renderCount);
 $('studentSearch').addEventListener('input',renderCount);
@@ -623,9 +557,14 @@ function openLessonDetail(id){
   $('detailTeacher').textContent=lesson.teacherName;
   $('detailGrade').textContent=[lesson.grade,lesson.school].filter(Boolean).join(' / ');
   const dates=$('futureDates');dates.replaceChildren();
-  const upcoming=futureDatesForLesson(lesson);
-  if(upcoming.length){upcoming.forEach((date,i)=>dates.append(make('div','future-date',`${i===0?'次回':'次々回'}：${prettyDate(date)}`)));}
-  else dates.append(make('div','future-date','今後の来塾予定はまだ登録されていません。'));
+  const upcoming=futureVisitsForLesson(lesson);
+  if(upcoming.length){
+    upcoming.forEach((visit,i)=>{
+      const label=`${i+1}回目：${prettyDate(visit.date)}　${visit.start}〜${visit.end}`;
+      const suffix=visit.periods>1?`（${visit.periods}コマ連続）`:'';
+      dates.append(make('div','future-date',label+suffix));
+    });
+  }else dates.append(make('div','future-date','今後の来塾予定はまだ登録されていません。'));
   // Employees see plain text only; no editable field or save button.
   const admin=isAdmin();
   $('memoForm').hidden=!admin;
