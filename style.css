@@ -97,3 +97,13 @@
 .month-help{margin:12px 5px 2px;color:#8390a8;font-size:12px}
 @media(min-width:1200px){.week-calendar{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:690px){.week-calendar{grid-template-columns:1fr}.schedule-viewbar{justify-content:flex-start}.view-help{flex-basis:100%}.datebar{gap:9px;padding:12px 8px}.date-center{min-width:0;flex:1}.date-center strong{font-size:14px}.date-arrow{flex:0 0 40px}.month-calendar{min-width:770px}}
+
+/* Fixed four-period timetable: consecutive bookings use one visual card per period. */
+.lesson-topline{flex-wrap:wrap;justify-content:flex-start}
+.lesson-topline .origin-tag{margin-left:auto}
+.split-tag{font-size:10px;font-weight:750;color:#5362a7;background:#f0f3ff;border:1px solid #e1e7ff;border-radius:99px;padding:4px 8px;white-space:nowrap}
+.week-split-tag{font-size:10px;font-weight:750;color:#5362a7}
+.is-absent .split-tag{color:#a42b40;background:#ffe4e8;border-color:#ffc9d0}
+.is-absent .week-split-tag{color:#ad3444}
+
+.slot-display-hint{font-size:11px;color:#7b879d;text-align:center;margin:-3px 0 20px}

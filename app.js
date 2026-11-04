@@ -177,16 +177,43 @@ $('studentLevel').addEventListener('change',renderCount);
 $('studentSort').addEventListener('change',renderCount);
 $('studentSearch').addEventListener('input',renderCount);
 function renderAll() { if(!state.user) return; renderLessons(); if(isAdmin())renderCount(); else renderTeacherStudents(); renderNoticeButton(); }
+// Shiftly's four fixed teaching periods. A continuous booking is split ONLY in
+// the timetable UI. Both display cards keep the same source lesson ID and memo.
+// A booking with non-standard start/end times remains a single card.
+const CLASS_PERIODS = [
+  {number:1,start:'17:30',end:'18:25'},
+  {number:2,start:'18:30',end:'19:25'},
+  {number:3,start:'19:30',end:'20:25'},
+  {number:4,start:'20:30',end:'21:25'}
+];
+function splitLessonForDisplay(entry){
+  const first=CLASS_PERIODS.findIndex(period=>period.start===entry.start);
+  const last=CLASS_PERIODS.findIndex(period=>period.end===entry.end);
+  if(first<0 || last<first)return [entry];
+  const count=last-first+1;
+  return CLASS_PERIODS.slice(first,last+1).map((period,index)=>({
+    ...entry,
+    start:period.start,
+    end:period.end,
+    displayPeriod:period.number,
+    splitIndex:index+1,
+    splitTotal:count,
+    // Keep the original ID so every segment opens the SAME saved lesson.
+    sourceLessonId:entry.id
+  }));
+}
 function visibleLessonsOnDate(date){
   return lessonsOnDate(date)
     .filter(e=>isAdmin() || $('teacherFilter').value==='all' || e.teacherUid===state.user.uid)
+    .flatMap(splitLessonForDisplay)
     .sort((a,b)=>a.start.localeCompare(b.start)||a.teacherName.localeCompare(b.teacherName)||a.studentName.localeCompare(b.studentName));
 }
 function openScheduleDay(date){state.date=date;selectScheduleView('day');}
 function fullLessonCard(item){
-  const time=`${item.start} – ${item.end}`;
+  const time=`${item.displayPeriod?item.displayPeriod+'限　':''}${item.start} – ${item.end}`;
   const card=make('button',item.status==='cancelled'?'lesson-card is-absent':'lesson-card');card.type='button';
   const headline=make('div','lesson-topline');headline.append(make('span','lesson-time',time));
+  if(item.splitTotal>1)headline.append(make('span','split-tag',`連続${item.splitTotal}コマ · ${item.splitIndex}/${item.splitTotal}`));
   const st=item.status==='done'?'実施済':item.status==='cancelled'?'欠席':'予定';
   headline.append(make('span',item.status==='cancelled'?'state-tag absent-tag':'state-tag',st));
   headline.append(make('span','origin-tag',item.regularId?'通常授業':'個別登録'));card.append(headline);
@@ -203,7 +230,7 @@ function renderDaySchedule(parent){
   if(!rows.length){parent.append(make('div','empty','この日の授業はありません。'));return;}
   let lastTime='';
   for(const item of rows){
-    const time=`${item.start} – ${item.end}`;
+    const time=`${item.displayPeriod?item.displayPeriod+'限　':''}${item.start} – ${item.end}`;
     if(time!==lastTime){parent.append(make('div','time-group-title',time));lastTime=time;}
     parent.append(fullLessonCard(item));
   }
@@ -219,17 +246,18 @@ function renderWeekSchedule(parent){
     const jump=make('button','week-day-button',prettyDate(date));jump.type='button';
     jump.title='この日の授業を詳しく見る';
     jump.addEventListener('click',()=>openScheduleDay(date));
-    head.append(jump,make('span','week-day-count',`${rows.length}件`));section.append(head);
+    head.append(jump,make('span','week-day-count',`${rows.length}コマ`));section.append(head);
     if(!rows.length){section.append(make('p','week-day-empty','授業なし'));parent.append(section);continue;}
     for(const item of rows){
       const lesson=make('button',item.status==='cancelled'?'week-lesson is-absent':'week-lesson');lesson.type='button';
       const topline=make('div','week-lesson-top');
-      topline.append(make('span','week-lesson-time',`${item.start}–${item.end}`));
+      topline.append(make('span','week-lesson-time',`${item.displayPeriod?item.displayPeriod+'限　':''}${item.start}–${item.end}`));
       if(item.status==='cancelled')topline.append(make('strong','week-absence','欠席'));
       else if(item.status==='done')topline.append(make('span','week-done','実施済'));
       lesson.append(topline);
       lesson.append(make('strong','week-student',`${item.grade||''} ${item.studentName||'生徒名未登録'}`));
       lesson.append(make('span','week-meta',`${item.subject||'教科未登録'} / ${item.teacherName||'担当教師未登録'}`));
+      if(item.splitTotal>1)lesson.append(make('span','week-split-tag',`連続${item.splitTotal}コマ · ${item.splitIndex}/${item.splitTotal}`));
       if(item.memo?.trim())lesson.append(make('span','week-memo',`伝達：${item.memo.slice(0,90)}${item.memo.length>90?'…':''}`));
       lesson.addEventListener('click',()=>openLessonDetail(item.id));
       section.append(lesson);
@@ -254,20 +282,20 @@ function renderMonthSchedule(parent){
     if(!inMonth){calendar.append(cell);continue;}
     const rows=visibleLessonsOnDate(date);
     const header=make('button','month-day-head');header.type='button';
-    header.title='この日の時間割を見る';header.setAttribute('aria-label',`${prettyDate(date)}の時間割 ${rows.length}件`);
+    header.title='この日の時間割を見る';header.setAttribute('aria-label',`${prettyDate(date)}の時間割 ${rows.length}コマ`);
     header.append(make('span','month-day-number',String(day)));
-    if(rows.length)header.append(make('span','month-day-count',`${rows.length}件`));
+    if(rows.length)header.append(make('span','month-day-count',`${rows.length}コマ`));
     header.addEventListener('click',()=>openScheduleDay(date));
     cell.append(header);
     for(const item of rows.slice(0,3)){
       const mini=make('button',item.status==='cancelled'?'month-event is-absent':'month-event');mini.type='button';
-      mini.textContent=`${item.start} ${item.studentName||'生徒名未登録'}${item.status==='cancelled'?'（欠席）':''}${item.memo?.trim()?' 📝':''}`;
-      mini.title=`${item.start}〜${item.end} ${item.studentName||'生徒名未登録'} ${item.subject||''} ${item.teacherName||''}${item.status==='cancelled'?' 欠席':''}${item.memo?.trim()?' / 伝達事項あり':''}`;
+      mini.textContent=`${item.displayPeriod?item.displayPeriod+'限 ':''}${item.start} ${item.studentName||'生徒名未登録'}${item.status==='cancelled'?'（欠席）':''}${item.memo?.trim()?' 📝':''}`;
+      mini.title=`${item.start}〜${item.end} ${item.studentName||'生徒名未登録'} ${item.subject||''} ${item.teacherName||''}${item.splitTotal>1?' / 連続'+item.splitTotal+'コマ（'+item.splitIndex+'/'+item.splitTotal+'）':''}${item.status==='cancelled'?' 欠席':''}${item.memo?.trim()?' / 伝達事項あり':''}`;
       mini.addEventListener('click',()=>openLessonDetail(item.id));
       cell.append(mini);
     }
     if(rows.length>3){
-      const more=make('button','month-day-more',`ほか${rows.length-3}件`);more.type='button';
+      const more=make('button','month-day-more',`ほか${rows.length-3}コマ`);more.type='button';
       more.addEventListener('click',()=>openScheduleDay(date));cell.append(more);
     }
     calendar.append(cell);
