@@ -51,3 +51,7 @@
 .detail-absence-status[hidden]{display:none!important}
 .absence-legend{max-width:800px;margin:0 auto 12px;display:flex;align-items:center;gap:8px;font-size:12px;color:#834250}
 .absence-legend-mark{display:inline-block;width:12px;height:12px;flex:none;border-radius:3px;background:#df4255}
+
+/* Student deletion preview: warning is visible on iPad and desktop */
+.delete-warning{background:#fff5f5;color:#97374c;border:1px solid #f3c4cf;border-radius:12px;padding:16px;font-size:13px;line-height:1.9;}
+.modal-actions .danger:disabled{opacity:.55;cursor:not-allowed}

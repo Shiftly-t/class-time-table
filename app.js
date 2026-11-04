@@ -303,13 +303,70 @@ $('studentForm').addEventListener('submit',async event=>{
   }
   catch(e){trapError(e,'生徒情報の保存に失敗しました');}finally{button.disabled=false;}
 });
-$('deleteStudent').addEventListener('click',async()=>{
+// The deletion preview is separate from the confirmation action. This protects
+// against accidentally deleting historical lesson records and teaching notes.
+let pendingStudentDeletion = null;
+$('deleteStudent').addEventListener('click', async () => {
   if(!isAdmin())return;
-  const id=$('studentId').value;const matches=await getDocs(query(collection(db,'timetableEntries'),where('studentId','==',id)));
-  if(!matches.empty || everySlot(state.students.find(s=>s.id===id)||{}).length){showMessage('この生徒の授業または通常授業の設定が残っています。先に削除してください。');return;}
-  if(!confirm('生徒情報を削除しますか？'))return;
-  try{await deleteDoc(doc(db,'schoolStudents',id));closeDialog('studentDialog');showMessage('生徒情報を削除しました。');}catch(e){trapError(e,'削除に失敗しました');}
+  const studentId=$('studentId').value;
+  const student=state.students.find(s=>s.id===studentId);
+  if(!student){showMessage('削除する生徒が見つかりません。');return;}
+  pendingStudentDeletion=null;
+  $('confirmStudentDeletion').disabled=true;
+  $('deleteStudentSummary').textContent='関連する授業記録を確認しています…';
+  showDialog('deleteStudentDialog');
+  try{
+    const [lessons,targets]=await Promise.all([
+      getDocs(query(collection(db,'timetableEntries'),where('studentId','==',studentId))),
+      getDocs(query(collection(db,'monthlyTargets'),where('studentId','==',studentId)))
+    ]);
+    if(!$('deleteStudentDialog').open)return;
+    pendingStudentDeletion={studentId,studentName:student.name,lessons:lessons.docs,targets:targets.docs};
+    const slots=everySlot(student).length;
+    $('deleteStudentSummary').textContent=
+      `「${student.name}」さんの情報を完全に削除します。\n`+
+      `通常授業：${slots}件（生徒データ内）\n`+
+      `保存済み授業記録：${lessons.size}件\n`+
+      `旧・月別回数記録：${targets.size}件\n\n`+
+      '過去の授業履歴・欠席情報・伝達事項も削除され、元には戻せません。';
+    $('confirmStudentDeletion').disabled=false;
+  }catch(error){
+    trapError(error,'削除対象の確認に失敗しました');
+    $('deleteStudentSummary').textContent='関連データを確認できませんでした。削除は実行できません。';
+  }
 });
+$('confirmStudentDeletion').addEventListener('click', async () => {
+  if(!isAdmin()||!pendingStudentDeletion)return;
+  const request=pendingStudentDeletion;
+  const button=$('confirmStudentDeletion');
+  button.disabled=true;
+  const original=button.textContent;
+  button.textContent='削除中…';
+  try{
+    // Keep the student record until all linked records are removed. Use chunks
+    // well under Firestore's write-batch limit. If a chunk fails, the student
+    // remains and the operation can be retried safely.
+    const linked=[...request.lessons,...request.targets];
+    for(let offset=0;offset<linked.length;offset+=400){
+      const batch=writeBatch(db);
+      for(const snapshot of linked.slice(offset,offset+400))batch.delete(snapshot.ref);
+      await batch.commit();
+    }
+    await deleteDoc(doc(db,'schoolStudents',request.studentId));
+    pendingStudentDeletion=null;
+    closeDialog('deleteStudentDialog');
+    closeDialog('studentDialog');
+    showMessage('生徒と関連する授業記録を削除しました。');
+  }catch(error){
+    trapError(error,'生徒の削除に失敗しました。関連データを再確認してからやり直してください');
+    $('deleteStudentSummary').textContent='削除が途中で停止しました。生徒情報は残っています。画面を閉じて、もう一度「生徒を削除」から確認してください。';
+  }finally{
+    button.textContent=original;
+    button.disabled=true;
+  }
+});
+$('cancelStudentDeletion').addEventListener('click',()=>closeDialog('deleteStudentDialog'));
+
 function selectOptions(select, array, labelFn){select.replaceChildren();for(const o of array){const option=make('option','',labelFn(o));option.value=o.id;select.append(option);}}
 function openLessonForm(id=''){
   if(!isAdmin()&&!id)return;
