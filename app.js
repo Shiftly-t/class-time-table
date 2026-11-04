@@ -12,7 +12,7 @@ const dateKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0'
 const datePlus = (value, increment) => { const [y,m,d] = value.split('-').map(Number); return dateKey(new Date(y,m-1,d+increment)); };
 const prettyDate = value => { if(!/^\d{4}-\d{2}-\d{2}$/.test(value||'')) return value||''; const [y,m,d] = value.split('-').map(Number); return `${m}月${d}日（${'日月火水木金土'[new Date(y,m-1,d).getDay()]}）`; };
 const isAdmin = () => state.profile?.role === 'admin';
-const state = { user:null, profile:null, date:todayKey(), page:'', students:[], people:[], entries:[], notices:[], activeLesson:null, unsub:[] };
+const state = { user:null, profile:null, date:todayKey(), scheduleView:'day', page:'', students:[], people:[], entries:[], notices:[], activeLesson:null, unsub:[] };
 const WEEKDAYS = ['日','月','火','水','木','金','土'];
 const everySlot = student => Object.values(student.regularSlots || {}).filter(s=>s && typeof s==='object');
 const slotDescription = s => `${WEEKDAYS[Number(s.weekday)]||'?'}曜 ${s.start}〜${s.end}`;
@@ -96,7 +96,14 @@ function lessonsOnDate(date){
   }
   return result;
 }
-function lessonById(id){return state.entries.find(e=>e.id===id) || lessonsOnDate(state.date).find(e=>e.id===id);}
+// Weekly/monthly cards may refer to a different day than the currently selected date.
+// Resolve generated regular lessons using the date embedded in their stable ID.
+function lessonById(id){
+  const stored=state.entries.find(e=>e.id===id);
+  if(stored)return stored;
+  const occurrenceDate=/^rec_.+_(\d{4}-\d{2}-\d{2})$/.exec(id||'')?.[1];
+  return lessonsOnDate(occurrenceDate||state.date).find(e=>e.id===id);
+}
 function futureDatesForLesson(lesson){
   const dates=new Set(state.entries.filter(e=>e.studentId===lesson.studentId && e.date>lesson.date && e.status!=='cancelled' && isVisibleEntry(e)).map(e=>e.date));
   // 16 weeks is enough for recurring lessons; one-off distant dates are included above.
@@ -139,33 +146,152 @@ $('teacherFilter').addEventListener('change',renderLessons);
 $('teacherStudentSearch').addEventListener('input',renderTeacherStudents);
 $('teacherStudentLevel').addEventListener('change',renderTeacherStudents);
 $('teacherStudentSort').addEventListener('change',renderTeacherStudents);
-$('prevDay').addEventListener('click',()=>{state.date=datePlus(state.date,-1);renderLessons();});
-$('nextDay').addEventListener('click',()=>{state.date=datePlus(state.date,1);renderLessons();});
+// Day / week / month select both the displayed range and arrow navigation step.
+const jsDate = value => { const [year,month,day]=value.split('-').map(Number); return new Date(year,month-1,day); };
+const startOfWeek = value => datePlus(value,-((jsDate(value).getDay()+6)%7)); // Monday first
+function shiftMonth(value,delta){
+  const [year,month,day]=value.split('-').map(Number);
+  const target=new Date(year,month-1+delta,1);
+  const last=new Date(target.getFullYear(),target.getMonth()+1,0).getDate();
+  return dateKey(new Date(target.getFullYear(),target.getMonth(),Math.min(day,last)));
+}
+function moveSchedule(direction){
+  state.date=state.scheduleView==='month'?shiftMonth(state.date,direction):datePlus(state.date,direction*(state.scheduleView==='week'?7:1));
+  renderLessons();
+}
+function selectScheduleView(view){
+  if(!['day','week','month'].includes(view))return;
+  state.scheduleView=view;
+  document.querySelectorAll('[data-schedule-view]').forEach(button=>{
+    const active=button.dataset.scheduleView===view;
+    button.classList.toggle('active',active);
+    button.setAttribute('aria-pressed',String(active));
+  });
+  renderLessons();
+}
+document.querySelectorAll('[data-schedule-view]').forEach(button=>button.addEventListener('click',()=>selectScheduleView(button.dataset.scheduleView)));
+$('prevDay').addEventListener('click',()=>moveSchedule(-1));
+$('nextDay').addEventListener('click',()=>moveSchedule(1));
 $('today').addEventListener('click',()=>{state.date=todayKey();renderLessons();});
 $('studentLevel').addEventListener('change',renderCount);
 $('studentSort').addEventListener('change',renderCount);
 $('studentSearch').addEventListener('input',renderCount);
 function renderAll() { if(!state.user) return; renderLessons(); if(isAdmin())renderCount(); else renderTeacherStudents(); renderNoticeButton(); }
-function renderLessons() {
-  if(!state.user) return;
-  $('displayDate').textContent=prettyDate(state.date);
-  const parent=$('lessonList'); parent.replaceChildren();
-  const rows=lessonsOnDate(state.date).filter(e=>(isAdmin() || $('teacherFilter').value==='all' || e.teacherUid===state.user.uid)).sort((a,b)=>a.start.localeCompare(b.start)||a.teacherName.localeCompare(b.teacherName)||a.studentName.localeCompare(b.studentName));
+function visibleLessonsOnDate(date){
+  return lessonsOnDate(date)
+    .filter(e=>isAdmin() || $('teacherFilter').value==='all' || e.teacherUid===state.user.uid)
+    .sort((a,b)=>a.start.localeCompare(b.start)||a.teacherName.localeCompare(b.teacherName)||a.studentName.localeCompare(b.studentName));
+}
+function openScheduleDay(date){state.date=date;selectScheduleView('day');}
+function fullLessonCard(item){
+  const time=`${item.start} – ${item.end}`;
+  const card=make('button',item.status==='cancelled'?'lesson-card is-absent':'lesson-card');card.type='button';
+  const headline=make('div','lesson-topline');headline.append(make('span','lesson-time',time));
+  const st=item.status==='done'?'実施済':item.status==='cancelled'?'欠席':'予定';
+  headline.append(make('span',item.status==='cancelled'?'state-tag absent-tag':'state-tag',st));
+  headline.append(make('span','origin-tag',item.regularId?'通常授業':'個別登録'));card.append(headline);
+  card.append(make('div','lesson-student',`${item.grade||''} ${item.studentName||'生徒名未登録'}`));
+  card.append(make('div','lesson-meta',`${item.subject||'教科未登録'}　/　${item.teacherName||'担当教師未登録'}`));
+  if(item.memo?.trim())card.append(make('div','memo-preview',item.memo.length>170?item.memo.slice(0,170)+'…':item.memo));
+  else card.append(make('div','lesson-meta','伝達事項なし'));
+  card.addEventListener('click',()=>openLessonDetail(item.id));
+  return card;
+}
+function renderDaySchedule(parent){
+  parent.className='lesson-list';
+  const rows=visibleLessonsOnDate(state.date);
   if(!rows.length){parent.append(make('div','empty','この日の授業はありません。'));return;}
   let lastTime='';
   for(const item of rows){
     const time=`${item.start} – ${item.end}`;
-    if(time!==lastTime){parent.append(make('div','time-group-title',time)); lastTime=time;}
-    const card=make('button',item.status==='cancelled'?'lesson-card is-absent':'lesson-card');card.type='button';
-    const headline=make('div','lesson-topline');headline.append(make('span','lesson-time',time));
-    const st=item.status==='done'?'実施済':item.status==='cancelled'?'欠席':'予定';headline.append(make('span',item.status==='cancelled'?'state-tag absent-tag':'state-tag',st));
-    headline.append(make('span','origin-tag',item.regularId?'通常授業':'個別登録'));card.append(headline);
-    card.append(make('div','lesson-student',`${item.grade||''} ${item.studentName||'生徒名未登録'}`));
-    card.append(make('div','lesson-meta',`${item.subject||'教科未登録'}　/　${item.teacherName||'担当教師未登録'}`));
-    if(item.memo?.trim())card.append(make('div','memo-preview',item.memo.length>170?item.memo.slice(0,170)+'…':item.memo));
-    else card.append(make('div','lesson-meta','伝達事項なし'));
-    card.addEventListener('click',()=>openLessonDetail(item.id));parent.append(card);
+    if(time!==lastTime){parent.append(make('div','time-group-title',time));lastTime=time;}
+    parent.append(fullLessonCard(item));
   }
+}
+function renderWeekSchedule(parent){
+  parent.className='lesson-list week-calendar';
+  const monday=startOfWeek(state.date);
+  for(let day=0;day<7;day++){
+    const date=datePlus(monday,day);
+    const rows=visibleLessonsOnDate(date);
+    const section=make('section','week-day'+(date===todayKey()?' is-today':''));
+    const head=make('div','week-day-head');
+    const jump=make('button','week-day-button',prettyDate(date));jump.type='button';
+    jump.title='この日の授業を詳しく見る';
+    jump.addEventListener('click',()=>openScheduleDay(date));
+    head.append(jump,make('span','week-day-count',`${rows.length}件`));section.append(head);
+    if(!rows.length){section.append(make('p','week-day-empty','授業なし'));parent.append(section);continue;}
+    for(const item of rows){
+      const lesson=make('button',item.status==='cancelled'?'week-lesson is-absent':'week-lesson');lesson.type='button';
+      const topline=make('div','week-lesson-top');
+      topline.append(make('span','week-lesson-time',`${item.start}–${item.end}`));
+      if(item.status==='cancelled')topline.append(make('strong','week-absence','欠席'));
+      else if(item.status==='done')topline.append(make('span','week-done','実施済'));
+      lesson.append(topline);
+      lesson.append(make('strong','week-student',`${item.grade||''} ${item.studentName||'生徒名未登録'}`));
+      lesson.append(make('span','week-meta',`${item.subject||'教科未登録'} / ${item.teacherName||'担当教師未登録'}`));
+      if(item.memo?.trim())lesson.append(make('span','week-memo',`伝達：${item.memo.slice(0,90)}${item.memo.length>90?'…':''}`));
+      lesson.addEventListener('click',()=>openLessonDetail(item.id));
+      section.append(lesson);
+    }
+    parent.append(section);
+  }
+}
+function renderMonthSchedule(parent){
+  parent.className='lesson-list month-calendar-wrap';
+  const current=jsDate(state.date);
+  const year=current.getFullYear(),month=current.getMonth();
+  const days=new Date(year,month+1,0).getDate();
+  const leading=(new Date(year,month,1).getDay()+6)%7;
+  const cells=Math.ceil((leading+days)/7)*7;
+  const calendar=make('div','month-calendar');
+  for(const dayName of ['月','火','水','木','金','土','日'])calendar.append(make('div','month-weekday',dayName));
+  for(let index=0;index<cells;index++){
+    const day=index-leading+1;
+    const inMonth=day>=1&&day<=days;
+    const date=dateKey(new Date(year,month,day));
+    const cell=make('div','month-day'+(!inMonth?' is-outside':'')+(date===todayKey()?' is-today':''));
+    if(!inMonth){calendar.append(cell);continue;}
+    const rows=visibleLessonsOnDate(date);
+    const header=make('button','month-day-head');header.type='button';
+    header.title='この日の時間割を見る';header.setAttribute('aria-label',`${prettyDate(date)}の時間割 ${rows.length}件`);
+    header.append(make('span','month-day-number',String(day)));
+    if(rows.length)header.append(make('span','month-day-count',`${rows.length}件`));
+    header.addEventListener('click',()=>openScheduleDay(date));
+    cell.append(header);
+    for(const item of rows.slice(0,3)){
+      const mini=make('button',item.status==='cancelled'?'month-event is-absent':'month-event');mini.type='button';
+      mini.textContent=`${item.start} ${item.studentName||'生徒名未登録'}${item.status==='cancelled'?'（欠席）':''}${item.memo?.trim()?' 📝':''}`;
+      mini.title=`${item.start}〜${item.end} ${item.studentName||'生徒名未登録'} ${item.subject||''} ${item.teacherName||''}${item.status==='cancelled'?' 欠席':''}${item.memo?.trim()?' / 伝達事項あり':''}`;
+      mini.addEventListener('click',()=>openLessonDetail(item.id));
+      cell.append(mini);
+    }
+    if(rows.length>3){
+      const more=make('button','month-day-more',`ほか${rows.length-3}件`);more.type='button';
+      more.addEventListener('click',()=>openScheduleDay(date));cell.append(more);
+    }
+    calendar.append(cell);
+  }
+  parent.append(calendar);
+  parent.append(make('p','month-help','日付をタップすると1日表示に切り替わります。授業名をタップすると詳細を開けます。'));
+}
+function renderLessons(){
+  if(!state.user)return;
+  const view=state.scheduleView;
+  const heading=$('displayDate');
+  if(view==='month'){
+    const d=jsDate(state.date);
+    heading.textContent=`${d.getFullYear()}年${d.getMonth()+1}月`;
+  }else if(view==='week'){
+    const start=startOfWeek(state.date),end=datePlus(start,6);
+    heading.textContent=`${start.slice(0,4)}年${prettyDate(start)} 〜 ${start.slice(0,4)===end.slice(0,4)?'':end.slice(0,4)+'年'}${prettyDate(end)}`;
+  }else heading.textContent=`${state.date.slice(0,4)}年${prettyDate(state.date)}`;
+  $('prevDay').setAttribute('aria-label',`前の${view==='day'?'日':view==='week'?'週':'月'}`);
+  $('nextDay').setAttribute('aria-label',`次の${view==='day'?'日':view==='week'?'週':'月'}`);
+  const parent=$('lessonList');parent.replaceChildren();
+  if(view==='week')renderWeekSchedule(parent);
+  else if(view==='month')renderMonthSchedule(parent);
+  else renderDaySchedule(parent);
 }
 function renderTeacherStudents(){
   if(isAdmin()||!state.user)return;
@@ -480,7 +606,7 @@ async function loggedIn(user){
   $('welcomeSub').textContent=isAdmin()?'生徒情報と授業の状況をまとめて管理できます。':'今日の授業・全教師の時間割・生徒情報を確認できます。';
   $('loginPanel').hidden=true;$('appPanel').hidden=false;$('logout').hidden=false;
   $('navCount').hidden=!isAdmin();$('navAdminLessons').hidden=!isAdmin();$('navTeacherLessons').hidden=isAdmin();$('navTeacherStudents').hidden=isAdmin();$('addLesson').hidden=!isAdmin();$('notificationButton').hidden=isAdmin();$('teacherFilterWrap').hidden=isAdmin();
-  $('teacherFilter').value='mine';state.date=todayKey();
+  $('teacherFilter').value='mine';state.date=todayKey();state.scheduleView='day';document.querySelectorAll('[data-schedule-view]').forEach(button=>{const active=button.dataset.scheduleView==='day';button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
   state.unsub.push(onSnapshot(collection(db,'schoolStudents'),snap=>{state.students=snap.docs.map(d=>({id:d.id,...d.data()}));renderAll();},err=>trapError(err,'生徒情報を取得できません')));
   state.unsub.push(onSnapshot(collection(db,'users'),snap=>{state.people=snap.docs.map(d=>({id:d.id,...d.data()}));renderAll();},err=>trapError(err,'教師情報を取得できません')));
   state.unsub.push(onSnapshot(collection(db,'timetableEntries'),snap=>{state.entries=snap.docs.map(d=>({id:d.id,...d.data()}));renderAll();},err=>trapError(err,'時間割を取得できません')));

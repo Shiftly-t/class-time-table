@@ -55,3 +55,45 @@
 /* Student deletion preview: warning is visible on iPad and desktop */
 .delete-warning{background:#fff5f5;color:#97374c;border:1px solid #f3c4cf;border-radius:12px;padding:16px;font-size:13px;line-height:1.9;}
 .modal-actions .danger:disabled{opacity:.55;cursor:not-allowed}
+
+
+/* v3.4: Day / week / month schedule views */
+.schedule-viewbar{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px;margin:4px 0 13px}
+.schedule-view-label{font-size:12px;font-weight:800;color:#69758c}
+.schedule-view-switch{display:inline-flex;gap:3px;padding:4px;border:1px solid #e1e7f2;border-radius:13px;background:#fff}
+.view-choice{min-width:65px;min-height:36px;border:0;border-radius:9px;color:#63708b;background:transparent;font-size:13px;font-weight:800}
+.view-choice:hover{background:#eff2ff}.view-choice.active{background:#4f63e9;color:#fff;box-shadow:0 2px 10px #4f63e921}
+.view-help{margin:0;color:#9aa5b5;font-size:11px}
+.datebar{margin-bottom:13px}.date-center{min-width:225px}.date-center strong{font-size:17px}
+/* Weekly view: seven readable day panels, without squeezing lesson titles. */
+.week-calendar{max-width:none;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:15px}
+.week-day{min-width:0;border:1px solid #e1e7f2;border-radius:15px;background:#fff;padding:13px;display:grid;align-content:start;gap:9px}
+.week-day.is-today{border-color:#8e9cf3;box-shadow:0 0 0 2px #e6eaff}
+.week-day-head{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:0 3px 8px;border-bottom:1px solid #ebeff6}
+.week-day-button{border:0;background:transparent;padding:5px 2px;color:#2d3e63;font-size:15px;font-weight:850;text-align:left;text-decoration:underline;text-decoration-color:#d5dced;text-underline-offset:4px}
+.week-day-button:hover{color:#4358d4}.week-day-count{font-size:11px;font-weight:750;color:#8c96a8;white-space:nowrap}
+.week-day-empty{margin:4px 0 7px;color:#a3acbb;font-size:12px}
+.week-lesson{display:grid;gap:5px;width:100%;background:#f7f9fe;border:1px solid #e8edf8;border-radius:10px;padding:11px 12px;text-align:left;color:#26344d}
+.week-lesson:hover{border-color:#a6b3f3;background:#f1f4ff}.week-lesson-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.week-lesson-time{color:#5163d2;font-size:11px;font-weight:850}.week-student{font-size:13px}.week-meta{font-size:11px;color:#6f7d95}
+.week-memo{font-size:11px;color:#65718a;background:#eef2fb;padding:6px 8px;border-radius:7px;white-space:pre-wrap;overflow-wrap:anywhere}
+.week-lesson.is-absent{border:2px solid #e46571;border-left:5px solid #d52f43;background:#fff1f2}
+.week-lesson.is-absent .week-student{color:#892238}.week-lesson.is-absent .week-lesson-time{color:#a62338}
+.week-absence{color:#bb3047;font-size:11px}.week-done{font-size:10px;color:#728097;font-weight:700}
+/* Monthly overview; a fixed seven-column grid can scroll on narrow iPad panes. */
+.month-calendar-wrap{max-width:none;display:block;overflow-x:auto;padding-bottom:5px}
+.month-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;min-width:770px}
+.month-weekday{text-align:center;font-size:12px;color:#8592a7;font-weight:800;padding:10px 3px}
+.month-day{min-height:124px;min-width:0;border:1px solid #e5eaf3;border-radius:10px;background:#fff;padding:6px;display:flex;flex-direction:column;gap:4px}
+.month-day.is-outside{background:#f4f6fa;border-color:#f4f6fa}
+.month-day.is-today{border:2px solid #798bed;background:#f9faff;padding:5px}
+.month-day-head{min-height:24px;background:transparent;border:0;color:#495670;display:flex;align-items:center;justify-content:space-between;gap:3px;text-align:left;padding:1px 3px;border-radius:6px}
+.month-day-head:hover{background:#eff2ff}.month-day-number{font-size:12px;font-weight:850}
+.month-day.is-today .month-day-number{color:#4358d4}
+.month-day-count{font-size:9px;color:#98a2b5;font-weight:800;white-space:nowrap}
+.month-event{display:block;width:100%;border:0;background:#eef1ff;border-radius:5px;color:#4b5db7;text-align:left;padding:5px;font-size:10px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.month-event:hover{background:#dfe5ff}.month-event.is-absent{background:#ffe5e9;color:#9a263a;border-left:3px solid #d52f43;font-weight:750}
+.month-day-more{border:0;background:transparent;color:#5366ce;font-size:10px;text-align:left;padding:4px 2px;font-weight:750}
+.month-help{margin:12px 5px 2px;color:#8390a8;font-size:12px}
+@media(min-width:1200px){.week-calendar{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:690px){.week-calendar{grid-template-columns:1fr}.schedule-viewbar{justify-content:flex-start}.view-help{flex-basis:100%}.datebar{gap:9px;padding:12px 8px}.date-center{min-width:0;flex:1}.date-center strong{font-size:14px}.date-arrow{flex:0 0 40px}.month-calendar{min-width:770px}}
