@@ -321,49 +321,49 @@ function renderLessons(){
   else if(view==='month')renderMonthSchedule(parent);
   else renderDaySchedule(parent);
 }
-function renderTeacherStudents(){
-  if(isAdmin()||!state.user)return;
-  const parent=$('teacherStudentList'); parent.replaceChildren();
-  const students=sortedStudents(state.students,$('teacherStudentSearch').value,$('teacherStudentLevel').value,$('teacherStudentSort').value);
-  $('teacherStudentResults').textContent=`${students.length}名を表示 / 全${state.students.length}名`;
-  if(!students.length){parent.append(make('div','empty','条件に合う生徒がいません。'));return;}
-  const groupOrder=['elementary','middle','high','other'];
+// The admin and teacher directories use the exact same table-rendering path.
+// Teacher rows never have an edit/action column or write handlers.
+function renderStudentTable({searchId, levelId, sortId, resultsId, rowsId, canEdit}){
+  const search=$(searchId).value;
+  const sort=$(sortId).value;
+  const students=sortedStudents(state.students,search,$(levelId).value,sort);
+  $(resultsId).textContent=`${students.length}名を表示 / 全${state.students.length}名`;
+  const tbody=$(rowsId);tbody.replaceChildren();
+  const columns=canEdit?7:6;
+  if(!students.length){
+    const tr=make('tr');const td=cell(tr,'条件に合う生徒がいません');td.colSpan=columns;tbody.append(tr);return;
+  }
   const labels={elementary:'小学生',middle:'中学生',high:'高校生',other:'その他・未分類'};
   let lastGroup='';
-  for(const s of students){
-    const group=gradeInfo(s.grade).level;
-    if(['gradeAsc','gradeDesc'].includes($('teacherStudentSort').value) && group!==lastGroup){
-      parent.append(make('div','directory-group-title',labels[group]));lastGroup=group;
+  for(const student of students){
+    const group=gradeInfo(student.grade).level;
+    if(['gradeAsc','gradeDesc'].includes(sort)&&group!==lastGroup){
+      const groupRow=make('tr','group-row');const td=cell(groupRow,labels[group]);td.colSpan=columns;
+      tbody.append(groupRow);lastGroup=group;
     }
-    const card=make('article','student-directory-card');
-    card.append(make('h3','',s.name||'生徒名未登録'));
-    card.append(make('p','',[s.grade,s.school].filter(Boolean).join(' / ')||'学年・学校の登録なし'));
-    for(const [label,value] of [['通常授業',regularDescription(s)],['教材',s.textbook],['備考',s.remarks]]){
-      if(!value||value==='―')continue;
-      card.append(make('div','directory-label',label));card.append(make('p','',value));
+    const tr=make('tr');
+    cell(tr,student.name||'―','student-name-cell');
+    cell(tr,student.grade||'―');
+    cell(tr,student.school||'―');
+    cell(tr,regularDescription(student),'regular-cell');
+    cell(tr,student.textbook||'―');
+    cell(tr,student.remarks||'―','remarks-cell');
+    if(canEdit){
+      const action=cell(tr,'');
+      const edit=make('button','mini-button','編集');edit.type='button';
+      edit.addEventListener('click',()=>openStudent(student.id));
+      action.append(edit);
     }
-    parent.append(card);
+    tbody.append(tr);
   }
+}
+function renderTeacherStudents(){
+  if(isAdmin()||!state.user)return;
+  renderStudentTable({searchId:'teacherStudentSearch',levelId:'teacherStudentLevel',sortId:'teacherStudentSort',resultsId:'teacherStudentResults',rowsId:'teacherStudentRows',canEdit:false});
 }
 function renderCount(){
   if(!isAdmin())return;
-  const search=$('studentSearch').value;
-  const filtered=sortedStudents(state.students,search,$('studentLevel').value,$('studentSort').value);
-  $('studentResults').textContent=`${filtered.length}名を表示 / 全${state.students.length}名`;
-  const tbody=$('countRows');tbody.replaceChildren();
-  if(!filtered.length){const tr=make('tr');const td=cell(tr,'条件に合う生徒がいません');td.colSpan=7;tbody.append(tr);return;}
-  const labels={elementary:'小学生',middle:'中学生',high:'高校生',other:'その他・未分類'};
-  let lastGroup='';
-  for(const student of filtered){
-    const group=gradeInfo(student.grade).level;
-    if(['gradeAsc','gradeDesc'].includes($('studentSort').value) && group!==lastGroup){
-      const groupRow=make('tr','group-row');const td=cell(groupRow,labels[group]);td.colSpan=7;tbody.append(groupRow);lastGroup=group;
-    }
-    const tr=make('tr');
-    cell(tr,student.name||'―','student-name-cell');cell(tr,student.grade||'―');cell(tr,student.school||'―');
-    cell(tr,regularDescription(student),'regular-cell');cell(tr,student.textbook||'―');cell(tr,student.remarks||'―','remarks-cell');
-    const action=cell(tr,'');const edit=make('button','mini-button','編集');edit.type='button';edit.addEventListener('click',()=>openStudent(student.id));action.append(edit);tbody.append(tr);
-  }
+  renderStudentTable({searchId:'studentSearch',levelId:'studentLevel',sortId:'studentSort',resultsId:'studentResults',rowsId:'countRows',canEdit:true});
 }
 function renderNoticeButton(){
   if(isAdmin())return;
