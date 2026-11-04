@@ -107,3 +107,64 @@
 .is-absent .week-split-tag{color:#ad3444}
 
 .slot-display-hint{font-size:11px;color:#7b879d;text-align:center;margin:-3px 0 20px}
+
+/* iPad Safari: keep dialog save actions reachable with the on-screen keyboard. */
+.modal-content{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scroll-padding-bottom:82px}
+.modal-content > .modal-actions{position:sticky;bottom:0;z-index:2;background:#fff;padding:12px 0 max(2px,env(safe-area-inset-bottom));border-top:1px solid #eef1f7}
+.modal-actions button,.stack button[type="submit"]{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+
+/* Shiftly v1.0: make the recurring lesson editor fit its dialog on iPad and desktop.
+   Older styles used seven columns based on window width even though the dialog
+   itself was only 600px wide; the form overflowed its visible area. */
+#studentDialog {
+  width: min(860px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+}
+#studentDialog .modal-content,
+#studentDialog .form-grid,
+#studentDialog .regular-editor,
+#studentDialog .regular-rows,
+#studentDialog .regular-row {
+  min-width: 0;
+  max-width: 100%;
+}
+#studentDialog .regular-heading {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+#studentDialog .regular-heading > div {
+  min-width: 0;
+  flex: 1 1 240px;
+}
+#studentDialog .regular-heading .mini-button {
+  white-space: normal;
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-height: 40px;
+}
+#studentDialog .regular-row {
+  /* Responsive to the actual available form width, not the screen width. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 12px;
+  align-items: end;
+}
+#studentDialog .regular-row label {
+  min-width: 0;
+  max-width: 100%;
+}
+#studentDialog .regular-row :is(input,select) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+#studentDialog .regular-row .danger-soft {
+  grid-column: 1 / -1;
+  justify-self: end;
+  width: min(100%, 120px);
+}
+@media (max-width: 500px) {
+  #studentDialog .regular-editor { padding: 12px; }
+  #studentDialog .regular-row { padding: 10px; gap: 10px; }
+  #studentDialog .regular-row .danger-soft { width: 100%; }
+}

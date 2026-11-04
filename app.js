@@ -123,6 +123,40 @@ function showDialog(id) { $(id).showModal(); }
 function closeDialog(id) { $(id).close(); }
 document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>closeDialog(button.dataset.close)));
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+
+// iPad Safari: when an input/textarea still has focus, the first tap on a
+// dialog's Save button can be consumed by the virtual keyboard dismissing.
+// Treat that touch as an explicit form submission while retaining native
+// required-field validation and the existing Firebase save handlers.
+function enableOneTapSave(formId) {
+  const form = $(formId);
+  const save = form.querySelector('button[type="submit"]');
+  if (!save) return;
+
+  function submitFromFocusedField(event) {
+    const active = document.activeElement;
+    // Do not intercept mouse/keyboard clicks or touches unrelated to an
+    // active input in this form. Native form submission remains the default.
+    if (event.type === 'pointerdown' && event.pointerType !== 'touch') return;
+    if (event.isPrimary === false || save.disabled || !active || active === save ||
+        !form.contains(active) || !['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) ||
+        active.type === 'hidden') return;
+    if (event.cancelable) event.preventDefault();
+    // reportValidity() highlights the first missing field as usual.
+    if (!form.reportValidity()) return;
+    // Blurring commits Japanese IME input before collecting form values.
+    active.blur();
+    form.requestSubmit(save);
+  }
+
+  if (window.PointerEvent) {
+    save.addEventListener('pointerdown', submitFromFocusedField, {passive:false});
+  } else {
+    save.addEventListener('touchstart', submitFromFocusedField, {passive:false});
+  }
+}
+['studentForm', 'lessonForm', 'memoForm'].forEach(enableOneTapSave);
+
 function resetSubscriptions(){state.unsub.forEach(fn=>fn());state.unsub=[];}
 function nav(page) {
   state.page=page;
