@@ -57,8 +57,27 @@ function regularDescription(student){
     }).join('\n');
 }
 
+// A regular occurrence may have been saved as a separate Firestore document when
+// someone edited that day's lesson or memo. If its parent weekly slot is later
+// removed or moved to another weekday, don't show the obsolete future lesson.
+// Historical entries stay visible to preserve records, and independently added
+// one-off lessons are never removed by changing a weekly schedule.
+function isCurrentRegularOccurrence(entry){
+  if(!entry.regularId)return true;
+  const student=state.students.find(s=>s.id===entry.studentId);
+  const slot=student?.regularSlots?.[entry.regularId];
+  if(!slot)return false;
+  const [year,month,day]=entry.date.split('-').map(Number);
+  const weekday=new Date(year,month-1,day).getDay();
+  return Number(slot.weekday)===weekday
+    && (!slot.activeFrom || entry.date>=slot.activeFrom)
+    && (!slot.activeUntil || entry.date<=slot.activeUntil);
+}
+function isVisibleEntry(entry){
+  return !entry.regularId || entry.date<todayKey() || isCurrentRegularOccurrence(entry);
+}
 function lessonsOnDate(date){
-  const stored = state.entries.filter(e=>e.date===date);
+  const stored = state.entries.filter(e=>e.date===date && isVisibleEntry(e));
   const storedIds = new Set(stored.map(e=>e.id));
   const weekday = new Date(...date.split('-').map((n,i)=>i===1?Number(n)-1:Number(n))).getDay();
   const result = [...stored];
@@ -79,7 +98,7 @@ function lessonsOnDate(date){
 }
 function lessonById(id){return state.entries.find(e=>e.id===id) || lessonsOnDate(state.date).find(e=>e.id===id);}
 function futureDatesForLesson(lesson){
-  const dates=new Set(state.entries.filter(e=>e.studentId===lesson.studentId && e.date>lesson.date && e.status!=='cancelled').map(e=>e.date));
+  const dates=new Set(state.entries.filter(e=>e.studentId===lesson.studentId && e.date>lesson.date && e.status!=='cancelled' && isVisibleEntry(e)).map(e=>e.date));
   // 16 weeks is enough for recurring lessons; one-off distant dates are included above.
   for(let offset=1;offset<=112;offset++){
     const date=datePlus(lesson.date,offset);
@@ -137,9 +156,10 @@ function renderLessons() {
   for(const item of rows){
     const time=`${item.start} – ${item.end}`;
     if(time!==lastTime){parent.append(make('div','time-group-title',time)); lastTime=time;}
-    const card=make('button','lesson-card');card.type='button';
+    const card=make('button',item.status==='cancelled'?'lesson-card is-absent':'lesson-card');card.type='button';
     const headline=make('div','lesson-topline');headline.append(make('span','lesson-time',time));
-    const st=item.status==='done'?'実施済':item.status==='cancelled'?'休講':'予定';headline.append(make('span','state-tag',st));card.append(headline);
+    const st=item.status==='done'?'実施済':item.status==='cancelled'?'欠席':'予定';headline.append(make('span',item.status==='cancelled'?'state-tag absent-tag':'state-tag',st));
+    headline.append(make('span','origin-tag',item.regularId?'通常授業':'個別登録'));card.append(headline);
     card.append(make('div','lesson-student',`${item.grade||''} ${item.studentName||'生徒名未登録'}`));
     card.append(make('div','lesson-meta',`${item.subject||'教科未登録'}　/　${item.teacherName||'担当教師未登録'}`));
     if(item.memo?.trim())card.append(make('div','memo-preview',item.memo.length>170?item.memo.slice(0,170)+'…':item.memo));
@@ -357,6 +377,7 @@ function openLessonDetail(id){
   state.activeLesson=id;
   $('detailTitle').textContent=lesson.studentName||'授業詳細';
   $('detailDate').textContent=`${prettyDate(lesson.date)} ${lesson.start}〜${lesson.end}`;
+  $('detailAbsenceStatus').hidden=lesson.status!=='cancelled';
   $('detailSubject').textContent=lesson.subject;
   $('detailTeacher').textContent=lesson.teacherName;
   $('detailGrade').textContent=[lesson.grade,lesson.school].filter(Boolean).join(' / ');

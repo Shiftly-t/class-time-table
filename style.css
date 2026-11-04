@@ -34,3 +34,20 @@
 .directory-group-title{grid-column:1/-1;font-weight:850;font-size:14px;color:#576ad4;padding:15px 5px 1px;border-bottom:1px solid #e4e9f7}
 @media(max-width:720px){.student-toolbar{flex-wrap:wrap}.student-toolbar label{flex:1 1 140px}.student-toolbar label.grow{flex:1 1 100%}}
 .student-toolbar label:first-child{max-width:none}
+
+/* Clarify whether the lesson is a generated weekly class or a standalone entry. */
+.origin-tag{display:inline-flex;align-items:center;border:1px solid #e3e8f4;color:#67748c;background:#f8faff;border-radius:99px;padding:3px 9px;font-size:10px;font-weight:700;margin-left:auto;white-space:nowrap}
+
+
+/* v3.2: 欠席は文字だけでなくカード全体でも明確に区別する */
+.lesson-card.is-absent{background:#fff1f2;border:2px solid #e46571;border-left:6px solid #d52f43;box-shadow:0 4px 16px #b91c1c13}
+.lesson-card.is-absent:hover,.lesson-card.is-absent:focus-visible{background:#ffe6e9;border-color:#cc263b}
+.lesson-card.is-absent .lesson-time{background:#ffe0e4;color:#a62338}
+.lesson-card.is-absent .lesson-student{color:#892238}
+.lesson-card.is-absent .memo-preview{background:#fff6f7;border-left-color:#df6a79}
+.state-tag.absent-tag,.detail-absence-status{display:inline-flex;align-items:center;border:1px solid #d83b50;border-radius:999px;background:#cb263e;color:white;padding:5px 12px;font-weight:850;letter-spacing:.03em;white-space:nowrap}
+.state-tag.absent-tag{font-size:12px}
+.detail-absence-status{margin-top:7px;font-size:12px;justify-self:start}
+.detail-absence-status[hidden]{display:none!important}
+.absence-legend{max-width:800px;margin:0 auto 12px;display:flex;align-items:center;gap:8px;font-size:12px;color:#834250}
+.absence-legend-mark{display:inline-block;width:12px;height:12px;flex:none;border-radius:3px;background:#df4255}
