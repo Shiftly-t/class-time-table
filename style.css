@@ -168,3 +168,7 @@
   #studentDialog .regular-row { padding: 10px; gap: 10px; }
   #studentDialog .regular-row .danger-soft { width: 100%; }
 }
+
+
+/* v1.0.1: employee lesson notes are strictly read-only, including on iPad. */
+.memo-readonly{min-height:100px;margin-top:16px;padding:15px 16px;background:#f6f8fd;border:1px solid #e3e9f4;border-radius:11px;white-space:pre-wrap;overflow-wrap:anywhere;color:#33425c;font-size:13px;line-height:1.85;user-select:text;-webkit-user-select:text}

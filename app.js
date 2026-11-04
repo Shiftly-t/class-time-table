@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
-import { getFirestore, collection, doc, getDoc, getDocs, query, where, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+import { getFirestore, collection, doc, getDoc, getDocs, query, where, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
 const fbApp = initializeApp(firebaseConfig);
@@ -168,7 +168,7 @@ function nav(page) {
   else if(page==='students')renderTeacherStudents();
   else {
     $('scheduleHeading').textContent=isAdmin()?'授業管理':'今日の時間割';
-    $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'全教師の時間割を確認し、伝達事項を共有できます。';
+    $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'全教師の時間割と伝達事項を閲覧できます。';
     renderLessons();
   }
 }
@@ -399,18 +399,19 @@ function renderCount(){
   if(!isAdmin())return;
   renderStudentTable({searchId:'studentSearch',levelId:'studentLevel',sortId:'studentSort',resultsId:'studentResults',rowsId:'countRows',canEdit:true});
 }
+// All staff notifications are read-only. A teacher must never update Firestore,
+// including the read flag; do not show a persistent unread badge that cannot clear.
 function renderNoticeButton(){
-  if(isAdmin())return;
-  const unread=state.notices.filter(n=>!n.read).length;
-  $('noticeCount').hidden=unread===0;$('noticeCount').textContent=unread>99?'99+':unread;
+  $('noticeCount').hidden=true;
 }
 function renderNotifications(){
   const parent=$('notificationList');parent.replaceChildren();
-  if(!state.notices.length){parent.append(make('div','empty','新しいお知らせはありません。'));return;}
+  if(!state.notices.length){parent.append(make('div','empty','お知らせはありません。'));return;}
   for(const n of [...state.notices].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).slice(0,50)){
-    const node=make('div','notification'+(n.read?'':' unread'));node.append(make('strong','',n.message||'授業が変更されました'));
-    const time=n.createdAt?.toDate?.();node.append(make('small','',time?time.toLocaleString('ja-JP'):'日時情報なし'));
-    if(!n.read){const btn=make('button','mini-button','確認済みにする');btn.type='button';btn.addEventListener('click',async()=>{try{await updateDoc(doc(db,'notifications',state.user.uid,'items',n.id),{read:true});}catch(e){trapError(e,'通知の更新に失敗しました')}});node.append(btn);}
+    const node=make('div','notification');
+    node.append(make('strong','',n.message||'授業が変更されました'));
+    const time=n.createdAt?.toDate?.();
+    node.append(make('small','',time?time.toLocaleString('ja-JP'):'日時情報なし'));
     parent.append(node);
   }
 }
@@ -449,6 +450,7 @@ function collectRegularSlots(){
 }
 
 function openStudent(id){
+  if(!isAdmin())return;
   const student=state.students.find(s=>s.id===id);
   $('studentForm').reset();$('studentId').value=id||'';$('studentDialogTitle').textContent=student?'生徒情報を編集':'生徒を登録';$('deleteStudent').hidden=!student;
   for(const [field,key] of [['studentName','name'],['studentGrade','grade'],['studentSchool','school'],['studentTextbook','textbook'],['studentRemarks','remarks']])$(field).value=student?.[key]||'';
@@ -560,7 +562,6 @@ function openLessonForm(id=''){
   if(!isAdmin())return;
   if(!state.students.length||!state.people.length){showMessage('先に生徒と担当教師のアカウントを登録してください。');return;}
   const lesson=lessonById(id);
-  if(!isAdmin()&&!lesson)return;
   $('lessonForm').reset();$('lessonId').value=id;$('lessonFormTitle').textContent=lesson?'授業を編集':'授業を登録';
   const isRegular=Boolean(lesson?.regularId);
   $('deleteLesson').hidden=!lesson||!isAdmin()||Boolean(lesson?.virtual);
@@ -585,7 +586,6 @@ $('lessonForm').addEventListener('submit',async event=>{
   event.preventDefault();if(!isAdmin())return;
   const id=$('lessonId').value||doc(collection(db,'timetableEntries')).id;
   const old=lessonById(id);
-  if(!isAdmin()&&!old){showMessage('既存授業のみ編集できます。');return;}
   const student=state.students.find(s=>s.id===$('lessonStudent').value);
   const teacher=state.people.find(p=>p.id===$('lessonTeacher').value);
   const date=$('lessonDate').value,start=$('lessonStart').value,end=$('lessonEnd').value;
@@ -595,15 +595,11 @@ $('lessonForm').addEventListener('submit',async event=>{
   if(!data.subject){showMessage('教科を入力してください。');return;}
   const btn=event.submitter;btn.disabled=true;
   try{
-    if(isAdmin()){
-      const batch=writeBatch(db);batch.set(doc(db,'timetableEntries',id),data);
-      const affected=[teacher.id];if(old?.teacherUid&&old.teacherUid!==teacher.id)affected.push(old.teacherUid);
-      await sendNotifications(affected,old?'担当授業の予定が更新されました':'新しい担当授業が登録されました',date,batch);
-      await batch.commit();
-    } else {
-      if(old?.virtual)await setDoc(doc(db,'timetableEntries',id),data);else await updateDoc(doc(db,'timetableEntries',id),data);
-    }
-    closeDialog('lessonFormDialog');showMessage(isAdmin()?'授業を保存し、関係する担当教師に通知しました。':'授業の変更を保存しました。');
+    const batch=writeBatch(db);batch.set(doc(db,'timetableEntries',id),data);
+    const affected=[teacher.id];if(old?.teacherUid&&old.teacherUid!==teacher.id)affected.push(old.teacherUid);
+    await sendNotifications(affected,old?'担当授業の予定が更新されました':'新しい担当授業が登録されました',date,batch);
+    await batch.commit();
+    closeDialog('lessonFormDialog');showMessage('授業を保存し、関係する担当教師に通知しました。');
   }catch(e){trapError(e,'授業の保存に失敗しました');}finally{btn.disabled=false;}
 });
 $('deleteLesson').addEventListener('click',async()=>{
@@ -630,26 +626,30 @@ function openLessonDetail(id){
   const upcoming=futureDatesForLesson(lesson);
   if(upcoming.length){upcoming.forEach((date,i)=>dates.append(make('div','future-date',`${i===0?'次回':'次々回'}：${prettyDate(date)}`)));}
   else dates.append(make('div','future-date','今後の来塾予定はまだ登録されていません。'));
-  $('memoContent').value=lesson.memo||'';$('editLesson').hidden=!isAdmin();showDialog('detailDialog');
+  // Employees see plain text only; no editable field or save button.
+  const admin=isAdmin();
+  $('memoForm').hidden=!admin;
+  $('memoReadOnly').hidden=admin;
+  $('memoReadOnly').textContent=lesson.memo?.trim()||'伝達事項はありません。';
+  $('memoContent').value=admin?(lesson.memo||''):'';
+  $('editLesson').hidden=!admin;
+  showDialog('detailDialog');
 }
 $('editLesson').addEventListener('click',()=>{if(!isAdmin())return;const id=state.activeLesson;closeDialog('detailDialog');openLessonForm(id);});
 $('memoForm').addEventListener('submit',async event=>{
-  event.preventDefault();const lesson=lessonById(state.activeLesson);if(!lesson)return;
+  event.preventDefault();
+  if(!isAdmin())return; // UI protection; Firestore Rules enforce this on the server.
+  const lesson=lessonById(state.activeLesson);if(!lesson)return;
   const content=$('memoContent').value.trim();const button=event.submitter;button.disabled=true;
   try{
-    if(isAdmin()){
-      const batch=writeBatch(db);
-      if(lesson.virtual){const {id,virtual,...stored}=lesson;batch.set(doc(db,'timetableEntries',lesson.id),{...stored,memo:content,memoUpdatedAt:serverTimestamp()});}
-      else batch.update(doc(db,'timetableEntries',lesson.id),{memo:content,memoUpdatedAt:serverTimestamp()});
-      await sendNotifications([lesson.teacherUid],'担当授業の伝達事項が更新されました',lesson.date,batch);
-      await batch.commit();
-    } else {
-      if(lesson.virtual){const {id,virtual,...stored}=lesson;await setDoc(doc(db,'timetableEntries',lesson.id),{...stored,memo:content,memoUpdatedAt:serverTimestamp()});}
-      else await updateDoc(doc(db,'timetableEntries',lesson.id),{memo:content,memoUpdatedAt:serverTimestamp()});
-    }
+    const batch=writeBatch(db);
+    if(lesson.virtual){const {id,virtual,...stored}=lesson;batch.set(doc(db,'timetableEntries',lesson.id),{...stored,memo:content,memoUpdatedAt:serverTimestamp()});}
+    else batch.update(doc(db,'timetableEntries',lesson.id),{memo:content,memoUpdatedAt:serverTimestamp()});
+    await sendNotifications([lesson.teacherUid],'担当授業の伝達事項が更新されました',lesson.date,batch);
+    await batch.commit();
     closeDialog('detailDialog');showMessage('伝達事項を保存しました。時間割にも反映されます。');
   }
-  catch(e){trapError(e,'メモの保存に失敗しました');}finally{button.disabled=false;}
+  catch(e){trapError(e,'伝達事項の保存に失敗しました');}finally{button.disabled=false;}
 });
 function loggedOut(){
   resetSubscriptions();state.user=null;state.profile=null;state.entries=[];state.students=[];state.people=[];state.notices=[];
