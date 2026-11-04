@@ -10,11 +10,36 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if false;
     }
-    match /requests/{id} {
-      allow read: if signedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
-      allow create, update: if signedIn() && request.resource.data.keys().hasOnly(['uid','date','start','end','note']) && request.resource.data.keys().hasAll(['uid','date','start','end','note']) && request.resource.data.uid == request.auth.uid && id == request.auth.uid + '_' + request.resource.data.date && validDate(request.resource.data) && validTimes(request.resource.data) && request.resource.data.note is string && request.resource.data.note.size() <= 200;
-      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
-    }
+
+match /requests/{id} {
+  allow read: if signedIn() &&
+    (isAdmin() || resource.data.uid == request.auth.uid);
+
+  function validRequest() {
+    return signedIn()
+      && request.resource.data.keys().hasOnly(
+        ['uid','date','start','end','note'])
+      && request.resource.data.keys().hasAll(
+        ['uid','date','start','end','note'])
+      && request.resource.data.uid == request.auth.uid
+      && id == request.auth.uid + '_' +
+         request.resource.data.date
+      && validDate(request.resource.data)
+      && validTimes(request.resource.data)
+      && request.resource.data.note is string
+      && request.resource.data.note.size() <= 200;
+  }
+
+  allow create: if validRequest();
+
+  allow update: if validRequest()
+    && resource.data.uid == request.auth.uid
+    && resource.data.date == request.resource.data.date;
+
+  allow delete: if signedIn()
+    && resource.data.uid == request.auth.uid;
+}
+  
     match /shifts/{id} {
       allow read: if signedIn();
       allow create, update: if isAdmin() && request.resource.data.keys().hasOnly(['uid','date','start','end']) && request.resource.data.keys().hasAll(['uid','date','start','end']) && request.resource.data.uid is string && exists(/databases/$(database)/documents/users/$(request.resource.data.uid)) && id == request.resource.data.uid + '_' + request.resource.data.date && validDate(request.resource.data) && validTimes(request.resource.data);
