@@ -1238,16 +1238,21 @@ $('editorNewForm').addEventListener('submit',event=>{
 });
 $('editorRemoveDraft').addEventListener('click',()=>{
   const id=courseEditor.selectedId;
-  if(!id||courseEditor.originals.has(id))return;
-  courseEditor.history.push({id,previous:{...courseEditor.draft.get(id)}});
-  courseEditor.draft.delete(id);courseEditor.selectedId='';renderCourseEditor();
+  if(!id||!courseEditor.draft.has(id))return;
+  const item=courseEditor.draft.get(id);
+  if(item.status!=='scheduled'){showMessage('実施済み・欠席の授業はエディターから削除できません。');return;}
+  if(!confirm(`${item.studentName||'この生徒'}の講習授業を削除しますか？\n「確定して反映」を押すまでFirebaseからは削除されません。`))return;
+  courseEditor.history.push({id,previous:{...item},wasDeleted:courseEditor.deleted.has(id)});
+  courseEditor.draft.delete(id);
+  if(courseEditor.originals.has(id))courseEditor.deleted.add(id);
+  courseEditor.selectedId='';renderCourseEditor();
 });
 
 // Spreadsheet-style seasonal course editor. All drag/tap edits are local drafts
 // until an administrator explicitly publishes the changed entries.
 let courseEditor;
 function resetCourseEditor(){
-  courseEditor={courseId:'',date:todayKey(),mode:'day',originals:new Map(),draft:new Map(),history:[],selectedId:'',drag:null,suppressClick:false,busy:false,courseSignature:'',warning:''};
+  courseEditor={courseId:'',date:todayKey(),mode:'day',originals:new Map(),draft:new Map(),history:[],deleted:new Set(),selectedId:'',drag:null,suppressClick:false,busy:false,courseSignature:'',warning:''};
 }
 resetCourseEditor();
 const courseEditorKey=e=>JSON.stringify([e?.courseId||'',e?.studentId||'',e?.date||'',e?.start||'',e?.end||'',e?.teacherUid||'',e?.status||'']);
@@ -1259,7 +1264,7 @@ const courseEditorSettings=c=>JSON.stringify([
   (Array.isArray(c?.periods)?c.periods:[]).map(p=>[String(p?.start||''),String(p?.end||'')])
 ]);
 function courseEditorChanges(){
-  return [...courseEditor.draft.values()].filter(e=>!courseEditor.originals.has(e.id)||courseEditorKey(e)!==courseEditorKey(courseEditor.originals.get(e.id)));
+  return [...courseEditor.deleted].map(id=>({...courseEditor.originals.get(id),id,_delete:true})).concat([...courseEditor.draft.values()].filter(e=>!courseEditor.originals.has(e.id)||courseEditorKey(e)!==courseEditorKey(courseEditor.originals.get(e.id))));
 }
 function openCourseEditor(id){
   if(!isAdmin())return false;
@@ -1270,7 +1275,7 @@ function openCourseEditor(id){
   courseEditor.date=course.startDate;
   courseEditor.originals=new Map(courseLessons(id).map(e=>[e.id,{...e}]));
   courseEditor.draft=new Map(courseLessons(id).map(e=>[e.id,{...e}]));
-  courseEditor.history=[];courseEditor.selectedId='';courseEditor.warning='';courseEditor.courseSignature=courseEditorSettings(course);
+  courseEditor.history=[];courseEditor.deleted=new Set();courseEditor.selectedId='';courseEditor.warning='';courseEditor.courseSignature=courseEditorSettings(course);
   return true;
 }
 function courseEditorEntries(){return [...courseEditor.draft.values()];}
@@ -1429,7 +1434,8 @@ function renderCourseEditor(){
   $('editorUndo').disabled=!courseEditor.history.length||courseEditor.busy;
   $('editorNew').disabled=!ok||courseEditor.busy;
   if(courseEditor.selectedId&&!courseEditor.draft.has(courseEditor.selectedId))courseEditor.selectedId='';
-  $('editorRemoveDraft').hidden=!courseEditor.selectedId||courseEditor.originals.has(courseEditor.selectedId);
+  $('editorRemoveDraft').hidden=!courseEditor.selectedId;
+  $('editorRemoveDraft').textContent=courseEditor.selectedId&&courseEditor.originals.has(courseEditor.selectedId)?'授業を削除':'仮登録を削除';
   const changes=courseEditorChanges();
   $('editorReset').disabled=!changes.length||courseEditor.busy;
   $('editorSave').disabled=!changes.length||!ok||courseEditor.busy;
@@ -1469,13 +1475,13 @@ $('editorNext').addEventListener('click',()=>{courseEditor.date=datePlus(courseE
 $('editorCancelSelection').addEventListener('click',()=>{courseEditor.selectedId='';renderCourseEditor();});
 $('editorUndo').addEventListener('click',()=>{
   const last=courseEditor.history.pop();if(!last)return;
-  if(last.previous)courseEditor.draft.set(last.id,last.previous);else courseEditor.draft.delete(last.id);courseEditor.selectedId='';renderCourseEditor();
+  if(last.previous)courseEditor.draft.set(last.id,last.previous);else courseEditor.draft.delete(last.id);if(last.wasDeleted)courseEditor.deleted.add(last.id);else courseEditor.deleted.delete(last.id);courseEditor.selectedId='';renderCourseEditor();
 });
 $('editorReset').addEventListener('click',()=>{
   if(!courseEditorChanges().length)return;
   if(!confirm('未反映の変更をすべて破棄し、現在の時間割を読み直しますか？'))return;
   const id=courseEditor.courseId,date=courseEditor.date,mode=courseEditor.mode;
-  courseEditor.draft=new Map();courseEditor.originals=new Map();courseEditor.history=[];
+  courseEditor.draft=new Map();courseEditor.originals=new Map();courseEditor.history=[];courseEditor.deleted=new Set();
   openCourseEditor(id);courseEditor.date=date;courseEditor.mode=mode;renderCourseEditor();
 });
 async function publishCourseEditor(){
@@ -1484,7 +1490,7 @@ async function publishCourseEditor(){
   if(!changes.length||!course)return;
   if(changes.length>150){showMessage('一度に反映できる変更は150件までです。複数回に分けて確定してください。');return;}
   if(courseEditorSettings(course)!==courseEditor.courseSignature){showMessage('講習設定が変更されました。再読み込みしてください。');return;}
-  for(const changed of changes){const error=courseEditorValidate(changed.id,changed);if(error){showMessage(error);return;}}
+  for(const changed of changes.filter(e=>!e._delete)){const error=courseEditorValidate(changed.id,changed);if(error){showMessage(error);return;}}
   if(!confirm(`${changes.length}件の講習授業の変更を確定し、講師の時間割に反映しますか？`))return;
   courseEditor.busy=true;renderCourseEditor();
   try{
@@ -1522,6 +1528,7 @@ async function publishCourseEditor(){
       const availableByUid=new Map(availabilitySnaps.map((snap,i)=>[affected[i],new Set(snap.exists()&&Array.isArray(snap.data().slots)?snap.data().slots:[])]));
       for(const change of changes){
         if(courseEditor.originals.has(change.id) && courseEditorKey(current.get(change.id))!==courseEditorKey(courseEditor.originals.get(change.id)))throw Error('移動対象の授業が変更されました。最新の時間割を確認してください。');
+        if(change._delete){current.delete(change.id);continue;}
         const periodIndex=courseEditorPeriod(course,change);
         if(periodIndex<0||!availableByUid.get(change.teacherUid)?.has(availabilitySlotKey(change.date,periodIndex)))throw Error('講師の勤務希望が変更されたか、未提出です。最新の希望を確認してください。');
         current.set(change.id,{...current.get(change.id),...change});
@@ -1546,6 +1553,7 @@ async function publishCourseEditor(){
         }
       }
       for(const change of changes){
+        if(change._delete){tx.delete(doc(db,'timetableEntries',change.id));continue;}
         const teacher=state.people.find(p=>p.id===change.teacherUid);
         if(!courseEditor.originals.has(change.id)){
           const {id,...entry}=change;tx.set(doc(db,'timetableEntries',change.id),{...entry,teacherName:teacher?.name||change.teacherName});
@@ -1558,9 +1566,9 @@ async function publishCourseEditor(){
       }
     });
     // Update local snapshot immediately; Firestore's real-time listener follows.
-    for(const change of changes){const live=state.entries.find(e=>e.id===change.id);if(live)Object.assign(live,{date:change.date,start:change.start,end:change.end,teacherUid:change.teacherUid,teacherName:change.teacherName});else state.entries.push({...change});}
+    for(const change of changes){if(change._delete){state.entries=state.entries.filter(e=>e.id!==change.id);continue;}const live=state.entries.find(e=>e.id===change.id);if(live)Object.assign(live,{date:change.date,start:change.start,end:change.end,teacherUid:change.teacherUid,teacherName:change.teacherName});else state.entries.push({...change});}
     const id=courseEditor.courseId,date=courseEditor.date,mode=courseEditor.mode;
-    courseEditor.draft=new Map();courseEditor.originals=new Map();courseEditor.history=[];
+    courseEditor.draft=new Map();courseEditor.originals=new Map();courseEditor.history=[];courseEditor.deleted=new Set();
     openCourseEditor(id);courseEditor.date=date;courseEditor.mode=mode;
     showMessage(`${changes.length}件の講習授業を確定して反映しました。`);
     renderAll();
