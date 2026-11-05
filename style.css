@@ -294,3 +294,6 @@
 @media(max-width:680px){.availability-week-controls{justify-content:space-between}.availability-toolbar>label{min-width:100%}.availability-week-controls strong{font-size:10px}.availability-actions button{flex:1}}
 
 .editor-grid .editor-slot.is-closed{background:#fff0f0!important}
+
+/* Notification bell and per-item controls */
+.bell-icon{width:21px;height:21px;display:block;color:#5364c8}.icon-button{display:inline-flex;align-items:center;justify-content:center;min-width:43px;min-height:43px;padding:9px}.notice-count{font-weight:800;min-width:19px;text-align:center}.notification-footer{display:flex;align-items:center;justify-content:space-between;gap:10px}.notification-footer .mini-button{color:#b7455b;margin:0}.notification strong{overflow-wrap:anywhere}
