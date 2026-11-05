@@ -1251,7 +1251,13 @@ function resetCourseEditor(){
 }
 resetCourseEditor();
 const courseEditorKey=e=>JSON.stringify([e?.courseId||'',e?.studentId||'',e?.date||'',e?.start||'',e?.end||'',e?.teacherUid||'',e?.status||'']);
-const courseEditorSettings=c=>JSON.stringify([c?.type,c?.name,c?.startDate,c?.endDate,c?.periods,c?.availabilityDeadline?.seconds||0]);
+// Only scheduling-critical fields belong to the optimistic concurrency guard.
+// Normalize Firestore arrays/objects before comparison; deadline and display name
+// can change without invalidating a draft's lesson dates and period times.
+const courseEditorSettings=c=>JSON.stringify([
+  String(c?.type||''),String(c?.startDate||''),String(c?.endDate||''),
+  (Array.isArray(c?.periods)?c.periods:[]).map(p=>[String(p?.start||''),String(p?.end||'')])
+]);
 function courseEditorChanges(){
   return [...courseEditor.draft.values()].filter(e=>!courseEditor.originals.has(e.id)||courseEditorKey(e)!==courseEditorKey(courseEditor.originals.get(e.id)));
 }
