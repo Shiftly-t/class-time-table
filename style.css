@@ -172,3 +172,26 @@
 
 /* v1.0.1: employee lesson notes are strictly read-only, including on iPad. */
 .memo-readonly{min-height:100px;margin-top:16px;padding:15px 16px;background:#f6f8fd;border:1px solid #e3e9f4;border-radius:11px;white-space:pre-wrap;overflow-wrap:anywhere;color:#33425c;font-size:13px;line-height:1.85;user-select:text;-webkit-user-select:text}
+
+
+/* Whole-school closures: day, week, month, future visits and management. */
+.closure-card{border:2px solid #f0b3b5;background:#fff2f1;color:#9b3338;border-radius:15px;padding:27px 20px;text-align:center;display:grid;gap:10px;min-width:0}
+.closure-title{font-size:23px;font-weight:900;letter-spacing:.07em}
+.closure-note{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+.closure-card.compact{padding:19px 12px;gap:7px;border-width:1px}
+.closure-card.compact .closure-title{font-size:20px}
+.week-day.is-closed{border-color:#eec0c4;background:#fff9f8}
+.week-day.is-closed .week-day-count{color:#b94350;font-weight:850}
+.month-day.is-closed{background:#fff3f3;border-color:#f2b8be}
+.month-closed-label{color:#b52d3d;font-size:11px;font-weight:900}
+.month-closed-note{background:#ffe2e5;color:#a52a40;border-radius:6px;padding:6px;font-size:10px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;max-height:76px;overflow:hidden}
+.future-date.is-closed{background:#fff1f2;border:1px solid #efb9c0;color:#a82d3a}
+.future-date.is-closed strong{font-size:13px}
+.future-closed-note{display:block;padding-top:5px;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.closure-load-warning{background:#fff9e6;color:#805b15;border:1px solid #f4d998;padding:18px;border-radius:12px;text-align:center;line-height:1.7;font-size:13px}
+.closure-list{display:grid;gap:12px;max-width:850px}
+.closure-list-item{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px;background:#fff;border:1px solid #e5eaf2;border-radius:13px}
+.closure-list-info{display:grid;gap:7px;min-width:0}
+.closure-list-info strong{font-size:14px;color:#303c56}
+.closure-list-note{font-size:12px;color:#67758e;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:680px){.closure-list-item{padding:12px}.closure-card{padding:25px 12px}}
