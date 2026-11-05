@@ -221,3 +221,46 @@
 @media(max-width:650px){.course-list-item{flex-direction:column;align-items:stretch}.course-period-row{flex-wrap:wrap}.course-period-row input{width:calc(50% - 30px)}.lesson-time-inputs{grid-template-columns:1fr}}
 
 #lessonNormalTime[hidden], #lessonCoursePeriodWrap[hidden], #lessonCourseHint[hidden], #coursesPage[hidden], #courseDialog[hidden] {display:none!important;}
+
+/* Course planner: unpublished local edits, pointer/touch and tap-to-move. */
+#courseEditorPage{max-width:none}
+.editor-toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:end;padding:15px;margin:0 0 13px}
+.editor-toolbar>label{flex:1 1 200px;max-width:330px}
+.editor-mode-switch{display:flex;flex-wrap:wrap;background:#f0f3ff;border:1px solid #dfe5ff;border-radius:12px;padding:3px;gap:2px}
+.editor-mode-switch .view-choice{font-size:12px;min-width:115px}
+.editor-day-nav{display:flex;gap:8px;align-items:flex-end;margin-left:auto}
+.editor-day-nav label{width:155px}
+.editor-day-nav button{font-weight:900;font-size:20px;min-width:43px;height:43px;padding:5px}
+.editor-guide{margin-bottom:13px}
+.editor-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+#editorStatus{font-size:13px;color:#2e4367}
+.editor-action-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.editor-action-buttons button{min-height:42px}
+.editor-action-buttons button:disabled{opacity:.45;cursor:default}
+.editor-warning{background:#fff5df;border:1px solid #f0d49b;border-radius:9px;color:#85591b;padding:12px;white-space:pre-wrap;font-size:12px;margin:0 0 12px}
+.editor-grid-wrap{overflow:auto;max-height:min(72vh,850px);min-height:250px;max-width:100%;border:1px solid #dfe5f1;background:#fff;border-radius:14px;overscroll-behavior:contain}
+.editor-grid{border-collapse:separate;border-spacing:0;min-width:790px;width:100%;table-layout:fixed}
+.editor-grid th,.editor-grid td{border-right:1px solid #e8edf7;border-bottom:1px solid #e8edf7;vertical-align:top}
+.editor-grid thead th{position:sticky;top:0;z-index:4;background:#eef2fb;color:#35496b;font-size:12px;padding:12px 7px;text-align:center;min-width:150px}
+.editor-grid .editor-period-heading{position:sticky;left:0;z-index:3;width:125px;min-width:125px;background:#f5f7fc;color:#4a5c7d;padding:12px 8px;text-align:center;font-size:12px}
+.editor-grid thead .editor-period-heading{z-index:6;background:#e9edfa}
+.editor-grid .editor-slot{position:relative;min-width:145px;min-height:96px;background:white;padding:8px;transition:background .1s;cursor:cell;outline-offset:-3px}
+.editor-grid .editor-slot:hover{background:#f8faff}
+.editor-grid .editor-slot.is-target{background:#e6f4ff;box-shadow:inset 0 0 0 3px #6a96e1}
+.editor-grid .editor-slot.is-blocked{background:#fff2f2;cursor:not-allowed}
+.editor-grid .editor-slot.is-blocked.is-target{box-shadow:inset 0 0 0 3px #c04a4a}
+.editor-grid .editor-slot.is-full{background:#fcfdff}
+.editor-grid .editor-slot.is-closed{background:#fff0f0;color:#a52d3d}
+.editor-slot-note{font-size:11px;color:#8f9ab0;margin-bottom:6px}
+.editor-slot-bag{display:grid;gap:7px}
+.editor-lesson{width:100%;display:grid;gap:3px;text-align:left;min-height:64px;padding:9px;border:1px solid #bfcdf0;border-left:4px solid #657bdb;border-radius:9px;background:#eef2ff;color:#2f4166;box-shadow:0 1px 3px #23386811;cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
+.editor-lesson strong{font-size:12px;overflow-wrap:anywhere}
+.editor-lesson small{font-size:10px;line-height:1.45;color:#53617e;overflow-wrap:anywhere}
+.editor-lesson.selected{background:#dce8ff;border-color:#466ad7;box-shadow:0 0 0 2px #667de8}
+.editor-lesson.dragging{opacity:.42;cursor:grabbing}
+.editor-lesson.is-absent{background:#fff0f3;border-color:#e3a8b5;border-left-color:#ce5267;cursor:not-allowed}
+.editor-lesson.is-done{background:#eef7f1;border-color:#a7d4b8;border-left-color:#4a9f6d;cursor:not-allowed}
+.editor-slot-empty{font-size:10px;color:#acb6c7;min-height:28px;display:flex;align-items:center;justify-content:center}
+.editor-slot.is-closed .editor-slot-empty{color:#a52d3d;font-weight:800}
+.editor-footnote{font-size:12px;color:#7e8ba3;line-height:1.8;margin:13px 2px}
+@media(max-width:650px){.editor-toolbar>label{max-width:none}.editor-day-nav{margin-left:0}.editor-guide{font-size:11px}.editor-actions{align-items:stretch}.editor-action-buttons{width:100%}.editor-action-buttons button{flex:1 1 auto}}
