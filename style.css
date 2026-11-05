@@ -264,3 +264,33 @@
 .editor-slot.is-closed .editor-slot-empty{color:#a52d3d;font-weight:800}
 .editor-footnote{font-size:12px;color:#7e8ba3;line-height:1.8;margin:13px 2px}
 @media(max-width:650px){.editor-toolbar>label{max-width:none}.editor-day-nav{margin-left:0}.editor-guide{font-size:11px}.editor-actions{align-items:stretch}.editor-action-buttons{width:100%}.editor-action-buttons button{flex:1 1 auto}}
+
+/* Seasonal availability + direct registration in the course board */
+.availability-toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:13px;margin-bottom:16px}
+.availability-toolbar>label{min-width:210px;flex:1 1 220px}
+.availability-week-controls{display:flex;align-items:center;justify-content:center;gap:12px;flex:1 1 320px}
+.availability-week-controls strong{font-size:12px;white-space:nowrap}
+.availability-deadline{flex-basis:100%;font-size:12px;color:#5d6a80;margin:0}
+.availability-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#566982;margin:9px 0 12px}
+#availabilityEditingState{font-weight:750;color:#5262b0}
+.availability-grid-wrap{overflow-x:auto;background:white;border:1px solid #e3e8f2;border-radius:15px}
+.availability-table{min-width:760px;width:100%;border-collapse:separate;border-spacing:0}
+.availability-table th{padding:13px 8px;text-align:center;background:#f3f6fd;position:sticky;top:0;min-width:92px}
+.availability-table th:first-child{position:sticky;left:0;z-index:3;min-width:150px}
+.availability-table td{text-align:center;padding:7px;border:1px solid #eef1f6}
+.availability-slot{height:43px;width:100%;border:1px solid #e2e7f1;border-radius:8px;background:#fafbfd;color:#fff;font-size:20px;font-weight:800;touch-action:manipulation}
+.availability-slot.is-available{background:#e0f6e9;color:#12814a;border-color:#80cfaa}
+.availability-slot:disabled{cursor:not-allowed;opacity:.55}
+.availability-outside{font-size:12px;color:#a8b4c4}
+.availability-actions{display:flex;justify-content:flex-end;gap:10px;margin:16px 0}
+#courseDeadline + small{font-size:11px;color:#79849d;line-height:1.5;font-weight:400}
+.editor-grid .editor-slot.is-unavailable{background:#f7f8fa!important;cursor:not-allowed;border-color:#ebedf1}
+.editor-grid .editor-slot.is-unavailable .editor-slot-bag:not(:empty){border-top:2px solid #dd795f;padding-top:5px}
+.editor-grid .editor-slot.is-unavailable .editor-slot-note:not(:empty){color:#b04746;font-weight:800}
+.editor-grid .editor-slot.is-unavailable:empty{min-height:90px}
+.editor-grid thead th{white-space:normal}
+.editor-action-buttons button{white-space:nowrap}
+#editorNewHelp{margin-top:13px}
+@media(max-width:680px){.availability-week-controls{justify-content:space-between}.availability-toolbar>label{min-width:100%}.availability-week-controls strong{font-size:10px}.availability-actions button{flex:1}}
+
+.editor-grid .editor-slot.is-closed{background:#fff0f0!important}
