@@ -195,3 +195,29 @@
 .closure-list-info strong{font-size:14px;color:#303c56}
 .closure-list-note{font-size:12px;color:#67758e;white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:680px){.closure-list-item{padding:12px}.closure-card{padding:25px 12px}}
+
+/* Seasonal-course management and normal/seasonal calendar indicators */
+.course-list{display:grid;gap:12px;margin-top:18px}
+.course-list-item{background:#fff;border:1px solid #dfe6f4;border-radius:13px;padding:17px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.course-list-info{display:grid;gap:6px;min-width:0;color:#5b6c85;font-size:12px;overflow-wrap:anywhere}
+.course-list-info strong{color:#254060;font-size:16px}
+.course-list-actions{display:flex;flex-wrap:wrap;gap:6px}
+.course-help{background:#ecf5ff;border:1px solid #cce0fa;border-radius:10px;padding:12px 14px;color:#2c5986;font-size:12px;line-height:1.6}
+.course-period-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.course-period-head strong{font-size:14px}
+.course-period-rows{display:grid;gap:8px}
+.course-period-row{display:flex;gap:8px;align-items:center;padding:8px;background:#f6f8fd;border-radius:9px}
+.course-period-row input{width:120px;min-width:0}
+.course-period-number{font-size:12px;color:#667894;white-space:nowrap}
+.lesson-time-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.lesson-time-inputs span{display:grid;gap:6px}
+.course-banner{background:#e8f1ff;border:1px solid #b9d2f8;border-left:5px solid #467ed4;color:#225386;border-radius:12px;padding:13px 16px;display:grid;gap:5px;line-height:1.5}
+.course-banner strong{font-weight:850;font-size:15px}
+.course-banner span{font-size:12px}
+.course-banner.compact{padding:8px 10px;border-radius:8px}
+.course-banner.compact strong{font-size:11px}
+.course-overlap-warning{color:#bb3636!important;font-weight:bold}
+.month-course-label{font-size:9px;color:#2566ac;background:#e3efff;padding:2px 4px;border-radius:4px;font-weight:800;max-width:100%;overflow-wrap:anywhere}
+@media(max-width:650px){.course-list-item{flex-direction:column;align-items:stretch}.course-period-row{flex-wrap:wrap}.course-period-row input{width:calc(50% - 30px)}.lesson-time-inputs{grid-template-columns:1fr}}
+
+#lessonNormalTime[hidden], #lessonCoursePeriodWrap[hidden], #lessonCourseHint[hidden], #coursesPage[hidden], #courseDialog[hidden] {display:none!important;}

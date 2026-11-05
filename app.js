@@ -12,7 +12,7 @@ const dateKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0'
 const datePlus = (value, increment) => { const [y,m,d] = value.split('-').map(Number); return dateKey(new Date(y,m-1,d+increment)); };
 const prettyDate = value => { if(!/^\d{4}-\d{2}-\d{2}$/.test(value||'')) return value||''; const [y,m,d] = value.split('-').map(Number); return `${m}月${d}日（${'日月火水木金土'[new Date(y,m-1,d).getDay()]}）`; };
 const isAdmin = () => state.profile?.role === 'admin';
-const state = { user:null, profile:null, date:todayKey(), scheduleView:'day', page:'', students:[], people:[], entries:[], closures:{}, closuresStatus:'loading', notices:[], activeLesson:null, unsub:[] };
+const state = { user:null, profile:null, date:todayKey(), scheduleView:'day', page:'', students:[], people:[], entries:[], entriesStatus:'loading', closures:{}, closuresStatus:'loading', courses:[], coursesStatus:'loading', notices:[], activeLesson:null, unsub:[] };
 const WEEKDAYS = ['日','月','火','水','木','金','土'];
 const everySlot = student => Object.values(student.regularSlots || {}).filter(s=>s && typeof s==='object');
 const slotDescription = s => `${WEEKDAYS[Number(s.weekday)]||'?'}曜 ${s.start}〜${s.end}`;
@@ -76,8 +76,20 @@ function isCurrentRegularOccurrence(entry){
 function isVisibleEntry(entry){
   return !entry.regularId || entry.date<todayKey() || isCurrentRegularOccurrence(entry);
 }
+function courseFor(date){
+  return state.courses.find(c=>c.startDate<=date && date<=c.endDate) || null;
+}
+function hasCourseConflict(date){
+  return state.courses.filter(c=>c.startDate<=date && date<=c.endDate).length>1;
+}
 function lessonsOnDate(date){
-  const stored = state.entries.filter(e=>e.date===date && isVisibleEntry(e));
+  const course=courseFor(date);
+  if(hasCourseConflict(date))return [];
+  const stored = state.entries.filter(e=>e.date===date && isVisibleEntry(e) && (course ? e.courseId===course.id : !e.courseId));
+  // Regular weekly lessons and regular one-off lessons are left in Firestore,
+  // but never shown or regenerated for any date inside a special course.
+  if(course)return stored;
+
   const storedIds = new Set(stored.map(e=>e.id));
   const weekday = new Date(...date.split('-').map((n,i)=>i===1?Number(n)-1:Number(n))).getDay();
   const result = [...stored];
@@ -105,53 +117,50 @@ function lessonById(id){
   return lessonsOnDate(occurrenceDate||state.date).find(e=>e.id===id);
 }
 function closureFor(date){ return state.closures[date] || null; }
+function lessonPeriodCount(entry){
+  if(entry.courseId)return 1;
+  const first=CLASS_PERIODS.findIndex(p=>p.start===entry.start);
+  const last=CLASS_PERIODS.findIndex(p=>p.end===entry.end);
+  return first>=0 && last>=first ? last-first+1 : 1;
+}
+function canJoinVisits(date, previousEnd, nextStart){
+  const [ah,am]=previousEnd.split(':').map(Number), [bh,bm]=nextStart.split(':').map(Number);
+  const gap=(bh*60+bm)-(ah*60+am);
+  if(gap<0 || gap>15)return false;
+  const course=courseFor(date);
+  if(!course)return true;
+  // Only adjacent course periods count as continuous (not an unrelated booking).
+  const before=course.periods.findIndex(p=>p.end===previousEnd);
+  const after=course.periods.findIndex(p=>p.start===nextStart);
+  return before>=0 && after===before+1;
+}
 function futureVisitsForLesson(lesson){
-  const dates=new Set(state.entries
-    .filter(e=>e.studentId===lesson.studentId && e.date>lesson.date && e.status!=='cancelled' && isVisibleEntry(e))
-    .map(e=>e.date));
+  const dates=new Set(state.entries.filter(e=>e.studentId===lesson.studentId && e.date>lesson.date).map(e=>e.date));
   for(let offset=1;offset<=112;offset++)dates.add(datePlus(lesson.date,offset));
   const visits=[];
-  const minutes=t=>{const [h,m]=t.split(':').map(Number);return h*60+m;};
-  const count=e=>{
-    const first=CLASS_PERIODS.findIndex(p=>p.start===e.start);
-    const last=CLASS_PERIODS.findIndex(p=>p.end===e.end);
-    return first>=0 && last>=first ? last-first+1 : 1;
-  };
   for(const date of [...dates].sort()){
-    const lessons=lessonsOnDate(date)
+    const entries=lessonsOnDate(date)
       .filter(e=>e.studentId===lesson.studentId && e.status!=='cancelled' && e.start && e.end)
       .sort((a,b)=>a.start.localeCompare(b.start)||a.end.localeCompare(b.end));
-    if(!lessons.length)continue;
-    // A closure is an upcoming scheduled day with the status '休校', not a
-    // disappearing lesson. Do not count its original individual periods as visits.
-    const closure=closureFor(date);
+    if(!entries.length)continue;
+    const closure=closureFor(date), course=courseFor(date);
     if(closure){
-      const ranges=[];
-      let range=null;
-      for(const entry of lessons){
-        if(!range)range={start:entry.start,end:entry.end};
-        else if(minutes(entry.start)-minutes(range.end)<=5){
-          if(entry.end>range.end)range.end=entry.end;
-        }else{ranges.push(range);range={start:entry.start,end:entry.end};}
-      }
-      if(range)ranges.push(range);
-      visits.push({date,closed:true,note:closure.note||'',timeText:ranges.map(r=>`${r.start}〜${r.end}`).join('、')});
+      // A cancelled visit is still shown as 休校, preserving the original time.
+      const timeText=entries.map(e=>`${e.start}〜${e.end}`).filter((v,i,a)=>a.indexOf(v)===i).join('、');
+      visits.push({date,closed:true,note:closure.note||'',timeText,courseName:course?.name||''});
     }else{
-      let visit=null;
-      for(const entry of lessons){
-        if(!visit){
-          visit={date,start:entry.start,end:entry.end,periods:count(entry)};
-        }else if(minutes(entry.start)-minutes(visit.end)<=5){
-          if(entry.end>visit.end){
-            visit.end=entry.end;
-            visit.periods+=count(entry);
-          }
+      let current=null;
+      for(const entry of entries){
+        if(!current){current={date,start:entry.start,end:entry.end,periods:lessonPeriodCount(entry),courseName:course?.name||''};continue;}
+        if(canJoinVisits(date,current.end,entry.start)){
+          if(entry.end>current.end)current.end=entry.end;
+          current.periods+=lessonPeriodCount(entry);
         }else{
-          visits.push(visit);
-          visit={date,start:entry.start,end:entry.end,periods:count(entry)};
+          visits.push(current);
+          current={date,start:entry.start,end:entry.end,periods:lessonPeriodCount(entry),courseName:course?.name||''};
         }
       }
-      if(visit)visits.push(visit);
+      if(current)visits.push(current);
     }
     if(visits.length>=3)break;
   }
@@ -199,7 +208,7 @@ function enableOneTapSave(formId) {
     save.addEventListener('touchstart', submitFromFocusedField, {passive:false});
   }
 }
-['studentForm', 'lessonForm', 'memoForm', 'closureForm'].forEach(enableOneTapSave);
+['studentForm', 'lessonForm', 'memoForm', 'closureForm', 'courseForm'].forEach(enableOneTapSave);
 
 function resetSubscriptions(){state.unsub.forEach(fn=>fn());state.unsub=[];}
 function nav(page) {
@@ -207,11 +216,13 @@ function nav(page) {
   $('adminCountPage').hidden=page!=='count';
   $('teacherStudentsPage').hidden=page!=='students';
   $('closuresPage').hidden=page!=='closures';
-  $('lessonsPage').hidden=page==='count'||page==='students'||page==='closures';
-  for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navClosures','closures'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students']]) $(''+id).classList.toggle('active',page===p);
+  $('coursesPage').hidden=page!=='courses';
+  $('lessonsPage').hidden=page==='count'||page==='students'||page==='closures'||page==='courses';
+  for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navClosures','closures'],['navCourses','courses'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students']]) $(''+id).classList.toggle('active',page===p);
   if(page==='count')renderCount();
   else if(page==='students')renderTeacherStudents();
   else if(page==='closures')renderClosures();
+  else if(page==='courses')renderCourses();
   else {
     $('scheduleHeading').textContent=isAdmin()?'授業管理':'今日の時間割';
     $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'全教師の時間割と伝達事項を閲覧できます。';
@@ -221,6 +232,7 @@ function nav(page) {
 $('navCount').addEventListener('click',()=>nav('count'));
 $('navAdminLessons').addEventListener('click',()=>nav('adminLessons'));
 $('navClosures').addEventListener('click',()=>{if(isAdmin())nav('closures');});
+$('navCourses').addEventListener('click',()=>{if(isAdmin())nav('courses');});
 $('navTeacherLessons').addEventListener('click',()=>nav('teacherLessons'));
 $('navTeacherStudents').addEventListener('click',()=>nav('students'));
 $('teacherFilter').addEventListener('change',renderLessons);
@@ -257,7 +269,7 @@ $('today').addEventListener('click',()=>{state.date=todayKey();renderLessons();}
 $('studentLevel').addEventListener('change',renderCount);
 $('studentSort').addEventListener('change',renderCount);
 $('studentSearch').addEventListener('input',renderCount);
-function renderAll() { if(!state.user) return; renderLessons(); if(isAdmin()){renderCount();renderClosures();}else renderTeacherStudents(); renderNoticeButton(); }
+function renderAll() { if(!state.user) return; renderLessons(); if(isAdmin()){renderCount();renderClosures();renderCourses();}else renderTeacherStudents(); renderNoticeButton(); }
 // Shiftly's four fixed teaching periods. A continuous booking is split ONLY in
 // the timetable UI. Both display cards keep the same source lesson ID and memo.
 // A booking with non-standard start/end times remains a single card.
@@ -268,6 +280,11 @@ const CLASS_PERIODS = [
   {number:4,start:'20:30',end:'21:25'}
 ];
 function splitLessonForDisplay(entry){
+  if(entry.courseId){
+    const course=state.courses.find(c=>c.id===entry.courseId);
+    const period=course?.periods.findIndex(p=>p.start===entry.start && p.end===entry.end) ?? -1;
+    return [{...entry,displayPeriod:period>=0?period+1:undefined}];
+  }
   const first=CLASS_PERIODS.findIndex(period=>period.start===entry.start);
   const last=CLASS_PERIODS.findIndex(period=>period.end===entry.end);
   if(first<0 || last<first)return [entry];
@@ -298,7 +315,7 @@ function fullLessonCard(item){
   if(item.splitTotal>1)headline.append(make('span','split-tag',`連続${item.splitTotal}コマ · ${item.splitIndex}/${item.splitTotal}`));
   const st=item.status==='done'?'実施済':item.status==='cancelled'?'欠席':'予定';
   headline.append(make('span',item.status==='cancelled'?'state-tag absent-tag':'state-tag',st));
-  headline.append(make('span','origin-tag',item.regularId?'通常授業':'個別登録'));card.append(headline);
+  headline.append(make('span','origin-tag',item.courseId?'講習授業':item.regularId?'通常授業':'個別登録'));card.append(headline);
   card.append(make('div','lesson-student',`${item.grade||''} ${item.studentName||'生徒名未登録'}`));
   card.append(make('div','lesson-meta',`${item.subject||'教科未登録'}　/　${item.teacherName||'担当教師未登録'}`));
   if(item.memo?.trim())card.append(make('div','memo-preview',item.memo.length>170?item.memo.slice(0,170)+'…':item.memo));
@@ -314,8 +331,18 @@ function closureCard(date, compact=false){
   else card.append(make('div','closure-note','この日は塾がお休みです。'));
   return card;
 }
+function courseBanner(date, compact=false){
+  const course=courseFor(date);
+  if(!course)return null;
+  const banner=make('div',compact?'course-banner compact':'course-banner');
+  banner.append(make('strong','',`${course.name}期間`));
+  if(!compact)banner.append(make('span','',`${prettyDate(course.startDate)}〜${prettyDate(course.endDate)}　通常授業は表示せず、講習専用の授業だけを表示しています。`));
+  if(hasCourseConflict(date))banner.append(make('span','course-overlap-warning','講習期間が重複しています。管理者に確認してください。'));
+  return banner;
+}
 function renderDaySchedule(parent){
   parent.className='lesson-list';
+  const banner=courseBanner(state.date);if(banner)parent.append(banner);
   if(closureFor(state.date)){parent.append(closureCard(state.date));return;}
   const rows=visibleLessonsOnDate(state.date);
   if(!rows.length){parent.append(make('div','empty','この日の授業はありません。'));return;}
@@ -339,6 +366,7 @@ function renderWeekSchedule(parent){
     jump.title='この日の授業を詳しく見る';
     jump.addEventListener('click',()=>openScheduleDay(date));
     head.append(jump,make('span','week-day-count',closure?'休校':`${rows.length}コマ`));section.append(head);
+    const banner=courseBanner(date,true);if(banner)section.append(banner);
     if(closure){section.append(closureCard(date,true));parent.append(section);continue;}
     if(!rows.length){section.append(make('p','week-day-empty','授業なし'));parent.append(section);continue;}
     for(const item of rows){
@@ -379,6 +407,8 @@ function renderMonthSchedule(parent){
     const header=make('button','month-day-head');header.type='button';
     header.title=closure?'休校日の詳細を見る':'この日の時間割を見る';header.setAttribute('aria-label',closure?`${prettyDate(date)}は休校`: `${prettyDate(date)}の時間割 ${rows.length}コマ`);
     header.append(make('span','month-day-number',String(day)));
+    const course=courseFor(date);
+    if(course)header.append(make('span','month-course-label',`${course.name}期間`));
     if(closure)header.append(make('span','month-closed-label','休校'));
     else if(rows.length)header.append(make('span','month-day-count',`${rows.length}コマ`));
     header.addEventListener('click',()=>openScheduleDay(date));
@@ -413,13 +443,14 @@ function renderLessons(){
   }else if(view==='week'){
     const start=startOfWeek(state.date),end=datePlus(start,6);
     heading.textContent=`${start.slice(0,4)}年${prettyDate(start)} 〜 ${start.slice(0,4)===end.slice(0,4)?'':end.slice(0,4)+'年'}${prettyDate(end)}`;
-  }else heading.textContent=`${state.date.slice(0,4)}年${prettyDate(state.date)}`;
+  }else heading.textContent=`${state.date.slice(0,4)}年${prettyDate(state.date)}${courseFor(state.date)?' · '+courseFor(state.date).name+'期間':''}`;
   $('prevDay').setAttribute('aria-label',`前の${view==='day'?'日':view==='week'?'週':'月'}`);
   $('nextDay').setAttribute('aria-label',`次の${view==='day'?'日':view==='week'?'週':'月'}`);
   const parent=$('lessonList');parent.replaceChildren();
-  if(state.closuresStatus!=='ready'){
+  if(isAdmin())$('addLesson').disabled=state.coursesStatus!=='ready'||state.entriesStatus!=='ready';
+  if(state.closuresStatus!=='ready'||state.coursesStatus!=='ready'){
     parent.className='lesson-list';
-    parent.append(make('div','closure-load-warning',state.closuresStatus==='error'?'休校日データを読み込めません。Firebaseのセキュリティルールを確認してください。':'休校日情報を読み込んでいます…'));
+    parent.append(make('div','closure-load-warning',state.closuresStatus==='error'||state.coursesStatus==='error'?'休校日または講習期間を読み込めません。Firebaseのルールを確認してください。':'休校日・講習期間情報を読み込んでいます…'));
     return;
   }
   if(view==='week')renderWeekSchedule(parent);
@@ -520,6 +551,93 @@ $('deleteClosure').addEventListener('click',async()=>{
     closeDialog('closureDialog');showMessage('休校日を解除しました。元の授業予定が再表示されます。');
   }catch(e){trapError(e,'休校日の解除に失敗しました');}
   finally{button.disabled=false;}
+});
+
+// Seasonal courses are separate from normal recurring lessons.
+// Never delete normal timetable entries when the course becomes active.
+const COURSE_NAMES={spring:'春期講習',summer:'夏期講習',winter:'冬季講習'};
+function courseLessons(courseId){return state.entries.filter(e=>e.courseId===courseId);}
+function renderCourses(){
+  if(!isAdmin())return;
+  const host=$('courseList');host.replaceChildren();
+  if(state.coursesStatus!=='ready'){
+    host.append(make('div','empty',state.coursesStatus==='error'?'講習データを読み込めません。Firestoreルールを確認してください。':'講習期間を読み込んでいます…'));
+    return;
+  }
+  const courses=[...state.courses].sort((a,b)=>a.startDate.localeCompare(b.startDate));
+  if(!courses.length){host.append(make('div','empty','講習期間は未登録です。「＋ 講習期間を登録」から設定できます。'));return;}
+  for(const course of courses){
+    const record=make('div','course-list-item');
+    const info=make('div','course-list-info');
+    info.append(make('strong','',course.name+'期間'));
+    info.append(make('span','',`${prettyDate(course.startDate)} 〜 ${prettyDate(course.endDate)}`));
+    info.append(make('span','',`${course.periods.length}コマ構成 / 講習授業 ${state.entriesStatus==='ready'?courseLessons(course.id).length+'件':'読込中'}`));
+    info.append(make('span','',course.periods.map((r,i)=>`${i+1}限 ${r.start}〜${r.end}`).join(' · ')));
+    const actions=make('div','course-list-actions');
+    const edit=make('button','mini-button','編集');edit.type='button';edit.addEventListener('click',()=>openCourseForm(course.id));
+    const jump=make('button','mini-button','開始日の時間割');jump.type='button';jump.addEventListener('click',()=>{state.date=course.startDate;nav('adminLessons');});
+    actions.append(edit,jump);record.append(info,actions);host.append(record);
+  }
+}
+function addCoursePeriodRow(period={}){
+  const root=$('coursePeriodRows');
+  if(root.children.length>=12){showMessage('講習は最大12コマまで登録できます。');return;}
+  const row=make('div','course-period-row');
+  const start=make('input');start.type='time';start.required=true;start.value=period.start||'';start.setAttribute('aria-label','コマ開始時刻');
+  const end=make('input');end.type='time';end.required=true;end.value=period.end||'';end.setAttribute('aria-label','コマ終了時刻');
+  const remove=make('button','mini-button','削除');remove.type='button';remove.addEventListener('click',()=>{if(root.children.length<=1){showMessage('最低1コマ必要です。');return;}row.remove();});
+  row.append(make('span','course-period-number','時間'),start,make('span','','〜'),end,remove);root.append(row);
+}
+function openCourseForm(courseId=''){
+  if(!isAdmin())return;
+  const course=state.courses.find(c=>c.id===courseId);
+  $('courseForm').reset();
+  $('courseId').value=course?.id||'';
+  $('courseDialogTitle').textContent=course?'講習期間を編集':'講習期間を登録';
+  $('courseType').value=course?.type||'spring';
+  $('courseStart').value=course?.startDate||'';
+  $('courseEnd').value=course?.endDate||'';
+  $('coursePeriodRows').replaceChildren();
+  (course?.periods||[{start:'09:00',end:'09:55'},{start:'10:00',end:'10:55'},{start:'11:00',end:'11:55'}]).forEach(addCoursePeriodRow);
+  $('deleteCourse').hidden=!course;
+  showDialog('courseDialog');
+}
+$('addCourse').addEventListener('click',()=>openCourseForm());
+$('addCoursePeriod').addEventListener('click',()=>addCoursePeriodRow());
+$('courseForm').addEventListener('submit',async event=>{
+  event.preventDefault();if(!isAdmin())return;
+  if(state.coursesStatus!=='ready'||state.entriesStatus!=='ready'){showMessage('講習・時間割データの読込完了後に操作してください。');return;}
+  const id=$('courseId').value||doc(collection(db,'specialCourses')).id;
+  const type=$('courseType').value,name=COURSE_NAMES[type],startDate=$('courseStart').value,endDate=$('courseEnd').value;
+  const periods=[...$('coursePeriodRows').children].map(row=>({start:row.querySelectorAll('input')[0].value,end:row.querySelectorAll('input')[1].value}));
+  if(!name||!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||!/^\d{4}-\d{2}-\d{2}$/.test(endDate)||startDate>endDate){showMessage('講習の種類と開始日・終了日を確認してください。');return;}
+  if(!periods.length||periods.length>12||periods.some(p=>!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(p.start)||!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(p.end)||p.start>=p.end)){
+    showMessage('コマの開始・終了時刻を確認してください（最大12コマ）。');return;
+  }
+  periods.sort((a,b)=>a.start.localeCompare(b.start));
+  if(periods.some((p,i)=>i>0&&p.start<periods[i-1].end)){showMessage('コマ同士の時間が重複しています。');return;}
+  if(state.courses.some(c=>c.id!==id && startDate<=c.endDate && endDate>=c.startDate)){
+    showMessage('他の講習期間と日付が重複しています。期間を確認してください。');return;
+  }
+  const existing=courseLessons(id);
+  if(existing.some(e=>e.date<startDate||e.date>endDate||!periods.some(p=>p.start===e.start&&p.end===e.end))){
+    showMessage('登録済み講習授業が新しい期間・コマから外れます。先に授業の日付・時間を調整してください。');return;
+  }
+  const button=event.submitter;button.disabled=true;
+  try{
+    await setDoc(doc(db,'specialCourses',id),{type,name,startDate,endDate,periods,updatedBy:state.user.uid,updatedAt:serverTimestamp()});
+    closeDialog('courseDialog');showMessage(`${name}期間を保存しました。期間内は講習授業だけが表示されます。`);
+  }catch(e){trapError(e,'講習期間の保存に失敗しました');}finally{button.disabled=false;}
+});
+$('deleteCourse').addEventListener('click',async()=>{
+  if(!isAdmin())return;
+  if(state.entriesStatus!=='ready'){showMessage('時間割データの読込完了後に操作してください。');return;}
+  const id=$('courseId').value,course=state.courses.find(c=>c.id===id);if(!course)return;
+  if(courseLessons(id).length){showMessage('講習授業が登録されています。削除前に講習授業をすべて削除してください。');return;}
+  if(!confirm(`${course.name}（${prettyDate(course.startDate)}〜${prettyDate(course.endDate)}）を削除しますか？期間内の通常授業が再表示されます。`))return;
+  const button=$('deleteCourse');button.disabled=true;
+  try{await deleteDoc(doc(db,'specialCourses',id));closeDialog('courseDialog');showMessage('講習期間を解除しました。通常授業が再表示されます。');}
+  catch(e){trapError(e,'講習期間の削除に失敗しました');}finally{button.disabled=false;}
 });
 
 function renderTeacherStudents(){
@@ -691,6 +809,7 @@ $('cancelStudentDeletion').addEventListener('click',()=>closeDialog('deleteStude
 function selectOptions(select, array, labelFn){select.replaceChildren();for(const o of array){const option=make('option','',labelFn(o));option.value=o.id;select.append(option);}}
 function openLessonForm(id=''){
   if(!isAdmin())return;
+  if(state.coursesStatus!=='ready'||state.entriesStatus!=='ready'){showMessage('授業と講習期間の読み込みが終わってから登録してください。');return;}
   if(closureFor(state.date)&&!id){showMessage('この日は休校です。休校日を解除してから授業を登録してください。');return;}
   if(!state.students.length||!state.people.length){showMessage('先に生徒と担当教師のアカウントを登録してください。');return;}
   const lesson=lessonById(id);
@@ -703,9 +822,26 @@ function openLessonForm(id=''){
   selectOptions($('lessonStudent'),state.students,s=>`${s.grade||''} ${s.name}`);
   selectOptions($('lessonTeacher'),state.people,p=>`${p.name||p.id}${p.role==='admin'?'（管理者）':''}`);
   if(lesson){$('lessonStudent').value=lesson.studentId;$('lessonTeacher').value=lesson.teacherUid;}
-  $('lessonDate').value=lesson?.date||state.date;$('lessonStart').value=lesson?.start||'17:30';$('lessonEnd').value=lesson?.end||'18:25';$('lessonSubject').value=lesson?.subject||'';$('lessonStatus').value=lesson?.status||'scheduled';
+  $('lessonDate').value=lesson?.date||state.date;$('lessonStart').value=lesson?.start||'17:30';$('lessonEnd').value=lesson?.end||'18:25';syncLessonCoursePeriod(lesson);$('lessonSubject').value=lesson?.subject||'';$('lessonStatus').value=lesson?.status||'scheduled';
   showDialog('lessonFormDialog');
 }
+function syncLessonCoursePeriod(lesson=null){
+  const date=$('lessonDate').value,course=courseFor(date);
+  $('lessonCourseHint').hidden=!course;
+  $('lessonNormalTime').hidden=Boolean(course);
+  $('lessonCoursePeriodWrap').hidden=!course;
+  $('lessonStart').required=!course;
+  $('lessonEnd').required=!course;
+  $('lessonCoursePeriod').replaceChildren();
+  if(course){
+    $('lessonCourseHint').textContent=`${course.name}期間：この日は講習専用の授業を登録します。通常授業は保存済みのまま非表示です。`;
+    course.periods.forEach((p,i)=>{const option=make('option','',`${i+1}限　${p.start}〜${p.end}`);option.value=String(i);$('lessonCoursePeriod').append(option);});
+    const current=course.periods.findIndex(p=>p.start===(lesson?.start||$('lessonStart').value) && p.end===(lesson?.end||$('lessonEnd').value));
+    $('lessonCoursePeriod').value=String(Math.max(0,current));
+    $('lessonCoursePeriod').required=true;
+  }else $('lessonCoursePeriod').required=false;
+}
+$('lessonDate').addEventListener('change',()=>syncLessonCoursePeriod());
 $('addLesson').addEventListener('click',()=>openLessonForm());
 async function sendNotifications(uids,message,date,batch=null){
   const unique=[...new Set(uids.filter(Boolean))];
@@ -716,16 +852,34 @@ async function sendNotifications(uids,message,date,batch=null){
 }
 $('lessonForm').addEventListener('submit',async event=>{
   event.preventDefault();if(!isAdmin())return;
+  if(state.coursesStatus!=='ready'||state.entriesStatus!=='ready'){showMessage('時間割と講習データの読込完了後に保存してください。');return;}
   const id=$('lessonId').value||doc(collection(db,'timetableEntries')).id;
   const old=lessonById(id);
   const student=state.students.find(s=>s.id===$('lessonStudent').value);
   const teacher=state.people.find(p=>p.id===$('lessonTeacher').value);
-  const date=$('lessonDate').value,start=$('lessonStart').value,end=$('lessonEnd').value;
+  const date=$('lessonDate').value,course=courseFor(date);
+  if(hasCourseConflict(date)){showMessage('講習期間が重複しているため授業を保存できません。期間設定を修正してください。');return;}
+  if(hasCourseConflict(date)){showMessage('この日に複数の講習期間が重複しています。講習期間管理から修正してください。');return;}
+  if(old && Boolean(old.courseId)!==Boolean(course)){
+    showMessage('通常授業と講習授業の間では移動できません。それぞれの時間割から登録してください。');return;
+  }
+  if(old?.courseId && old.courseId!==course?.id){showMessage('別の講習期間への直接移動はできません。');return;}
+  const period=course?.periods[Number($('lessonCoursePeriod').value)];
+  const start=course?period?.start:$('lessonStart').value;
+  const end=course?period?.end:$('lessonEnd').value;
   if(!student||!teacher||!date||!start||!end||start>=end){showMessage('入力内容と授業時間を確認してください。');return;}
   if(closureFor(date)){showMessage('指定日は休校です。休校日を解除してから授業を保存してください。');return;}
   const data={studentId:student.id,studentName:student.name,grade:student.grade,school:student.school,teacherUid:teacher.id,teacherName:teacher.name,date,start,end,subject:$('lessonSubject').value.trim(),status:$('lessonStatus').value,memo:old?.memo||'',memoUpdatedAt:old?.memoUpdatedAt||null,nextDates:old?.nextDates||[]};
   if(old?.regularId)data.regularId=old.regularId;
+  if(course)data.courseId=course.id;
   if(!data.subject){showMessage('教科を入力してください。');return;}
+  // A student can attend at most one class in a given course period; a
+  // teacher can handle up to two students in the same period (1:2 maximum).
+  if(course && data.status!=='cancelled'){
+    const peers=lessonsOnDate(date).filter(e=>e.id!==id && e.status!=='cancelled' && e.start===start && e.end===end);
+    if(peers.some(e=>e.studentId===student.id)){showMessage('同じ生徒が同じ講習コマで重複しています。');return;}
+    if(peers.filter(e=>e.teacherUid===teacher.id).length>=2){showMessage('このコマの担当講師はすでに2人の生徒を担当しています。');return;}
+  }
   const btn=event.submitter;btn.disabled=true;
   try{
     const batch=writeBatch(db);batch.set(doc(db,'timetableEntries',id),data);
@@ -753,11 +907,11 @@ function renderUpcomingForLesson(lesson){
     upcoming.forEach((visit,i)=>{
       const node=make('div',visit.closed?'future-date is-closed':'future-date');
       if(visit.closed){
-        node.append(make('strong','',`${i+1}回目：${prettyDate(visit.date)}　${visit.timeText}　休校`));
+        node.append(make('strong','',`${i+1}回目：${prettyDate(visit.date)}　${visit.timeText}　休校${visit.courseName?'（'+visit.courseName+'期間）':''}`));
         if(visit.note)node.append(make('span','future-closed-note',`備考：${visit.note}`));
       }else{
         const suffix=visit.periods>1?`（${visit.periods}コマ連続）`:'';
-        node.textContent=`${i+1}回目：${prettyDate(visit.date)}　${visit.start}〜${visit.end}${suffix}`;
+        node.textContent=`${i+1}回目：${prettyDate(visit.date)}　${visit.start}〜${visit.end}${suffix}${visit.courseName?'　'+visit.courseName+'期間':''}`;
       }
       dates.append(node);
     });
@@ -768,7 +922,8 @@ function openLessonDetailContents(id){
   const lesson=lessonById(id);if(!lesson)return;
   state.activeLesson=id;
   $('detailTitle').textContent=lesson.studentName||'授業詳細';
-  $('detailDate').textContent=`${prettyDate(lesson.date)} ${lesson.start}〜${lesson.end}`;
+  const detailCourse=courseFor(lesson.date);
+  $('detailDate').textContent=`${prettyDate(lesson.date)} ${lesson.start}〜${lesson.end}${detailCourse?'（'+detailCourse.name+'期間）':''}`;
   $('detailAbsenceStatus').hidden=lesson.status!=='cancelled';
   $('detailSubject').textContent=lesson.subject;
   $('detailTeacher').textContent=lesson.teacherName;
@@ -804,12 +959,12 @@ $('memoForm').addEventListener('submit',async event=>{
   catch(e){trapError(e,'伝達事項の保存に失敗しました');}finally{button.disabled=false;}
 });
 function loggedOut(){
-  resetSubscriptions();state.user=null;state.profile=null;state.entries=[];state.students=[];state.people=[];state.closures={};state.closuresStatus='loading';state.notices=[];
+  resetSubscriptions();state.user=null;state.profile=null;state.entries=[];state.entriesStatus='loading';state.students=[];state.people=[];state.closures={};state.closuresStatus='loading';state.courses=[];state.coursesStatus='loading';state.notices=[];
   $('loginPanel').hidden=false;$('appPanel').hidden=true;$('logout').hidden=true;$('notificationButton').hidden=true;$('identity').textContent='';$('password').value='';
   for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();
 }
 async function loggedIn(user){
-  resetSubscriptions();state.user=user;state.closures={};state.closuresStatus='loading';
+  resetSubscriptions();state.user=user;state.entries=[];state.entriesStatus='loading';state.closures={};state.closuresStatus='loading';state.courses=[];state.coursesStatus='loading';
   const profileSnap=await getDoc(doc(db,'users',user.uid));
   if(!profileSnap.exists()||!['admin','employee'].includes(profileSnap.data().role)){showMessage('利用者登録がありません。管理者に連絡してください。');await signOut(auth);return;}
   if(auth.currentUser?.uid!==user.uid)return;
@@ -819,11 +974,17 @@ async function loggedIn(user){
   $('identity').textContent=`${name}（${isAdmin()?'管理者':'教師'}）`;
   $('welcomeSub').textContent=isAdmin()?'生徒情報と授業の状況をまとめて管理できます。':'今日の授業・全教師の時間割・生徒情報を確認できます。';
   $('loginPanel').hidden=true;$('appPanel').hidden=false;$('logout').hidden=false;
-  $('navCount').hidden=!isAdmin();$('navAdminLessons').hidden=!isAdmin();$('navClosures').hidden=!isAdmin();$('navTeacherLessons').hidden=isAdmin();$('navTeacherStudents').hidden=isAdmin();$('addLesson').hidden=!isAdmin();$('notificationButton').hidden=isAdmin();$('teacherFilterWrap').hidden=isAdmin();
+  $('navCount').hidden=!isAdmin();$('navAdminLessons').hidden=!isAdmin();$('navClosures').hidden=!isAdmin();$('navCourses').hidden=!isAdmin();$('navTeacherLessons').hidden=isAdmin();$('navTeacherStudents').hidden=isAdmin();$('addLesson').hidden=!isAdmin();$('notificationButton').hidden=isAdmin();$('teacherFilterWrap').hidden=isAdmin();
   $('teacherFilter').value='mine';state.date=todayKey();state.scheduleView='day';document.querySelectorAll('[data-schedule-view]').forEach(button=>{const active=button.dataset.scheduleView==='day';button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
   state.unsub.push(onSnapshot(collection(db,'schoolStudents'),snap=>{state.students=snap.docs.map(d=>({id:d.id,...d.data()}));renderAll();},err=>trapError(err,'生徒情報を取得できません')));
   state.unsub.push(onSnapshot(collection(db,'users'),snap=>{state.people=snap.docs.map(d=>({id:d.id,...d.data()}));renderAll();},err=>trapError(err,'教師情報を取得できません')));
-  state.unsub.push(onSnapshot(collection(db,'timetableEntries'),snap=>{state.entries=snap.docs.map(d=>({id:d.id,...d.data()}));renderAll();},err=>trapError(err,'時間割を取得できません')));
+  state.unsub.push(onSnapshot(collection(db,'timetableEntries'),snap=>{state.entries=snap.docs.map(d=>({id:d.id,...d.data()}));state.entriesStatus='ready';renderAll();},err=>{state.entriesStatus='error';trapError(err,'時間割を取得できません');}));
+  state.unsub.push(onSnapshot(collection(db,'specialCourses'),snap=>{
+    state.courses=snap.docs.map(d=>({id:d.id,...d.data()})).filter(c=>Array.isArray(c.periods) && c.startDate && c.endDate).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+    state.coursesStatus='ready';renderAll();
+    if($('lessonFormDialog').open)syncLessonCoursePeriod(lessonById($('lessonId').value));
+    if($('detailDialog').open && state.activeLesson){const lesson=lessonById(state.activeLesson);if(lesson)renderUpcomingForLesson(lesson);}
+  },err=>{state.coursesStatus='error';trapError(err,'講習情報を取得できません');renderAll();}));
   state.unsub.push(onSnapshot(collection(db,'schoolClosures'),snap=>{
     state.closures=Object.fromEntries(snap.docs.map(d=>[d.id,{...d.data(),date:d.id}]));
     state.closuresStatus='ready';renderAll();
