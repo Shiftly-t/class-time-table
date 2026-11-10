@@ -295,5 +295,108 @@
 
 .editor-grid .editor-slot.is-closed{background:#fff0f0!important}
 
-/* Notification bell and per-item controls */
-.bell-icon{width:21px;height:21px;display:block;color:#5364c8}.icon-button{display:inline-flex;align-items:center;justify-content:center;min-width:43px;min-height:43px;padding:9px}.notice-count{font-weight:800;min-width:19px;text-align:center}.notification-footer{display:flex;align-items:center;justify-content:space-between;gap:10px}.notification-footer .mini-button{color:#b7455b;margin:0}.notification strong{overflow-wrap:anywhere}
+/* Notification inbox: iPad-friendly bell, unread count, 10-item history. */
+.icon-button{min-width:47px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;position:relative}
+.bell-icon{display:block;color:#374a6c;flex:none}
+.notice-count{min-width:20px;min-height:20px;display:grid;place-items:center;top:-7px;right:-7px;padding:2px 5px;border:2px solid white;background:#d92c45;font-size:10px;line-height:1.1;font-weight:850;white-space:nowrap}
+.notification-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.notification-row strong{flex:1;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.notification-delete{flex:none;background:#fff4f4;border:1px solid #f2c6ce;color:#b23b4e;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:750;min-height:37px}
+.notification-delete:disabled{opacity:.5}
+.notifications-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 13px}
+.notifications-head .muted{font-size:11px}
+.notifications-head button{white-space:nowrap}
+.broadcast-form{background:#f4f6ff;border:1px solid #e0e6fa;padding:15px;border-radius:13px;margin-bottom:18px;display:grid;gap:11px}
+.broadcast-form textarea{background:white;min-height:100px}
+.broadcast-form label{font-size:13px;font-weight:800;color:#314060}
+.broadcast-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.broadcast-actions span{font-size:11px;color:#718098}
+@media(max-width:550px){.notifications-head{align-items:flex-start}.broadcast-actions{flex-direction:column;align-items:stretch}.broadcast-actions .primary{width:100%}}
+
+
+/* Home screen: live seasonal-work deadline and Firestore submission status. */
+.nav-availability{display:inline-flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px}
+.nav-availability-status{font-size:10px;font-weight:850;letter-spacing:0;border-radius:99px;padding:4px 8px;background:#e8ebf2;color:#48566f;white-space:nowrap}
+.nav-availability-status.is-pending{background:#ffe3e7;color:#a52843}
+.nav-availability-status.is-submitted{background:#dff5e8;color:#147247}
+.nav-availability-status.is-closed{background:#f0f1f5;color:#667086}
+.nav-availability-status.is-loading{background:#edf0f6;color:#62718a}
+.nav-tab.active .nav-availability-status{background:#ffffffeb;color:#3952b9}
+.availability-home{padding:20px 22px;margin:-7px 0 26px;background:#f9faff;border:1px solid #dfe6f8;border-radius:19px}
+.availability-home-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}
+.availability-home-heading .eyebrow{margin-bottom:6px}
+.availability-home-heading h2{margin:0;font-size:18px}
+.availability-home-heading-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:#e9edff;color:#5263cb;font-size:25px}
+.availability-home-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:12px}
+.availability-home-card{display:grid;gap:10px;align-content:start;padding:17px;background:#fff;border:1px solid #dfe5f1;border-left:4px solid #929eae;border-radius:13px;box-shadow:0 2px 10px #24365308}
+.availability-home-card.is-pending{border-left-color:#e24b67;background:#fffafd}
+.availability-home-card.is-submitted{border-left-color:#24a26a;background:#fbfffd}
+.availability-home-card.is-closed{border-left-color:#a1aab8;background:#fafbfc}
+.availability-home-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.availability-home-course-name{font-size:15px;color:#2e405f;overflow-wrap:anywhere}
+.availability-home-state{display:inline-block;font-size:11px;font-weight:850;white-space:nowrap;border-radius:100px;padding:5px 10px;background:#edf0f5;color:#687487}
+.availability-home-state.is-pending{background:#ffe5e9;color:#b42e4b}
+.availability-home-state.is-submitted{background:#def6e7;color:#168054}
+.availability-home-state.is-closed{background:#e9edf2;color:#5c6979}
+.availability-home-date{font-size:12px;font-weight:650;color:#65738b;margin:0}
+.availability-home-timer{font-size:25px;font-weight:900;letter-spacing:-.5px;color:#344fc0;font-variant-numeric:tabular-nums;line-height:1.25}
+.availability-home-card.is-pending .availability-home-timer{color:#b4354f}
+.availability-home-timer.is-overdue{font-size:21px;color:#66738a}
+.availability-home-description{font-size:12px;line-height:1.6;color:#5e6e88;margin:0}
+.availability-home-action{justify-self:start;margin-top:3px;padding:10px 14px;background:#4f63e9;color:#fff;border:0;border-radius:9px;font-weight:800;font-size:12px;min-height:42px}
+.availability-home-action:hover{background:#3d52d1}
+@media(max-width:680px){.availability-home{padding:16px 13px;margin:-5px 0 22px}.availability-home-heading h2{font-size:16px}.availability-home-timer{font-size:24px}.nav-availability-status{font-size:10px}}
+
+/* Owner-only scheduled official announcements. Not part of the 10 deletable inbox items. */
+.announcement-dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.announcement-dates label{font-size:12px}
+.official-notices-section{margin:15px 0 20px}
+.official-notices-section h3,.owner-announcement-management h3{font-size:14px;margin:0 0 11px;color:#33466b}
+.official-pinned-label{font-size:10px;background:#e9eefe;color:#4155ba;padding:4px 8px;border-radius:99px;vertical-align:middle;font-weight:750}
+.official-notice{background:#f7f9ff;border-color:#b4c4f3;border-left:4px solid #6074d8;padding:16px}
+.official-notice.unread{background:#eef2ff;border-color:#7e92e2}
+.official-notice-title{font-size:13px;color:#304c94}
+.official-notice-message{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;font-size:13px;line-height:1.8;color:#293650}
+.official-notice-period{color:#65738e;font-weight:700}
+.official-notice-lock{color:#74819d}
+.owner-announcement-management{margin:16px 0 20px;padding:13px;background:#fafbff;border:1px solid #e2e8f7;border-radius:12px}
+.owner-announcement-list{display:grid;gap:9px}
+.owner-announcement-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #e8ecf6;padding:8px 0}
+.owner-announcement-row:last-child{border-bottom:0}
+.owner-announcement-text{display:grid;gap:4px;min-width:0;overflow-wrap:anywhere;font-size:12px;color:#42506d}
+.owner-announcement-text small{color:#8390a5}
+@media(max-width:550px){.announcement-dates{grid-template-columns:1fr}.owner-announcement-row{align-items:flex-start;flex-direction:column}.owner-announcement-row button{align-self:flex-end}}
+
+
+/* 2026-11-10: seasonal tools grouped under 講習期間管理. */
+.course-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin:18px 0 20px}
+.course-shortcut{display:flex;align-items:center;gap:13px;min-width:0;padding:18px 19px;text-align:left;background:#fff;border:1px solid #e3e8f2;border-radius:16px;box-shadow:0 5px 18px #27355408;color:#273653;transition:border-color .18s,background-color .18s}
+.course-shortcut:hover{border-color:#a8b5ee;background:#fafbff}
+.course-shortcut:focus-visible{outline:3px solid #bac5ff;outline-offset:2px}
+.course-shortcut-icon{display:grid;place-items:center;width:44px;height:44px;flex:none;background:#edf0ff;color:#4f63d7;border-radius:12px}
+.course-shortcut-copy{display:grid;gap:6px;flex:1;min-width:0}
+.course-shortcut-copy strong{font-size:14px;font-weight:800;line-height:1.4;color:#273650}
+.course-shortcut-copy small{font-size:11px;line-height:1.6;color:#78869e;font-weight:500}
+.course-shortcut-arrow{flex:none;font-size:20px;color:#7885be;line-height:1}
+.course-back-link{display:inline-flex;align-items:center;background:transparent;border:0;border-radius:9px;padding:8px 4px;color:#5263d1;font-size:12px;font-weight:750;margin:-8px 0 15px}
+.course-back-link:hover{color:#354bbf;text-decoration:underline}
+/* Availability submission summary belongs to the registration page, not the student dashboard. */
+.availability-home{margin:0 0 20px;padding:20px 22px;background:#fff;border:1px solid #e7ebf3;border-radius:17px;box-shadow:0 5px 18px #27355408}
+.availability-home-heading{align-items:flex-start;gap:12px;margin-bottom:16px}
+.availability-home-heading h3{font-size:16px;font-weight:800;letter-spacing:-.3px;color:#233650;margin:0 0 5px}
+.availability-home-heading .eyebrow{font-size:10px;font-weight:850;letter-spacing:1.8px;color:#5a6be0;margin:0 0 7px}
+.availability-home-heading-icon{flex:none;width:42px;height:42px;background:#edf0ff;border-radius:12px;color:#5263cb}
+.availability-home-card{gap:9px;padding:17px 18px;border-radius:12px;box-shadow:none}
+.availability-home-course-name{font-size:15px;font-weight:800;color:#263a58}
+.availability-home-date{font-size:12px;font-weight:650;line-height:1.6}
+.availability-home-timer{font-size:23px;line-height:1.35;letter-spacing:-.4px}
+.availability-home-description{font-size:12px;color:#66758f;line-height:1.75}
+.availability-home-action{padding:10px 14px;border-radius:10px;min-height:42px;font-size:12px}
+@media(max-width:700px){
+  .course-shortcuts{grid-template-columns:1fr;gap:10px}
+  .course-shortcut{padding:15px 14px;gap:12px}
+  .course-shortcut-copy strong{font-size:13px}
+  .availability-home{padding:17px 14px;margin:0 0 18px}
+  .availability-home-heading h3{font-size:16px}
+  .availability-home-heading-icon{width:38px;height:38px}
+}

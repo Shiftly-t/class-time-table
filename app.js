@@ -255,7 +255,7 @@ function nav(page) {
   $('courseEditorPage').hidden=page!=='courseEditor';
   $('availabilityPage').hidden=page!=='availability';
   $('lessonsPage').hidden=page==='count'||page==='students'||page==='closures'||page==='courses'||page==='courseEditor'||page==='availability';
-  for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navClosures','closures'],['navCourses','courses'],['navCourseEditor','courseEditor'],['navAvailability','availability'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students']]) $(''+id).classList.toggle('active',page===p);
+  for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navClosures','closures'],['navCourses','courses'],['navAvailability','availability'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students']]) $(''+id).classList.toggle('active',page===p || (id==='navCourses'&&isAdmin()&&(page==='availability'||page==='courseEditor')));
   if(page==='count')renderCount();
   else if(page==='students')renderTeacherStudents();
   else if(page==='closures')renderClosures();
@@ -273,8 +273,24 @@ $('navCount').addEventListener('click',()=>nav('count'));
 $('navAdminLessons').addEventListener('click',()=>nav('adminLessons'));
 $('navClosures').addEventListener('click',()=>{if(isAdmin())nav('closures');});
 $('navCourses').addEventListener('click',()=>{if(isAdmin())nav('courses');});
-$('navCourseEditor').addEventListener('click',()=>{if(isAdmin())nav('courseEditor');});
 $('navAvailability').addEventListener('click',()=>nav('availability'));
+function preferredCourse(){
+  return state.courses.find(course=>course.endDate>=todayKey())||state.courses.at(-1)||null;
+}
+$('coursesOpenAvailability').addEventListener('click',()=>{
+  if(!isAdmin())return;
+  const course=preferredCourse();
+  if(course)openAvailabilityFromHome(course.id);
+  else nav('availability');
+});
+$('coursesOpenEditor').addEventListener('click',()=>{
+  if(!isAdmin())return;
+  const course=preferredCourse();
+  if(!course){showMessage('先に講習期間を登録してください。');return;}
+  if(openCourseEditor(course.id))nav('courseEditor');
+});
+$('editorBackToCourses').addEventListener('click',()=>{if(isAdmin())nav('courses');});
+$('availabilityBackToCourses').addEventListener('click',()=>{if(isAdmin())nav('courses');});
 $('navTeacherLessons').addEventListener('click',()=>nav('teacherLessons'));
 $('navTeacherStudents').addEventListener('click',()=>nav('students'));
 $('teacherFilter').addEventListener('change',renderLessons);
@@ -670,7 +686,8 @@ function renderCourses(){
     const edit=make('button','mini-button','編集');edit.type='button';edit.addEventListener('click',()=>openCourseForm(course.id));
     const jump=make('button','mini-button','開始日の時間割');jump.type='button';jump.addEventListener('click',()=>{state.date=course.startDate;nav('adminLessons');});
     const grid=make('button','mini-button','表で配置');grid.type='button';grid.addEventListener('click',()=>{if(openCourseEditor(course.id))nav('courseEditor');});
-    actions.append(edit,jump,grid);record.append(info,actions);host.append(record);
+    const avail=make('button','mini-button','勤務希望を確認');avail.type='button';avail.addEventListener('click',()=>openAvailabilityFromHome(course.id));
+    actions.append(edit,avail,jump,grid);record.append(info,actions);host.append(record);
   }
 }
 function addCoursePeriodRow(period={}){
@@ -1275,17 +1292,14 @@ function openAvailabilityFromHome(courseId){
   nav('availability');
 }
 function renderAvailabilityHome(){
-  const panel=$('availabilityHomePanel'),host=$('availabilityHomeCards'),navStatus=$('navAvailabilityStatus');
-  if(!panel||!host||!navStatus)return;
+  const panel=$('availabilityHomePanel'),host=$('availabilityHomeCards');
+  if(!panel||!host)return;
   const loggedIn=Boolean(state.user&&state.profile);
-  const homepage=state.page===(isAdmin()?'count':'teacherLessons');
   const courses=loggedIn?state.courses
     .filter(c=>c.endDate>=todayKey()&&availabilityDeadlineDate(c))
     .sort((a,b)=>availabilityDeadlineDate(a).getTime()-availabilityDeadlineDate(b).getTime()):[];
-  const visible=loggedIn&&homepage&&courses.length>0;
+  const visible=loggedIn&&state.page==='availability'&&courses.length>0;
   panel.hidden=!visible;
-  navStatus.hidden=true;
-  navStatus.className='nav-availability-status';
   if(!courses.length){if(visible)host.replaceChildren();return;}
   const now=Date.now();
   const employees=state.people.filter(p=>p.role==='employee');
@@ -1298,18 +1312,6 @@ function renderAvailabilityHome(){
     }
     return {course,ready,overdue,submitted:Boolean(availabilityRecord(course.id,state.user.uid))};
   });
-  const upcoming=summary.filter(s=>!s.overdue),current=upcoming[0]||summary[0];
-  // Compact state alongside the existing home navigation button.
-  if(current){
-    const missing=upcoming.some(s=>s.ready&&(isAdmin()?s.submittedCount<s.total:!s.submitted));
-    const loading=upcoming.some(s=>!s.ready);
-    const label=!current.ready||loading?'確認中':isAdmin()
-      ?`${current.submittedCount}/${current.total}名提出`
-      :missing?'未提出':upcoming.length?'提出済み':current.submitted?'提出済み':'締切終了';
-    navStatus.textContent=label;
-    navStatus.hidden=false;
-    navStatus.classList.add(!current.ready||loading?'is-loading':missing?'is-pending':(!upcoming.length?'is-closed':'is-submitted'));
-  }
   if(!visible)return;
   const fragment=document.createDocumentFragment();
   for(const item of summary){
@@ -1927,7 +1929,7 @@ $('editorSave').addEventListener('click',publishCourseEditor);
 
 function loggedOut(){
   resetSubscriptions();state.user=null;state.profile=null;state.entries=[];state.entriesStatus='loading';state.students=[];state.people=[];state.closures={};state.closuresStatus='loading';state.courses=[];state.coursesStatus='loading';state.notices=[];state.officialAnnouncements=[];state.officialSeenIds=new Set();state.officialSeenReady=false;clearAvailabilitySubscriptions();state.availability=new Map();state.availabilityStatus={};resetCourseEditor();resetAvailabilityEditor();
-  $('availabilityHomePanel').hidden=true;$('availabilityHomeCards').replaceChildren();$('navAvailabilityStatus').hidden=true;
+  $('availabilityHomePanel').hidden=true;$('availabilityHomeCards').replaceChildren();
   $('loginPanel').hidden=false;$('appPanel').hidden=true;$('logout').hidden=true;$('notificationButton').hidden=true;$('identity').textContent='';$('password').value='';$('noticeCount').hidden=true;
   for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();
 }
@@ -1941,8 +1943,10 @@ async function loggedIn(user){
   $('welcomeName').textContent=`ようこそ、${name}さん`;
   $('identity').textContent=`${name}（${isOwner()?'運営':isAdmin()?'管理者':'教師'}）`;
   $('welcomeSub').textContent=isAdmin()?'生徒情報と授業の状況をまとめて管理できます。':'今日の授業・全教師の時間割・生徒情報を確認できます。';
+  $('availabilityPageTitle').textContent=isAdmin()?'勤務希望登録・提出状況':'勤務希望登録';
+  $('availabilityPageDescription').textContent=isAdmin()?'各講師の勤務希望と提出状況を確認・修正できます。':'出勤できる日・コマを選択して、締切までに提出してください。';
   $('loginPanel').hidden=true;$('appPanel').hidden=false;$('logout').hidden=false;
-  $('navCount').hidden=!isAdmin();$('navAdminLessons').hidden=!isAdmin();$('navClosures').hidden=!isAdmin();$('navCourses').hidden=!isAdmin();$('navCourseEditor').hidden=!isAdmin();$('navAvailability').hidden=false;$('navTeacherLessons').hidden=isAdmin();$('navTeacherStudents').hidden=isAdmin();$('addLesson').hidden=!isAdmin();$('notificationButton').hidden=false;$('broadcastForm').hidden=!isOwner();$('ownerAnnouncementManagement').hidden=!isOwner();
+  $('navCount').hidden=!isAdmin();$('navAdminLessons').hidden=!isAdmin();$('navClosures').hidden=!isAdmin();$('navCourses').hidden=!isAdmin();$('navAvailability').hidden=isAdmin();$('availabilityBackToCourses').hidden=!isAdmin();$('editorBackToCourses').hidden=!isAdmin();$('navTeacherLessons').hidden=isAdmin();$('navTeacherStudents').hidden=isAdmin();$('addLesson').hidden=!isAdmin();$('notificationButton').hidden=false;$('broadcastForm').hidden=!isOwner();$('ownerAnnouncementManagement').hidden=!isOwner();
   renderedAcademicYear=academicYearJST();
   const now=new Date();$('broadcastStart').value=localDateTimeInput(now);$('broadcastEnd').value=localDateTimeInput(new Date(now.getTime()+7*86400000));$('teacherFilterWrap').hidden=isAdmin();
   resetCourseEditor();resetAvailabilityEditor();$('teacherFilter').value='mine';state.date=todayKey();state.scheduleView='day';document.querySelectorAll('[data-schedule-view]').forEach(button=>{const active=button.dataset.scheduleView==='day';button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
