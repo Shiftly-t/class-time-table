@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
-import { getFirestore, collection, doc, getDoc, getDocs, query, where, setDoc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, writeBatch, runTransaction, increment, arrayUnion } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+import { getFirestore, collection, doc, getDoc, getDocs, query, where, setDoc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, writeBatch, runTransaction, increment, arrayUnion, Timestamp, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
 const fbApp = initializeApp(firebaseConfig);
@@ -200,7 +200,9 @@ function automaticClosure(date){
   return {date,note:holiday?`${holiday}のため休校`:'日曜日のため休校',automatic:true,holidayName:holiday||''};
 }
 
-function closureFor(date){ return state.closures[date] || automaticClosure(date); }
+// A scheduled mock exam takes priority over all automatic/manual closures for that date.
+// Removing the exam restores the underlying closure; no source data is deleted.
+function closureFor(date){ return examFor(date) ? null : (state.closures[date] || automaticClosure(date)); }
 function explicitClosureFor(date){return state.closures[date]||null;}
 function examFor(date){return state.examEvents[date]||null;}
 function lessonPeriodCount(entry){
@@ -296,6 +298,253 @@ function enableOneTapSave(formId) {
 }
 ['studentForm', 'lessonForm', 'memoForm', 'closureForm', 'courseForm', 'courseDeadlineForm'].forEach(enableOneTapSave);
 
+
+// ────────────────────────────────────────────────────────────────────────────
+// Owner audit and safe recovery. Every event stores the previous and new record
+// so accidental deletes can be reversed. Records are written atomically with
+// application changes wherever possible; Firebase Console edits are NOT traced.
+// ────────────────────────────────────────────────────────────────────────────
+const OWNER_ROOT_COLLECTIONS=['schoolStudents','timetableEntries','monthlyTargets','specialCourses','schoolClosures','schoolEvents'];
+const auditState={logs:[],archives:[],busy:false,loaded:false};
+function archivedValue(value){
+  if(value===null||value===undefined)return null;
+  if(value instanceof Date)return {__shiftlyType:'timestamp',value:value.toISOString()};
+  if(typeof value?.toDate==='function')return {__shiftlyType:'timestamp',value:value.toDate().toISOString()};
+  if(value?._methodName==='serverTimestamp')return {__shiftlyType:'serverNow'};
+  if(Array.isArray(value))return value.map(archivedValue);
+  if(typeof value==='object'){
+    const obj={};for(const [key,val] of Object.entries(value))if(val!==undefined)obj[key]=archivedValue(val);return obj;
+  }
+  return value;
+}
+function unarchiveValue(value){
+  if(value===null||typeof value!=='object')return value;
+  if(Array.isArray(value))return value.map(unarchiveValue);
+  if(value.__shiftlyType==='timestamp')return Timestamp.fromDate(new Date(value.value));
+  if(value.__shiftlyType==='serverNow')return serverTimestamp();
+  return Object.fromEntries(Object.entries(value).map(([key,val])=>[key,unarchiveValue(val)]));
+}
+const auditJson=value=>JSON.stringify(value==null?null:archivedValue(value));
+function cleanRecord(data){
+  if(data==null)return null;
+  const clone={...data};for(const k of ['id','virtual','displayPeriod','splitTotal','splitIndex'])delete clone[k];
+  return clone;
+}
+function validOwnerDocPath(path){
+  const seg=String(path||'').split('/');
+  if(seg.length===2)return OWNER_ROOT_COLLECTIONS.includes(seg[0])&&Boolean(seg[1])&&!seg[1].includes('..');
+  return seg.length===4 && seg[0]==='specialCourses' && seg[1] && (seg[2]==='teacherAvailability'||seg[2]==='scheduleMeta')&&seg[3]&&!seg.some(x=>x==='..');
+}
+function auditChange(writer,path,before,after,action,summary,groupId=''){
+  if(!state.user||!validOwnerDocPath(path))throw Error('変更履歴の対象が不正です');
+  const beforeJson=auditJson(cleanRecord(before)),afterJson=auditJson(cleanRecord(after));
+  if(beforeJson.length>300000||afterJson.length>300000)throw Error('変更履歴が大きすぎるため、保存できません。運営に確認してください。');
+  writer.set(doc(collection(db,'auditLogs')),{path,action,summary:String(summary||path).slice(0,150),actorUid:state.user.uid,
+    actorName:(state.profile?.name||'担当者').slice(0,90),beforeJson,afterJson,groupId:String(groupId||'').slice(0,100),courseId:path.includes('/teacherAvailability/')?path.split('/')[1]:'',createdAt:serverTimestamp()});
+}
+function stampedRestoreData(path,data){
+  const restored=unarchiveValue(data);
+  if(restored==null)return null;
+  if(/^(specialCourses\/[^/]+|schoolClosures\/[^/]+|schoolEvents\/[^/]+|specialCourses\/[^/]+\/teacherAvailability\/[^/]+|specialCourses\/[^/]+\/scheduleMeta\/[^/]+)$/.test(path)){
+    restored.updatedAt=serverTimestamp();restored.updatedBy=state.user.uid;
+  }
+  return restored;
+}
+function ownerOperationBusy(busy,text=''){
+  auditState.busy=busy;
+  for(const id of ['ownerCreateBackup','ownerRefresh','ownerDownloadBackup','ownerRestoreBackup'])if($(id))$(id).disabled=busy;
+  if(text)$('ownerAuditMessage').textContent=text;
+}
+function doubleConfirmRecovery(message){
+  if(!confirm(`【復元確認 1/2】\n${message}\n\n現在のデータが上書き・削除される可能性があります。続行しますか？`))return false;
+  return prompt(`【復元確認 2/2】\n${message}\n\n実行する場合は「復元する」と入力してください。`)==='復元する';
+}
+function formatAuditDate(value){return value?.toDate?.()?.toLocaleString('ja-JP')||'日時不明';}
+async function gatherOwnerRecords(){
+  if(!isOwner())throw Error('運営アカウント専用です');
+  const records=[];
+  for(const name of OWNER_ROOT_COLLECTIONS){
+    const docs=await getDocs(collection(db,name));
+    for(const item of docs.docs)records.push({path:item.ref.path,data:archivedValue(item.data())});
+    if(records.length>10000)throw Error('バックアップ対象が多すぎます。分割バックアップが必要です。');
+    if(name==='specialCourses'){
+      for(const course of docs.docs){
+        for(const nested of ['teacherAvailability','scheduleMeta']){
+          const children=await getDocs(collection(db,'specialCourses',course.id,nested));
+          for(const child of children.docs)records.push({path:child.ref.path,data:archivedValue(child.data())});
+        }
+      }
+    }
+  }
+  return records;
+}
+function splitOwnerArchive(records){
+  const chunks=[];let chunk=[],size=2;
+  for(const record of records){
+    const estimated=JSON.stringify(record).length+4;
+    if(estimated>70000)throw Error('1件のデータが大きすぎてバックアップできません。');
+    if(chunk.length&&(chunk.length>=45||size+estimated>75000)){
+      chunks.push(chunk);chunk=[];size=2;
+    }
+    chunk.push(record);size+=estimated;
+  }
+  if(chunk.length)chunks.push(chunk);
+  return chunks;
+}
+async function createOwnerArchive(label='手動バックアップ'){
+  if(!isOwner())throw Error('運営アカウント専用です');
+  const records=await gatherOwnerRecords();
+  const parts=splitOwnerArchive(records);
+  const archiveRef=doc(collection(db,'backupArchives'));
+  if(parts.length>500)throw Error('バックアップの分割数が上限を超えています。');
+  // Write all parts first, and publish the metadata ONLY when all succeed.
+  for(let i=0;i<parts.length;i+=20){
+    const batch=writeBatch(db);
+    for(let j=i;j<Math.min(parts.length,i+20);j++)batch.set(doc(db,'backupArchives',archiveRef.id,'parts',String(j).padStart(5,'0')),{json:JSON.stringify(parts[j])});
+    await batch.commit();
+  }
+  await setDoc(archiveRef,{label:String(label).slice(0,100),createdBy:state.user.uid,createdAt:serverTimestamp(),partCount:parts.length,recordCount:records.length,formatVersion:1});
+  return {id:archiveRef.id,recordCount:records.length,partCount:parts.length};
+}
+async function readOwnerArchive(id){
+  if(!isOwner())throw Error('運営アカウント専用です');
+  const meta=await getDoc(doc(db,'backupArchives',id));
+  if(!meta.exists()||meta.data().formatVersion!==1)throw Error('復元可能なバックアップではありません。');
+  const parts=[];
+  for(let i=0;i<meta.data().partCount;i++){
+    const part=await getDoc(doc(db,'backupArchives',id,'parts',String(i).padStart(5,'0')));
+    if(!part.exists())throw Error('バックアップの一部がありません。復元は中止しました。');
+    const data=JSON.parse(part.data().json);if(!Array.isArray(data))throw Error('バックアップ形式が不正です');
+    parts.push(...data);
+  }
+  if(parts.length!==meta.data().recordCount||parts.some(item=>!validOwnerDocPath(item.path)))throw Error('バックアップの整合性が確認できません');
+  return {meta:meta.data(),records:parts};
+}
+function downloadOwnerJson(name,object){
+  const blob=new Blob([JSON.stringify(object,null,2)],{type:'application/json;charset=utf-8'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+async function reloadOwnerTools(){
+  if(!isOwner())return;
+  const [logs,archives]=await Promise.all([
+    getDocs(query(collection(db,'auditLogs'),orderBy('createdAt','desc'),limit(150))),
+    getDocs(query(collection(db,'backupArchives'),orderBy('createdAt','desc'),limit(80)))
+  ]);
+  auditState.logs=logs.docs.map(d=>({id:d.id,...d.data()}));
+  auditState.archives=archives.docs.map(d=>({id:d.id,...d.data()}));
+  auditState.loaded=true;renderOwnerTools();
+}
+async function loadOwnerTools(){
+  if(!isOwner())return;
+  $('ownerAuditMessage').textContent='変更履歴とバックアップを確認しています…';
+  try{await reloadOwnerTools();$('ownerAuditMessage').textContent='最近の変更履歴を最大150件表示しています。';}
+  catch(error){trapError(error,'変更履歴を取得できませんでした');$('ownerAuditMessage').textContent='読み込みに失敗しました。Firebaseルールを確認してください。';}
+}
+function renderOwnerTools(){
+  const logHost=$('ownerAuditList'),archiveHost=$('ownerArchiveList');
+  logHost.replaceChildren();archiveHost.replaceChildren();
+  if(!auditState.logs.length)logHost.append(make('p','empty','まだ記録された変更履歴がありません。新版の適用後の操作から記録されます。'));
+  for(const log of auditState.logs){
+    const card=make('article','owner-audit-card'),head=make('div','owner-audit-head');
+    head.append(make('strong','',log.summary||'データの変更'),make('span','owner-audit-time',formatAuditDate(log.createdAt)));
+    card.append(head,make('p','owner-audit-meta',`${log.actorName||'不明'} ・ ${log.action||'変更'} ・ ${log.path||''}`));
+    const controls=make('div','owner-audit-controls');
+    for(const [label,key] of [['変更前に戻す','beforeJson'],['変更後に戻す','afterJson']]){
+      const btn=make('button','ghost',label);btn.type='button';btn.disabled=auditState.busy||log.action==='全体復元';
+      btn.addEventListener('click',()=>restoreOwnerHistory(log,key));controls.append(btn);
+    }
+    card.append(controls);logHost.append(card);
+  }
+  if(!auditState.archives.length)archiveHost.append(make('p','empty','クラウドバックアップはまだありません。'));
+  for(const archive of auditState.archives){
+    const row=make('div','owner-archive-row');
+    const info=make('div','owner-archive-info');
+    info.append(make('strong','',archive.label||'バックアップ'),make('small','',`${formatAuditDate(archive.createdAt)} ・ ${archive.recordCount}件`));row.append(info);
+    const dl=make('button','ghost','JSON保存');dl.type='button';dl.addEventListener('click',()=>downloadOwnerArchive(archive.id));
+    const rollback=make('button','danger-soft','全体復元');rollback.type='button';rollback.addEventListener('click',()=>restoreOwnerArchive(archive));
+    row.append(dl,rollback);archiveHost.append(row);
+  }
+}
+async function downloadOwnerArchive(id){
+  if(!isOwner()||auditState.busy)return;
+  ownerOperationBusy(true,'JSONファイルを作成中…');
+  try{const data=await readOwnerArchive(id);downloadOwnerJson(`Shiftly-T-backup-${id}.json`,{format:'Shiftly-T-operational-backup-v1',exportedAt:new Date().toISOString(),...data});}
+  catch(error){trapError(error,'バックアップのダウンロードに失敗しました');}
+  finally{ownerOperationBusy(false,'JSONの作成が完了しました。');renderOwnerTools();}
+}
+async function restoreOwnerHistory(log,key){
+  if(!isOwner()||auditState.busy||log.action==='全体復元')return;
+  if(!validOwnerDocPath(log.path)){showMessage('復元対象のパスが不正です。');return;}
+  if(!doubleConfirmRecovery(`${log.summary||log.path}\n${key==='beforeJson'?'変更前':'変更後'}の状態に復元します。`))return;
+  ownerOperationBusy(true,'安全バックアップを作成してから、選択した履歴を復元しています…');
+  try{
+    const archived=JSON.parse(log[key]);
+    await createOwnerArchive(`[自動] 履歴復元前 ${log.summary||''}`);
+    const target=doc(db,log.path),historyRef=doc(collection(db,'auditLogs'));
+    await runTransaction(db,async tx=>{
+      const current=await tx.get(target);
+      const old=current.exists()?current.data():null;
+      const desired=archived===null?null:stampedRestoreData(log.path,archived);
+      if(desired===null)tx.delete(target);else tx.set(target,desired);
+      auditChange({set:(ref,data)=>tx.set(ref,data)},log.path,old,desired,'復元',`履歴から復元：${log.summary||log.path}`);
+    });
+    await reloadOwnerTools();showMessage('選択した履歴の内容に復元しました。復元操作も履歴に記録しました。');
+  }catch(error){trapError(error,'履歴の復元に失敗しました。安全バックアップを確認してください');}
+  finally{ownerOperationBusy(false,'復元処理が終了しました。');renderOwnerTools();}
+}
+async function restoreOwnerArchive(archive){
+  if(!isOwner()||auditState.busy)return;
+  if(!doubleConfirmRecovery(`「${archive.label}」（${archive.recordCount}件）に業務データ全体を戻します。\n現在の登録内容のうちバックアップにないものは削除されます。`))return;
+  ownerOperationBusy(true,'復元データを検証しています…');
+  try{
+    const {records}=await readOwnerArchive(archive.id);
+    // Safety copy of the current live data is committed BEFORE the first restore write.
+    const safety=await createOwnerArchive(`[自動] 全体復元前 ${archive.label}`);
+    $('ownerAuditMessage').textContent=`復元前の安全バックアップ（${safety.id}）を保存しました。データを順番に復元しています…`;
+    const existing=await gatherOwnerRecords(),wanted=new Map(records.map(r=>[r.path,r]));
+    const obsolete=existing.filter(item=>!wanted.has(item.path));
+    const groups=[
+      records.filter(r=>r.path.startsWith('schoolStudents/')||r.path.startsWith('specialCourses/')&&r.path.split('/').length===2),
+      records.filter(r=>['schoolClosures','schoolEvents','monthlyTargets'].includes(r.path.split('/')[0])),
+      records.filter(r=>r.path.split('/').length===4),
+      records.filter(r=>r.path.startsWith('timetableEntries/'))
+    ];
+    // All writes are chunked because the Firestore SDK has a batch write limit.
+    // A failed phase leaves the PRE-RESTORE backup available for recovery.
+    let processed=0;
+    for(const group of groups){
+      for(let offset=0;offset<group.length;offset+=180){
+        const batch=writeBatch(db);
+        for(const record of group.slice(offset,offset+180))batch.set(doc(db,record.path),stampedRestoreData(record.path,record.data));
+        await batch.commit();processed+=Math.min(180,group.length-offset);
+        $('ownerAuditMessage').textContent=`復元中 ${processed}/${records.length}件…`;
+      }
+    }
+    const deletedOrder=obsolete.sort((a,b)=>{
+      const priority=p=>p.startsWith('timetableEntries/')?0:p.split('/').length===4?1:p.startsWith('schoolStudents/')?3:p.startsWith('specialCourses/')?4:2;
+      return priority(a.path)-priority(b.path);
+    });
+    for(let offset=0;offset<deletedOrder.length;offset+=180){
+      const batch=writeBatch(db);for(const record of deletedOrder.slice(offset,offset+180))batch.delete(doc(db,record.path));await batch.commit();
+    }
+    const batch=writeBatch(db);
+    auditChange(batch,`schoolStudents/${archive.id}`,null,null,'全体復元',`全体バックアップを復元：${archive.label}`);
+    await batch.commit();
+    await reloadOwnerTools();
+    showMessage('全体復元が完了しました。復元前の安全バックアップも保存してあります。');
+  }catch(error){trapError(error,'全体復元が中断しました。復元前の自動バックアップから復旧できるよう保全しています');}
+  finally{ownerOperationBusy(false,'処理が終了しました。必要に応じて画面を再読み込みしてください。');renderOwnerTools();}
+}
+$('ownerCreateBackup').addEventListener('click',async()=>{
+  if(!isOwner()||auditState.busy)return;
+  const label=($('ownerBackupLabel').value||'手動バックアップ').trim().slice(0,100);
+  ownerOperationBusy(true,'Firebase上にバックアップを作成しています…');
+  try{const archive=await createOwnerArchive(label);await reloadOwnerTools();showMessage(`${archive.recordCount}件のバックアップをFirebaseに保存しました。`);}
+  catch(error){trapError(error,'バックアップを作成できませんでした');}
+  finally{ownerOperationBusy(false,'バックアップ処理が終了しました。');renderOwnerTools();}
+});
+$('ownerRefresh').addEventListener('click',loadOwnerTools);
+
 function resetSubscriptions(){state.unsub.forEach(fn=>fn());state.unsub=[];}
 function nav(page) {
   state.page=page;
@@ -303,18 +552,20 @@ function nav(page) {
   $('teacherStudentsPage').hidden=page!=='students';
   $('closuresPage').hidden=page!=='closures';
   $('closurePageTitle').textContent=isAdmin()?'休校日管理':'休校日カレンダー';
-  $('closurePageDescription').textContent=isAdmin()?'日曜日・祝日は自動で休校になります。休校日でも模試を登録できます。':'休校日・祝日・模試の予定を閲覧できます（編集は管理者のみ）。';
+  $('closurePageDescription').textContent=isAdmin()?'日曜日・祝日は休校です。模試を登録した日は休校扱いが解除されます。':'休校日・祝日・模試の予定を閲覧できます（編集は管理者のみ）。';
   $('coursesPage').hidden=page!=='courses';
   $('courseEditorPage').hidden=page!=='courseEditor';
   $('availabilityPage').hidden=page!=='availability';
-  $('lessonsPage').hidden=page==='count'||page==='students'||page==='closures'||page==='courses'||page==='courseEditor'||page==='availability';
-  for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navClosures','closures'],['navCourses','courses'],['navAvailability','availability'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students']]) $(''+id).classList.toggle('active',page===p || (id==='navCourses'&&isAdmin()&&(page==='availability'||page==='courseEditor')));
+  $('ownerHistoryPage').hidden=page!=='ownerHistory';
+  $('lessonsPage').hidden=page==='count'||page==='students'||page==='closures'||page==='courses'||page==='courseEditor'||page==='availability'||page==='ownerHistory';
+  for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navClosures','closures'],['navCourses','courses'],['navAvailability','availability'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students'],['navOwnerHistory','ownerHistory']]) $(''+id).classList.toggle('active',page===p || (id==='navCourses'&&isAdmin()&&(page==='availability'||page==='courseEditor')));
   if(page==='count')renderCount();
   else if(page==='students')renderTeacherStudents();
   else if(page==='closures')renderClosures();
   else if(page==='courses')renderCourses();
   else if(page==='courseEditor')renderCourseEditor();
   else if(page==='availability')renderAvailabilityPage();
+  else if(page==='ownerHistory')loadOwnerTools();
   else {
     $('scheduleHeading').textContent=isAdmin()?'授業管理':'今日の時間割';
     $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'全教師の時間割と伝達事項を閲覧できます。';
@@ -346,6 +597,7 @@ $('editorBackToCourses').addEventListener('click',()=>{if(isAdmin())nav('courses
 $('availabilityBackToCourses').addEventListener('click',()=>{if(isAdmin())nav('courses');});
 $('navTeacherLessons').addEventListener('click',()=>nav('teacherLessons'));
 $('navTeacherStudents').addEventListener('click',()=>nav('students'));
+$('navOwnerHistory').addEventListener('click',()=>{if(isOwner())nav('ownerHistory');});
 $('teacherFilter').addEventListener('change',renderLessons);
 $('teacherStudentSearch').addEventListener('input',renderTeacherStudents);
 $('teacherStudentLevel').addEventListener('change',renderTeacherStudents);
@@ -404,6 +656,7 @@ async function persistAnnualGradePromotion(){
         const next=shiftGrade(data.grade,year-from);
         if(from>=year||next===data.grade)return;
         tx.update(ref,{grade:next,gradeYear:year});
+        auditChange({set:(r,d)=>tx.set(r,d)},ref.path,data,{...data,grade:next,gradeYear:year},'自動進級',`${data.name||student.name}さんの学年進級`);
       });
     }
   }catch(error){
@@ -677,7 +930,7 @@ function renderClosures(){
   $('addClosure').hidden=!admin;
   $('closureSelectedAction').hidden=!admin;
   $('closureSelectedExamAction').hidden=!admin;
-  $('closureSelectedHint').textContent=admin?'日曜日・祝日は自動休校です。模試は休校を解除せずに登録できます。':'閲覧専用です。休校日や模試の変更は管理者が行います。';
+  $('closureSelectedHint').textContent=admin?'日曜・祝日は通常休校ですが、模試を登録するとその日だけ休校を解除します。':'閲覧専用です。休校日や模試の変更は管理者が行います。';
   const [year,month]=closureCalendarView.month.split('-').map(Number);
   $('closureMonthTitle').textContent=`${year}年${month}月`;
   if(state.closuresStatus!=='ready'||state.examStatus!=='ready'){
@@ -712,7 +965,7 @@ function renderClosures(){
     cell.type='button';cell.setAttribute('aria-pressed',String(selected));
     cell.setAttribute('aria-label',`${prettyDate(date)}${record?'、休校':''}${record?.note?'、'+record.note:''}${exam?'、'+exam.title+'実施':''}`);
     cell.append(make('span','closure-calendar-number',String(Number(date.slice(-2)))));
-    if(record)cell.append(make('span','closure-calendar-closed',record.automatic?'自動休校':'休校'));
+    if(record)cell.append(make('span','closure-calendar-closed','休校'));
     if(exam)cell.append(make('span','closure-calendar-exam','模試'));
     if(record?.note)cell.append(make('span','closure-calendar-day-note',record.note));
     cell.addEventListener('click',()=>{closureCalendarView.selected=date;closureCalendarView.month=date.slice(0,7);renderClosures();});
@@ -721,9 +974,9 @@ function renderClosures(){
   grid.append(fragment);
   const selected=closureCalendarView.selected,record=closureFor(selected),explicit=explicitClosureFor(selected),exam=examFor(selected);
   $('closureSelectedTitle').textContent=prettyDate(selected);
-  $('closureSelectedStatus').textContent=record?(record.automatic?'自動休校（日曜日・祝日）':'休校登録済み'):'通常営業日';
+  $('closureSelectedStatus').textContent=exam?'模試実施日':record?'休校':'通常営業日';
   $('closureSelectedStatus').className='closure-selected-status'+(record?' is-closed':'');
-  $('closureSelectedNote').textContent=record?(record.note||'備考の登録はありません。'):'この日は休校登録されていません。';
+  $('closureSelectedNote').textContent=exam?'模試・テストを実施するため、休校扱いを解除しています。':record?(record.note||'備考の登録はありません。'):'この日は休校登録されていません。';
   $('closureSelectedExamInfo').textContent=exam?`📝 ${exam.title}｜${exam.start}〜${exam.end}${exam.note?'｜'+exam.note:''}`:'模試・テストの予定はありません。';
   $('closureSelectedAction').textContent=explicit?'休校内容を編集・登録解除':record?.automatic?'休校日の備考を追加':'この日を休校にする';
   $('closureSelectedExamAction').textContent=exam?'模試・テストを編集／削除':'＋ 模試・テストを登録';
@@ -736,7 +989,7 @@ function renderClosures(){
     edit.addEventListener('click',()=>{closureCalendarView.selected=record.date;closureCalendarView.month=record.date.slice(0,7);renderClosures();$('closureCalendarGrid').scrollIntoView({block:'nearest',behavior:'smooth'});});
     item.append(info,edit);host.append(item);
   }
-  if(!records.length)host.append(make('div','empty','手動で登録した休校日はありません（日曜・祝日は自動休校です）。'));
+  if(!records.length)host.append(make('div','empty','手動で登録した休校日はありません（日曜・祝日は休校です）。'));
 }
 function openClosureForm(date=''){
   if(!isAdmin())return;
@@ -746,7 +999,7 @@ function openClosureForm(date=''){
   $('closureDate').value=closure?.date||date||state.date;
   $('closureDate').disabled=Boolean(closure);
   $('closureNote').value=closure?.note||'';
-  $('closureDialogTitle').textContent=closure?'休校日を編集':automaticClosure(date)?'自動休校日に備考を追加':'休校日を登録';
+  $('closureDialogTitle').textContent=closure?'休校日を編集':automaticClosure(date)?'休校日の備考を追加':'休校日を登録';
   $('deleteClosure').hidden=!closure;
   showDialog('closureDialog');
 }
@@ -763,7 +1016,8 @@ $('closureForm').addEventListener('submit',async event=>{
   if(explicitClosureFor(date)&&!$('closureEditingDate').value){showMessage('この日はすでに休校登録されています。「編集」から変更してください。');return;}
   const button=event.submitter;button.disabled=true;
   try{
-    await setDoc(doc(db,'schoolClosures',date),{date,note,updatedAt:serverTimestamp(),updatedBy:state.user.uid});
+    const before=explicitClosureFor(date);const after={date,note,updatedAt:serverTimestamp(),updatedBy:state.user.uid};
+    const batch=writeBatch(db);batch.set(doc(db,'schoolClosures',date),after);auditChange(batch,`schoolClosures/${date}`,before,after,before?'変更':'追加',`${prettyDate(date)}の休校日`);await batch.commit();
     closureCalendarView.selected=date;closureCalendarView.month=date.slice(0,7);
     closeDialog('closureDialog');renderClosures();showMessage(`${prettyDate(date)}の休校設定を保存しました。授業データは削除されません。`);
   }catch(e){trapError(e,'休校日の保存に失敗しました');}
@@ -774,9 +1028,9 @@ $('deleteClosure').addEventListener('click',async()=>{
   const date=$('closureEditingDate').value;
   if(!date||!explicitClosureFor(date))return;
   const automatic=Boolean(automaticClosure(date));
-  if(!confirm(`${prettyDate(date)}の手動休校設定を解除しますか？${automatic?'日曜・祝日の自動休校は引き続き有効です。':'元の時間割が再び表示されます。'}`))return;
+  if(!confirm(`${prettyDate(date)}の手動休校設定を解除しますか？${automatic?'日曜・祝日の休校は引き続き有効です。':'元の時間割が再び表示されます。'}`))return;
   const button=$('deleteClosure');button.disabled=true;
-  try{await deleteDoc(doc(db,'schoolClosures',date));closeDialog('closureDialog');renderClosures();showMessage(automatic?'備考を解除しました。自動休校は継続します。':'休校日を解除しました。元の授業予定が再表示されます。');}
+  try{const batch=writeBatch(db);batch.delete(doc(db,'schoolClosures',date));auditChange(batch,`schoolClosures/${date}`,explicitClosureFor(date),null,'削除',`${prettyDate(date)}の休校日`);await batch.commit();closeDialog('closureDialog');renderClosures();showMessage(automatic?'備考を解除しました。日曜・祝日の休校は継続します。':'休校日を解除しました。元の授業予定が再表示されます。');}
   catch(e){trapError(e,'休校日の解除に失敗しました');}finally{button.disabled=false;}
 });
 function openExamForm(date){
@@ -797,8 +1051,9 @@ $('examForm').addEventListener('submit',async event=>{
   const date=$('examDate').value,title=$('examTitle').value.trim(),start=$('examStart').value,end=$('examEnd').value,note=$('examNote').value.trim();
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!title||title.length>80||!start||!end||start>=end||note.length>500){showMessage('模試の日時・名称・備考を確認してください。');return;}
   const button=event.submitter;button.disabled=true;
-  try{await setDoc(doc(db,'schoolEvents',date),{date,type:'exam',title,start,end,note,updatedBy:state.user.uid,updatedAt:serverTimestamp()});
-    closeDialog('examDialog');showMessage(`${prettyDate(date)}の模試・テストを登録しました。休校設定は変更されません。`);}
+  try{const previous=examFor(date),after={date,type:'exam',title,start,end,note,updatedBy:state.user.uid,updatedAt:serverTimestamp()};
+    const batch=writeBatch(db);batch.set(doc(db,'schoolEvents',date),after);auditChange(batch,`schoolEvents/${date}`,previous,after,previous?'変更':'追加',`${prettyDate(date)}の模試・テスト`);await batch.commit();
+    closeDialog('examDialog');showMessage(`${prettyDate(date)}の模試・テストを登録しました。この日の休校扱いを解除しました。`);}
   catch(error){trapError(error,'模試の登録に失敗しました');}finally{button.disabled=false;}
 });
 $('deleteExam').addEventListener('click',async()=>{
@@ -806,7 +1061,7 @@ $('deleteExam').addEventListener('click',async()=>{
   const date=$('examDate').value;if(!examFor(date))return;
   if(!confirm(`${prettyDate(date)}の模試・テスト予定を削除しますか？`))return;
   const button=$('deleteExam');button.disabled=true;
-  try{await deleteDoc(doc(db,'schoolEvents',date));closeDialog('examDialog');showMessage('模試・テスト予定を削除しました。');}
+  try{const batch=writeBatch(db);batch.delete(doc(db,'schoolEvents',date));auditChange(batch,`schoolEvents/${date}`,examFor(date),null,'削除',`${prettyDate(date)}の模試・テスト`);await batch.commit();closeDialog('examDialog');showMessage('模試・テスト予定を削除しました。日曜・祝日・手動休校の設定が再び適用されます。');}
   catch(error){trapError(error,'模試を削除できませんでした');}finally{button.disabled=false;}
 });
 
@@ -882,7 +1137,8 @@ $('courseDeadlineForm').addEventListener('submit',async event=>{
   if(!date||Number.isNaN(date.getTime())){showMessage('提出締切の日時を入力してください。');return;}
   const button=event.submitter||$('courseDeadlineForm').querySelector('[type="submit"]');button.disabled=true;
   try{
-    await updateDoc(doc(db,'specialCourses',id),{availabilityDeadline:date,updatedBy:state.user.uid,updatedAt:serverTimestamp()});
+    const before=state.courses.find(c=>c.id===id),change={availabilityDeadline:date,updatedBy:state.user.uid,updatedAt:serverTimestamp()};
+    const batch=writeBatch(db);batch.update(doc(db,'specialCourses',id),change);auditChange(batch,`specialCourses/${id}`,before,{...before,...change},'変更',`${before?.name||'講習'}の勤務希望提出締切`);await batch.commit();
     closeDialog('courseDeadlineDialog');showMessage('勤務希望の提出締切を変更しました。');
   }catch(e){trapError(e,'提出締切の変更に失敗しました');}
   finally{button.disabled=false;}
@@ -912,7 +1168,8 @@ $('courseForm').addEventListener('submit',async event=>{
   }
   const button=event.submitter;button.disabled=true;
   try{
-    await setDoc(doc(db,'specialCourses',id),{type,name,startDate,endDate,periods,availabilityDeadline:deadline,updatedBy:state.user.uid,updatedAt:serverTimestamp()});
+    const before=state.courses.find(c=>c.id===id),after={type,name,startDate,endDate,periods,availabilityDeadline:deadline,updatedBy:state.user.uid,updatedAt:serverTimestamp()};
+    const batch=writeBatch(db);batch.set(doc(db,'specialCourses',id),after);auditChange(batch,`specialCourses/${id}`,before,after,before?'変更':'追加',`${name}期間・コマ設定`);await batch.commit();
     closeDialog('courseDialog');showMessage(`${name}期間を保存しました。期間内は講習授業だけが表示されます。`);
   }catch(e){trapError(e,'講習期間の保存に失敗しました');}finally{button.disabled=false;}
 });
@@ -925,11 +1182,13 @@ $('deleteCourse').addEventListener('click',async()=>{
   const button=$('deleteCourse');button.disabled=true;
   try{
     const availabilityDocs=await getDocs(collection(db,'specialCourses',id,'teacherAvailability'));
-    if(availabilityDocs.size>450)throw Error('勤務希望が多数あるため削除できません。管理者に連絡してください。');
+    if(availabilityDocs.size>170)throw Error('勤務希望が多数あるため一度に削除できません。運営に相談してください。');
     const batch=writeBatch(db);
-    for(const snapshot of availabilityDocs.docs)batch.delete(snapshot.ref);
-    batch.delete(doc(db,'specialCourses',id,'scheduleMeta','state'));
-    batch.delete(doc(db,'specialCourses',id));
+    const group=doc(collection(db,'auditLogs')).id;
+    for(const snapshot of availabilityDocs.docs){batch.delete(snapshot.ref);auditChange(batch,snapshot.ref.path,snapshot.data(),null,'削除',`${course.name}の講師勤務希望`,group);}
+    const metaRef=doc(db,'specialCourses',id,'scheduleMeta','state');const meta=await getDoc(metaRef);
+    if(meta.exists()){batch.delete(metaRef);auditChange(batch,metaRef.path,meta.data(),null,'削除',`${course.name}の配置管理情報`,group);}
+    batch.delete(doc(db,'specialCourses',id));auditChange(batch,`specialCourses/${id}`,course,null,'削除',`${course.name}講習期間`,group);
     await batch.commit();
     closeDialog('courseDialog');showMessage('講習期間と勤務希望を解除しました。通常授業が再表示されます。');
   }
@@ -1172,9 +1431,11 @@ $('addStudent').addEventListener('click',()=>openStudent(''));
 async function updateStudentEntryLabels(studentId, studentData){
   const docs=await getDocs(query(collection(db,'timetableEntries'),where('studentId','==',studentId)));
   let batch=writeBatch(db),count=0;
+  const group=doc(collection(db,'auditLogs')).id;
   for(const snapshot of docs.docs){
-    batch.update(snapshot.ref,{studentName:studentData.name,grade:studentData.grade,school:studentData.school});count++;
-    if(count===400){await batch.commit();batch=writeBatch(db);count=0;}
+    const change={studentName:studentData.name,grade:studentData.grade,school:studentData.school};
+    batch.update(snapshot.ref,change);auditChange(batch,snapshot.ref.path,snapshot.data(),{...snapshot.data(),...change},'変更',`${studentData.name}さんの授業表示情報`,group);count++;
+    if(count===175){await batch.commit();batch=writeBatch(db);count=0;}
   }
   if(count)await batch.commit();
   const recipients=[...new Set(docs.docs.filter(d=>d.data().date>=todayKey()).map(d=>d.data().teacherUid).filter(Boolean))];
@@ -1190,7 +1451,7 @@ $('studentForm').addEventListener('submit',async event=>{
   if(!data.name||!data.grade){showMessage('生徒名と学年を入力してください。');return;}
   const button=event.submitter;button.disabled=true;
   try{
-    await setDoc(doc(db,'schoolStudents',id),data);
+    const batch=writeBatch(db);batch.set(doc(db,'schoolStudents',id),data);auditChange(batch,`schoolStudents/${id}`,before,data,before?'変更':'追加',`${data.name}さんの生徒情報・通常授業`);await batch.commit();
     if($('studentId').value)await updateStudentEntryLabels(id,data);
     if(JSON.stringify(before?.regularSlots||{})!==JSON.stringify(data.regularSlots)){
       const affected=[...everySlot(before||{}),...everySlot(data)].map(s=>s.teacherUid);
@@ -1228,7 +1489,7 @@ $('deleteStudent').addEventListener('click', async () => {
       `通常授業：${slots}件（生徒データ内）\n`+
       `保存済み授業記録：${lessons.size}件\n`+
       `旧・月別回数記録：${targets.size}件\n\n`+
-      '過去の授業履歴・欠席情報・伝達事項も削除され、元には戻せません。';
+      '過去の授業・欠席・伝達事項も削除されます。運営の変更履歴から復元できる場合がありますが、削除前のバックアップを推奨します。';
     $('confirmStudentDeletion').disabled=false;
   }catch(error){
     trapError(error,'削除対象の確認に失敗しました');
@@ -1246,13 +1507,15 @@ $('confirmStudentDeletion').addEventListener('click', async () => {
     // Keep the student record until all linked records are removed. Use chunks
     // well under Firestore's write-batch limit. If a chunk fails, the student
     // remains and the operation can be retried safely.
-    const linked=[...request.lessons,...request.targets];
-    for(let offset=0;offset<linked.length;offset+=400){
+    const linked=[...request.lessons,...request.targets],group=doc(collection(db,'auditLogs')).id;
+    for(let offset=0;offset<linked.length;offset+=175){
       const batch=writeBatch(db);
-      for(const snapshot of linked.slice(offset,offset+400))batch.delete(snapshot.ref);
+      for(const snapshot of linked.slice(offset,offset+175)){batch.delete(snapshot.ref);auditChange(batch,snapshot.ref.path,snapshot.data(),null,'削除',`${request.studentName}さんの関連授業・記録`,group);}
       await batch.commit();
     }
-    await deleteDoc(doc(db,'schoolStudents',request.studentId));
+    const before=state.students.find(s=>s.id===request.studentId);
+    const batch=writeBatch(db);batch.delete(doc(db,'schoolStudents',request.studentId));
+    auditChange(batch,`schoolStudents/${request.studentId}`,before,null,'削除',`${request.studentName}さんの生徒情報`,group);await batch.commit();
     pendingStudentDeletion=null;
     closeDialog('deleteStudentDialog');
     closeDialog('studentDialog');
@@ -1417,6 +1680,7 @@ $('lessonForm').addEventListener('submit',async event=>{
   const btn=event.submitter;btn.disabled=true;
   try{
     const batch=writeBatch(db);batch.set(doc(db,'timetableEntries',id),data);
+    auditChange(batch,`timetableEntries/${id}`,old?.virtual?null:old,data,old?'変更':'追加',`${prettyDate(date)} ${start}〜${end} ${student.name}さんの授業`);
     if(course)batch.set(doc(db,'specialCourses',course.id,'scheduleMeta','state'),{version:increment(1),updatedBy:state.user.uid,updatedAt:serverTimestamp()},{merge:true});
     const affected=[teacher.id];if(old?.teacherUid&&old.teacherUid!==teacher.id)affected.push(old.teacherUid);
     await sendLessonNotifications(affected,old,{...data,id},'save',batch);
@@ -1430,6 +1694,7 @@ $('deleteLesson').addEventListener('click',async()=>{
   if(!confirm('この授業を削除しますか？'))return;
   try{
     const batch=writeBatch(db);batch.delete(doc(db,'timetableEntries',old.id));
+    auditChange(batch,`timetableEntries/${old.id}`,old,null,'削除',`${prettyDate(old.date)} ${old.start}〜${old.end} ${old.studentName||'生徒'}さんの授業`);
     if(old.courseId)batch.set(doc(db,'specialCourses',old.courseId,'scheduleMeta','state'),{version:increment(1),updatedBy:state.user.uid,updatedAt:serverTimestamp()},{merge:true});
     await sendLessonNotifications([old.teacherUid],old,null,'delete',batch);
     await batch.commit();
@@ -1488,6 +1753,7 @@ $('memoForm').addEventListener('submit',async event=>{
     const batch=writeBatch(db);
     if(lesson.virtual){const {id,virtual,...stored}=lesson;batch.set(doc(db,'timetableEntries',lesson.id),{...stored,memo:content,memoUpdatedAt:serverTimestamp()});}
     else batch.update(doc(db,'timetableEntries',lesson.id),{memo:content,memoUpdatedAt:serverTimestamp()});
+    auditChange(batch,`timetableEntries/${lesson.id}`,lesson.virtual?null:lesson,{...lesson,memo:content,memoUpdatedAt:serverTimestamp()},'変更',`${prettyDate(lesson.date)} ${lesson.studentName||'生徒'}さんの伝達事項`);
     await sendLessonNotifications([lesson.teacherUid],lesson,{...lesson,memo:content},'memo',batch);
     await batch.commit();
     closeDialog('detailDialog');showMessage('伝達事項を保存しました。時間割にも反映されます。');
@@ -1773,7 +2039,9 @@ $('availabilitySubmit').addEventListener('click',async()=>{
       const snapshot=await tx.get(availabilityRef);
       const previous=snapshot.exists()&&Array.isArray(snapshot.data().slots)?snapshot.data().slots:[];
       if(availabilitySetKey(previous)!==availabilityEditor.sourceKey)throw Error('他の端末で勤務希望が更新されました。変更を破棄して読み直してください。');
-      tx.set(availabilityRef,{slots,updatedBy:state.user.uid,updatedAt:serverTimestamp()});
+      const submitted={slots,updatedBy:state.user.uid,updatedAt:serverTimestamp()};
+      tx.set(availabilityRef,submitted);
+      auditChange({set:(r,d)=>tx.set(r,d)},availabilityRef.path,snapshot.exists()?snapshot.data():null,submitted,'勤務希望',`${course?.name||'講習'}の勤務希望（${slots.length}コマ）`);
       for(const ref of notificationRefs){
         tx.set(ref,{kind:'availability',senderUid:state.user.uid,courseId,
           read:false,createdAt:serverTimestamp()});
@@ -2092,7 +2360,7 @@ async function publishCourseEditor(){
   if(!isAdmin()||courseEditor.busy)return;
   const changes=courseEditorChanges(),course=state.courses.find(c=>c.id===courseEditor.courseId);
   if(!changes.length||!course)return;
-  if(changes.length>150){showMessage('一度に反映できる変更は150件までです。複数回に分けて確定してください。');return;}
+  if(changes.length>90){showMessage('履歴記録を含め、一度に反映できる変更は90件までです。複数回に分けて確定してください。');return;}
   if(courseEditorSettings(course)!==courseEditor.courseSignature){showMessage('講習設定が変更されました。再読み込みしてください。');return;}
   for(const changed of changes.filter(e=>!e._delete)){const error=courseEditorValidate(changed.id,changed);if(error){showMessage(error);return;}}
   if(!confirm(`${changes.length}件の講習授業の変更を確定し、講師の時間割に反映しますか？`))return;
@@ -2111,6 +2379,7 @@ async function publishCourseEditor(){
     if(peerDocs.length>350)throw Error('対象日の授業が多すぎます。変更を分けて反映してください。');
     const courseRef=doc(db,'specialCourses',course.id);
     const closureRefs=dates.map(date=>doc(db,'schoolClosures',date));
+    const examRefs=dates.map(date=>doc(db,'schoolEvents',date));
     const affected=[...new Set(changes.flatMap(e=>[e.teacherUid,courseEditor.originals.get(e.id)?.teacherUid]).filter(Boolean))];
     const availRefs=affected.map(uid=>doc(db,'specialCourses',course.id,'teacherAvailability',uid));
     await runTransaction(db,async tx=>{
@@ -2118,11 +2387,12 @@ async function publishCourseEditor(){
       const courseSnap=await tx.get(courseRef);
       const metaNow=await tx.get(metaRef);
       const closureSnaps=await Promise.all(closureRefs.map(r=>tx.get(r)));
+      const examSnaps=await Promise.all(examRefs.map(r=>tx.get(r)));
       const fresh=await Promise.all(peerDocs.map(s=>tx.get(s.ref)));
       const availabilitySnaps=await Promise.all(availRefs.map(ref=>tx.get(ref)));
       if(!courseSnap.exists()||courseEditorSettings(courseSnap.data())!==courseEditor.courseSignature)throw Error('講習期間・時間設定が変更されました。画面を再読み込みしてください。');
       if((metaNow.exists()?Number(metaNow.data().version)||0:0)!==expectedVersion)throw Error('他の管理者が講習授業を更新しました。最新の時間割を読み直してください。');
-      if(closureSnaps.some(s=>s.exists()))throw Error('対象日に休校日が登録されました。再確認してください。');
+      if(closureSnaps.some((s,i)=>s.exists()&&!(examSnaps[i].exists()&&examSnaps[i].data().type==='exam')))throw Error('対象日に休校日が登録されました。再確認してください。');
       const current=new Map();
       for(let i=0;i<peerDocs.length;i++){
         const snap=peerDocs[i],now=fresh[i];
@@ -2156,12 +2426,16 @@ async function publishCourseEditor(){
           if(count>2)throw Error('担当講師が同時に3人以上の生徒を担当しています。');
         }
       }
+      const auditGroup=doc(collection(db,'auditLogs')).id;
       for(const change of changes){
-        if(change._delete){tx.delete(doc(db,'timetableEntries',change.id));continue;}
+        const original=courseEditor.originals.get(change.id)||null;
+        if(change._delete){tx.delete(doc(db,'timetableEntries',change.id));
+          auditChange({set:(r,d)=>tx.set(r,d)},`timetableEntries/${change.id}`,original,null,'削除',`${prettyDate(change.date)} ${change.studentName||'生徒'}さんの講習授業`,auditGroup);continue;}
         const teacher=state.people.find(p=>p.id===change.teacherUid);
         if(!courseEditor.originals.has(change.id)){
           const {id,...entry}=change;tx.set(doc(db,'timetableEntries',change.id),{...entry,teacherName:teacher?.name||change.teacherName});
         }else{tx.update(doc(db,'timetableEntries',change.id),{date:change.date,start:change.start,end:change.end,teacherUid:change.teacherUid,teacherName:teacher?.name||change.teacherName});}
+        auditChange({set:(r,d)=>tx.set(r,d)},`timetableEntries/${change.id}`,original,{...original,...change,teacherName:teacher?.name||change.teacherName},original?'変更':'追加',`${prettyDate(change.date)} ${change.start}〜${change.end} ${change.studentName||'生徒'}さんの講習授業`,auditGroup);
       }
       tx.set(metaRef,{version:expectedVersion+1,updatedBy:state.user.uid,updatedAt:serverTimestamp()});
       for(const change of changes){
@@ -2185,6 +2459,8 @@ async function publishCourseEditor(){
 $('editorSave').addEventListener('click',publishCourseEditor);
 
 function loggedOut(){
+  auditState.logs=[];auditState.archives=[];auditState.loaded=false;auditState.busy=false;
+  $('ownerAuditList').replaceChildren();$('ownerArchiveList').replaceChildren();$('ownerAuditMessage').textContent='';
   resetSubscriptions();state.user=null;state.profile=null;state.entries=[];state.entriesStatus='loading';state.students=[];state.people=[];state.closures={};state.closuresStatus='loading';state.examEvents={};state.examStatus='loading';state.courses=[];state.coursesStatus='loading';state.notices=[];state.officialAnnouncements=[];state.officialSeenIds=new Set();state.officialSeenReady=false;clearAvailabilitySubscriptions();state.availability=new Map();state.availabilityStatus={};resetCourseEditor();resetAvailabilityEditor();
   $('availabilityHomePanel').hidden=true;$('availabilityHomeCards').replaceChildren();
   $('loginPanel').hidden=false;$('appPanel').hidden=true;$('logout').hidden=true;$('notificationButton').hidden=true;$('identity').textContent='';$('password').value='';$('noticeCount').hidden=true;
@@ -2201,8 +2477,12 @@ async function loggedIn(user){
   $('identity').textContent=`${name}（${isOwner()?'運営':isAdmin()?'管理者':'教師'}）`;
   $('welcomeSub').textContent=isAdmin()?'生徒情報と授業の状況をまとめて管理できます。':'今日の授業・全教師の時間割・生徒情報を確認できます。';
   $('availabilityPageTitle').textContent=isAdmin()?'勤務希望登録・提出状況':'勤務希望登録';
+  $('navOwnerHistory').hidden=!isOwner();
   $('availabilityPageDescription').textContent=isAdmin()?'各講師の勤務希望と提出状況を確認・修正できます。':'出勤できる日・コマを選択して、締切までに提出してください。';
   $('loginPanel').hidden=true;$('appPanel').hidden=false;$('logout').hidden=false;
+  // Teacher navigation: timetable, student list, school calendar, availability.
+  if(isAdmin())$('navAdminLessons').after($('navClosures'));else $('navTeacherStudents').after($('navClosures'));
+  $('navOwnerHistory').hidden=!isOwner();
   $('navCount').hidden=!isAdmin();$('navAdminLessons').hidden=!isAdmin();$('navClosures').hidden=false;$('navCourses').hidden=!isAdmin();$('navAvailability').hidden=isAdmin();$('availabilityBackToCourses').hidden=!isAdmin();$('editorBackToCourses').hidden=!isAdmin();$('navTeacherLessons').hidden=isAdmin();$('navTeacherStudents').hidden=isAdmin();$('addLesson').hidden=!isAdmin();$('notificationButton').hidden=false;$('broadcastForm').hidden=!isOwner();$('ownerAnnouncementManagement').hidden=!isOwner();
   renderedAcademicYear=academicYearJST();
   const now=new Date();$('broadcastStart').value=localDateTimeInput(now);$('broadcastEnd').value=localDateTimeInput(new Date(now.getTime()+7*86400000));$('teacherFilterWrap').hidden=isAdmin();
