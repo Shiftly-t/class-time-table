@@ -3,6 +3,12 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from
 import { getFirestore, collection, doc, getDoc, getDocs, query, where, setDoc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, writeBatch, runTransaction, increment, arrayUnion, Timestamp, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
+// A staging build must never contact the production Firebase project.
+const IS_TEST_BUILD = document.documentElement.dataset.shiftlyEnvironment === 'test';
+if(IS_TEST_BUILD && (!firebaseConfig.projectId || JSON.stringify(firebaseConfig).includes('shiftly-d02f6') || firebaseConfig.projectId.startsWith('REPLACE_'))){
+  document.body.innerHTML='<main class="test-configuration-error"><h1>Shiftly-T TEST：設定が必要です</h1><p>テスト専用のFirebaseプロジェクトを作成し、config.jsをテスト用の値に差し替えてください。本番用プロジェクトへの接続は禁止されています。</p></main>';
+  throw new Error('テスト用のFirebase設定が未完了、または本番のprojectIdを指定しています。');
+}
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
@@ -14,6 +20,7 @@ const prettyDate = value => { if(!/^\d{4}-\d{2}-\d{2}$/.test(value||'')) return 
 const isOwner = () => state.profile?.role === 'owner';
 const isManagementRole = role => role === 'owner' || role === 'admin';
 const isAdmin = () => isManagementRole(state.profile?.role);
+const maintenanceState={loaded:false,enabled:false,message:'',version:'',updatedAt:null,startedAt:null,unsub:null,dataStarted:false,history:[],busy:false};
 const state = { user:null, profile:null, date:todayKey(), scheduleView:'day', page:'', students:[], people:[], entries:[], entriesStatus:'loading', closures:{}, closuresStatus:'loading', examEvents:{}, examStatus:'loading', courses:[], coursesStatus:'loading', notices:[], officialAnnouncements:[], officialSeenIds:new Set(), officialSeenReady:false, activeLesson:null, availability:new Map(), availabilityStatus:{}, availabilityUnsub:[], unsub:[] };
 const WEEKDAYS = ['日','月','火','水','木','金','土'];
 const closureCalendarView={month:todayKey().slice(0,7),selected:todayKey()};
@@ -545,7 +552,86 @@ $('ownerCreateBackup').addEventListener('click',async()=>{
 });
 $('ownerRefresh').addEventListener('click',loadOwnerTools);
 
-function resetSubscriptions(){state.unsub.forEach(fn=>fn());state.unsub=[];}
+function resetSubscriptions(){state.unsub.forEach(fn=>fn());state.unsub=[];maintenanceState.dataStarted=false;}
+
+// Readable by registered users even when ordinary data access is blocked.
+const MAINTENANCE_REF = doc(db,'systemConfig','maintenance');
+function applyMaintenanceState(){
+  const blocked=maintenanceState.enabled && !isOwner();
+  $('maintenancePanel').hidden=!blocked;
+  $('appPanel').hidden=blocked || !maintenanceState.loaded;
+  $('notificationButton').hidden=blocked || !maintenanceState.loaded;
+  $('maintenanceMessage').textContent=maintenanceState.message||'現在、機能の更新と動作確認を行っています。';
+  $('maintenanceVersion').textContent=maintenanceState.version?`対象バージョン：${maintenanceState.version}`:'';
+  $('maintenanceStatus').textContent=maintenanceState.loaded?'ただいまメンテナンス中です':'利用状況を確認しています…';
+  if(!blocked && maintenanceState.loaded && state.user){ $('notificationButton').hidden=false; }
+  if(isOwner())renderMaintenanceOwner();
+}
+function renderMaintenanceOwner(){
+  if(!isOwner()||!$('maintenanceOwnerPage'))return;
+  $('maintenanceModeLabel').textContent=maintenanceState.enabled?'メンテナンス中':'通常運用中';
+  $('maintenanceModeLabel').className='maintenance-badge'+(maintenanceState.enabled?' is-active':'');
+  $('maintenanceOwnerCurrent').textContent=maintenanceState.enabled?'現在、管理者・講師の業務データアクセスを停止しています。運営のみ操作できます。':'管理者・講師が通常利用できる状態です。';
+  $('maintenanceStart').hidden=maintenanceState.enabled;
+  $('maintenanceEnd').hidden=!maintenanceState.enabled;
+  $('maintenanceStart').disabled=maintenanceState.busy;
+  $('maintenanceEnd').disabled=maintenanceState.busy;
+  $('maintenanceRecord').disabled=maintenanceState.busy;
+  const host=$('maintenanceHistoryList');host.replaceChildren();
+  if(!maintenanceState.history.length){host.append(make('p','empty','メンテナンス履歴はまだありません。'));return;}
+  for(const item of maintenanceState.history){
+    const row=make('article','maintenance-history-item');
+    const kind=item.type==='start'?'メンテナンス開始':item.type==='end'?'メンテナンス終了':'更新内容の記録';
+    row.append(make('strong','',kind),make('small','',formatAuditDate(item.createdAt)));
+    row.append(make('p','',item.message||'記録なし'));
+    row.append(make('small','',`記録者：${item.actorName||'運営'}${item.version?' ／ '+item.version:''}${item.backupId?' ／ 開始前バックアップあり':''}`));
+    host.append(row);
+  }
+}
+async function loadMaintenanceHistory(){
+  if(!isOwner())return;
+  try{
+    const rows=await getDocs(query(collection(db,'maintenanceEvents'),orderBy('createdAt','desc'),limit(50)));
+    maintenanceState.history=rows.docs.map(row=>({id:row.id,...row.data()}));
+    renderMaintenanceOwner();
+  }catch(error){trapError(error,'メンテナンス履歴を取得できませんでした');}
+}
+async function changeMaintenance(type){
+  if(!isOwner()||maintenanceState.busy||!maintenanceState.loaded)return;
+  const enabled=type==='start'?true:type==='end'?false:maintenanceState.enabled;
+  if(type==='start'&&maintenanceState.enabled||type==='end'&&!maintenanceState.enabled)return;
+  const message=$('maintenanceNoticeInput').value.trim().slice(0,300);
+  const version=$('maintenanceVersionInput').value.trim().slice(0,50);
+  if(type==='start'&&!confirm('メンテナンスモードを開始します。管理者・講師はサイト内の業務データへアクセスできなくなります。開始しますか？'))return;
+  if(type==='end'&&!confirm('動作確認は完了しましたか？メンテナンスモードを終了して管理者・講師の利用を再開しますか？'))return;
+  if(type==='update'&&!message){showMessage('更新内容を入力してください。');return;}
+  maintenanceState.busy=true;renderMaintenanceOwner();
+  try{
+    let backupId='';
+    if(type==='start'){
+      $('maintenanceProgress').textContent='停止前のバックアップを作成しています…';
+      const backup=await createOwnerArchive('メンテナンス開始前 '+new Date().toLocaleString('ja-JP'));
+      backupId=backup.id;
+    }
+    const eventRef=doc(collection(db,'maintenanceEvents'));
+    const record={type,toEnabled:enabled,message,version,actorUid:state.user.uid,
+      actorName:(state.profile?.name||'運営').slice(0,90),backupId,createdAt:serverTimestamp()};
+    const config={enabled,message,version,updatedBy:state.user.uid,updatedAt:serverTimestamp(),
+      lastEventId:eventRef.id,startedAt:enabled?(maintenanceState.enabled?maintenanceState.startedAt||serverTimestamp():serverTimestamp()):null};
+    const batch=writeBatch(db);
+    batch.set(eventRef,record);
+    batch.set(MAINTENANCE_REF,config);
+    await batch.commit();
+    $('maintenanceProgress').textContent=type==='start'?'メンテナンスを開始しました。':type==='end'?'メンテナンスを終了しました。':'更新内容を履歴に記録しました。';
+    await loadMaintenanceHistory();
+  }catch(error){trapError(error,'メンテナンス設定を保存できませんでした');$('maintenanceProgress').textContent='設定を変更できませんでした。停止状態を確認してください。';}
+  finally{maintenanceState.busy=false;renderMaintenanceOwner();}
+}
+$('maintenanceStart').addEventListener('click',()=>changeMaintenance('start'));
+$('maintenanceEnd').addEventListener('click',()=>changeMaintenance('end'));
+$('maintenanceRecord').addEventListener('click',()=>changeMaintenance('update'));
+$('maintenanceHistoryRefresh').addEventListener('click',loadMaintenanceHistory);
+
 function nav(page) {
   state.page=page;
   $('adminCountPage').hidden=page!=='count';
@@ -557,8 +643,9 @@ function nav(page) {
   $('courseEditorPage').hidden=page!=='courseEditor';
   $('availabilityPage').hidden=page!=='availability';
   $('ownerHistoryPage').hidden=page!=='ownerHistory';
-  $('lessonsPage').hidden=page==='count'||page==='students'||page==='closures'||page==='courses'||page==='courseEditor'||page==='availability'||page==='ownerHistory';
-  for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navClosures','closures'],['navCourses','courses'],['navAvailability','availability'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students'],['navOwnerHistory','ownerHistory']]) $(''+id).classList.toggle('active',page===p || (id==='navCourses'&&isAdmin()&&(page==='availability'||page==='courseEditor')));
+  $('maintenanceOwnerPage').hidden=page!=='maintenanceOwner';
+  $('lessonsPage').hidden=page==='count'||page==='students'||page==='closures'||page==='courses'||page==='courseEditor'||page==='availability'||page==='ownerHistory'||page==='maintenanceOwner';
+  for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navClosures','closures'],['navCourses','courses'],['navAvailability','availability'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students'],['navOwnerHistory','ownerHistory'],['navMaintenanceOwner','maintenanceOwner']]) $(''+id).classList.toggle('active',page===p || (id==='navCourses'&&isAdmin()&&(page==='availability'||page==='courseEditor')));
   if(page==='count')renderCount();
   else if(page==='students')renderTeacherStudents();
   else if(page==='closures')renderClosures();
@@ -566,6 +653,7 @@ function nav(page) {
   else if(page==='courseEditor')renderCourseEditor();
   else if(page==='availability')renderAvailabilityPage();
   else if(page==='ownerHistory')loadOwnerTools();
+  else if(page==='maintenanceOwner'){renderMaintenanceOwner();loadMaintenanceHistory();}
   else {
     $('scheduleHeading').textContent=isAdmin()?'授業管理':'今日の時間割';
     $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'全教師の時間割と伝達事項を閲覧できます。';
@@ -598,6 +686,7 @@ $('availabilityBackToCourses').addEventListener('click',()=>{if(isAdmin())nav('c
 $('navTeacherLessons').addEventListener('click',()=>nav('teacherLessons'));
 $('navTeacherStudents').addEventListener('click',()=>nav('students'));
 $('navOwnerHistory').addEventListener('click',()=>{if(isOwner())nav('ownerHistory');});
+$('navMaintenanceOwner').addEventListener('click',()=>{if(isOwner())nav('maintenanceOwner');});
 $('teacherFilter').addEventListener('change',renderLessons);
 $('teacherStudentSearch').addEventListener('input',renderTeacherStudents);
 $('teacherStudentLevel').addEventListener('change',renderTeacherStudents);
@@ -2459,6 +2548,9 @@ async function publishCourseEditor(){
 $('editorSave').addEventListener('click',publishCourseEditor);
 
 function loggedOut(){
+  if(maintenanceState.unsub){maintenanceState.unsub();maintenanceState.unsub=null;}
+  maintenanceState.loaded=false;maintenanceState.dataStarted=false;maintenanceState.enabled=false;maintenanceState.history=[];
+  $('maintenancePanel').hidden=true;
   auditState.logs=[];auditState.archives=[];auditState.loaded=false;auditState.busy=false;
   $('ownerAuditList').replaceChildren();$('ownerArchiveList').replaceChildren();$('ownerAuditMessage').textContent='';
   resetSubscriptions();state.user=null;state.profile=null;state.entries=[];state.entriesStatus='loading';state.students=[];state.people=[];state.closures={};state.closuresStatus='loading';state.examEvents={};state.examStatus='loading';state.courses=[];state.coursesStatus='loading';state.notices=[];state.officialAnnouncements=[];state.officialSeenIds=new Set();state.officialSeenReady=false;clearAvailabilitySubscriptions();state.availability=new Map();state.availabilityStatus={};resetCourseEditor();resetAvailabilityEditor();
@@ -2467,6 +2559,7 @@ function loggedOut(){
   for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();
 }
 async function loggedIn(user){
+  if(maintenanceState.unsub){maintenanceState.unsub();maintenanceState.unsub=null;}
   resetSubscriptions();clearAvailabilitySubscriptions();state.availability=new Map();state.availabilityStatus={};state.user=user;state.notices=[];state.officialAnnouncements=[];state.officialSeenIds=new Set();state.officialSeenReady=false;state.entries=[];state.entriesStatus='loading';state.closures={};state.closuresStatus='loading';state.examEvents={};state.examStatus='loading';state.courses=[];state.coursesStatus='loading';
   const profileSnap=await getDoc(doc(db,'users',user.uid));
   if(!profileSnap.exists()||!['owner','admin','employee'].includes(profileSnap.data().role)){showMessage('利用者登録がありません。管理者に連絡してください。');await signOut(auth);return;}
@@ -2478,15 +2571,56 @@ async function loggedIn(user){
   $('welcomeSub').textContent=isAdmin()?'生徒情報と授業の状況をまとめて管理できます。':'今日の授業・全教師の時間割・生徒情報を確認できます。';
   $('availabilityPageTitle').textContent=isAdmin()?'勤務希望登録・提出状況':'勤務希望登録';
   $('navOwnerHistory').hidden=!isOwner();
+  $('navMaintenanceOwner').hidden=!isOwner();
   $('availabilityPageDescription').textContent=isAdmin()?'各講師の勤務希望と提出状況を確認・修正できます。':'出勤できる日・コマを選択して、締切までに提出してください。';
   $('loginPanel').hidden=true;$('appPanel').hidden=false;$('logout').hidden=false;
   // Teacher navigation: timetable, student list, school calendar, availability.
   if(isAdmin())$('navAdminLessons').after($('navClosures'));else $('navTeacherStudents').after($('navClosures'));
   $('navOwnerHistory').hidden=!isOwner();
+  $('navMaintenanceOwner').hidden=!isOwner();
   $('navCount').hidden=!isAdmin();$('navAdminLessons').hidden=!isAdmin();$('navClosures').hidden=false;$('navCourses').hidden=!isAdmin();$('navAvailability').hidden=isAdmin();$('availabilityBackToCourses').hidden=!isAdmin();$('editorBackToCourses').hidden=!isAdmin();$('navTeacherLessons').hidden=isAdmin();$('navTeacherStudents').hidden=isAdmin();$('addLesson').hidden=!isAdmin();$('notificationButton').hidden=false;$('broadcastForm').hidden=!isOwner();$('ownerAnnouncementManagement').hidden=!isOwner();
   renderedAcademicYear=academicYearJST();
   const now=new Date();$('broadcastStart').value=localDateTimeInput(now);$('broadcastEnd').value=localDateTimeInput(new Date(now.getTime()+7*86400000));$('teacherFilterWrap').hidden=isAdmin();
   resetCourseEditor();resetAvailabilityEditor();$('teacherFilter').value='mine';state.date=todayKey();state.scheduleView='day';document.querySelectorAll('[data-schedule-view]').forEach(button=>{const active=button.dataset.scheduleView==='day';button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
+  // Workspaces remain hidden until the server-side maintenance state is known.
+  $('appPanel').hidden=true;
+  maintenanceState.loaded=false;
+  maintenanceState.dataStarted=false;
+  if(maintenanceState.unsub){maintenanceState.unsub();maintenanceState.unsub=null;}
+  maintenanceState.unsub=onSnapshot(MAINTENANCE_REF,snapshot=>{
+    if(state.user?.uid!==user.uid)return;
+    const data=snapshot.exists()?snapshot.data():{};
+    maintenanceState.loaded=true;
+    maintenanceState.enabled=data.enabled===true;
+    maintenanceState.message=String(data.message||'');
+    maintenanceState.version=String(data.version||'');
+    maintenanceState.startedAt=data.startedAt||null;
+    maintenanceState.updatedAt=data.updatedAt||null;
+    $('maintenanceNoticeInput').value=maintenanceState.message;
+    if(maintenanceState.version)$('maintenanceVersionInput').value=maintenanceState.version;
+    if(maintenanceState.enabled&&!isOwner()){
+      if(maintenanceState.dataStarted){resetSubscriptions();clearAvailabilitySubscriptions();maintenanceState.dataStarted=false;}
+      for(const dialog of document.querySelectorAll('dialog'))if(dialog.open)dialog.close();
+      state.students=[];state.entries=[];state.entriesStatus='loading';state.people=[];state.courses=[];state.coursesStatus='loading';state.notices=[];state.closures={};state.closuresStatus='loading';state.examEvents={};state.examStatus='loading';
+      applyMaintenanceState();
+    }else{
+      applyMaintenanceState();
+      if(!maintenanceState.dataStarted)startBusinessSubscriptions(user);
+    }
+  },error=>{
+    console.error('メンテナンス状態を確認できません',error);
+    maintenanceState.loaded=false;$('appPanel').hidden=true;
+    $('maintenancePanel').hidden=false;
+    $('maintenanceStatus').textContent='利用状況を確認できません';
+    $('maintenanceMessage').textContent='Firebaseルールの公開状況を運営に確認してください。';
+    $('maintenanceVersion').textContent='';
+    $('notificationButton').hidden=true;
+  });
+  if(isOwner())loadMaintenanceHistory();
+}
+function startBusinessSubscriptions(user){
+  if(maintenanceState.dataStarted||!state.user||state.user.uid!==user.uid)return;
+  maintenanceState.dataStarted=true;
   state.unsub.push(onSnapshot(collection(db,'schoolStudents'),snap=>{state.students=snap.docs.map(d=>({id:d.id,...d.data()}));renderAll();persistAnnualGradePromotion();},err=>trapError(err,'生徒情報を取得できません')));
   state.unsub.push(onSnapshot(collection(db,'users'),snap=>{state.people=snap.docs.map(d=>({id:d.id,...d.data()}));renderAll();},err=>trapError(err,'教師情報を取得できません')));
   state.unsub.push(onSnapshot(collection(db,'timetableEntries'),snap=>{state.entries=snap.docs.map(d=>({id:d.id,...d.data()}));state.entriesStatus='ready';renderAll();},err=>{state.entriesStatus='error';trapError(err,'時間割を取得できません');}));
