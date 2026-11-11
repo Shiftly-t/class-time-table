@@ -20,7 +20,7 @@ function isoJst(value){if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))throw E
 function note(msg,isError=false){$('feedback').textContent=msg;$('feedback').className='status'+(isError?' error':'');}
 function errorMessage(e){return String(e?.message||'処理に失敗しました').slice(0,240);}
 async function api(action,fields={}){return (await call({action,courseId,...fields})).data;}
-async function guarded(label,fn){if(busy)return;busy=true;document.querySelectorAll('button').forEach(x=>x.disabled=true);note(label+'…');try{const result=await fn();note(label+'が完了しました');return result;}catch(e){note(errorMessage(e),true);return null;}finally{busy=false;render();}}
+async function guarded(label,fn){if(busy)return;busy=true;document.querySelectorAll('#app button').forEach(x=>x.disabled=true);note(label+'…');try{const result=await fn();note(label+'が完了しました');return result;}catch(e){note(errorMessage(e),true);return null;}finally{busy=false;render();}}
 function b(action,label,cls='secondary',props=''){return `<button type="button" class="${cls}" data-act="${esc(action)}" ${props}>${esc(label)}</button>`;}
 function badge(text){return `<span class="badge ${text==='不参加'?'gray':text==='確定済み'?'ok':text==='一部確定'?'warn':text==='未回答'?'bad':''}">${esc(text)}</span>`;}
 async function reloadCourse(){if(!courseId)return;const a=await Promise.all([api('getSettings'),api('roster'),api('slotDemand'),api('teachers')]);({course,settings}=a[0]);roster=a[1].rows;demand=a[2].slots;teachers=a[3].teachers;if(studentId){const s=roster.find(x=>x.id===studentId);if(!s){studentId='';detail=null;}else detail=await api('detail',{studentId});}}
