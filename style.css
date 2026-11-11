@@ -508,3 +508,49 @@
 .editor-day-nav label{width:auto;min-width:0}
 .editor-day-nav button{width:43px}
 @media(max-width:650px){.editor-day-nav{width:100%;grid-template-columns:43px minmax(0,1fr) 43px}}
+
+
+/* 2026-11-11: one horizontally scrollable timeline across the entire course. */
+.availability-period-controls{display:grid;gap:4px;flex:1 1 320px;min-width:0;align-content:center;justify-items:center;padding:2px 10px}
+.availability-period-kicker{font-size:10px;font-weight:850;letter-spacing:.06em;color:#5165c9}
+.availability-period-controls strong{font-size:13px;line-height:1.5;color:#2b3c58;text-align:center}
+.availability-period-subline{font-size:11px;color:#7887a0}
+.availability-period-overview{background:#eef2ff;border:1px solid #cfdbff;border-radius:13px;margin:15px 0 8px;padding:13px 16px;min-height:53px}
+.availability-overview-main{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.availability-overview-course{color:#3049a7;font-size:15px}
+.availability-overview-dates{font-size:13px;font-weight:800;color:#344865}
+.availability-overview-count{font-size:12px;font-weight:730;color:#586b8e;margin-left:auto}
+.availability-scroll-label{color:#4662bf;font-weight:800}
+.availability-grid-wrap{overflow-x:auto;overflow-y:auto;max-height:min(73vh,800px);overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-gutter:stable}
+.availability-grid-wrap:focus-visible{outline:3px solid #a5b4fc;outline-offset:3px}
+.availability-table{width:max-content;min-width:100%;table-layout:fixed}
+.availability-table thead th{box-sizing:border-box}
+.availability-table thead .availability-corner{position:sticky;left:0;top:0;z-index:9;min-width:166px;width:166px;text-align:center;background:#e5ebfa;vertical-align:middle;border-right:2px solid #cdd8ef}
+.availability-table thead .availability-month-label{position:sticky;top:0;z-index:5;background:#e8edfb;height:38px;color:#445c9b;font-size:12px;letter-spacing:.06em;border-bottom:1px solid #cfd9ef}
+.availability-table thead .availability-date-header{position:sticky;top:38px;left:auto;z-index:4;min-width:114px;width:114px;height:65px;background:#f3f6fd;padding:7px 4px;border-right:1px solid #e1e7f2;vertical-align:middle}
+.availability-date-main{display:block;font-size:12px;font-weight:850;white-space:nowrap;color:#344761}
+.availability-boundary-label,.availability-closed-label{display:inline-block;font-size:10px;border-radius:6px;padding:3px 6px;margin-top:5px;white-space:nowrap;font-weight:800}
+.availability-boundary-label{color:#3455b9;background:#dce6ff}
+.availability-closed-label{color:#8c5761;background:#fcebef}
+.availability-table thead .availability-date-header.is-course-start,.availability-table thead .availability-date-header.is-course-end{background:#e8efff;border-top:3px solid #667ee4}
+.availability-table thead .availability-date-header.is-closed-date{background:#f6f3f6}
+.availability-table tbody .availability-period-head{position:sticky;left:0;z-index:3;min-width:166px;width:166px;background:#f6f8fd;color:#40516f;border-right:2px solid #d7dff0;padding:13px 10px;white-space:nowrap;text-align:center;font-weight:800}
+.availability-table tbody .availability-day-cell{min-width:114px;width:114px;padding:8px;border-right:1px solid #eef1f8}
+.availability-table tbody .availability-day-cell.is-closed{background:#f6f7fa}
+.availability-table tbody .availability-day-cell.is-course-start,.availability-table tbody .availability-day-cell.is-course-end{box-shadow:inset 2px 0 0 #a6b6f2}
+.availability-slot{min-width:0;width:100%;min-height:49px}
+.availability-slot:focus-visible{outline-offset:0}
+.month-course-summary{background:#eaf0ff;border:1px solid #ccd8fc;border-radius:11px;padding:11px 14px;margin:0 0 13px;display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;color:#425889;font-size:12px;line-height:1.5}
+.month-course-summary strong{color:#3557c8}
+.month-day.is-course-period:not(.is-closed){background:#eff3ff;border:1px solid #b6c7f5}
+.month-day.is-course-period.is-closed{border-left:3px solid #7489e7}
+.month-day.is-course-period .month-course-label{background:#d4e1ff;color:#2e54b5;font-size:10px;line-height:1.3}
+.closure-calendar-legend{flex-wrap:wrap}
+.closure-calendar-course-legend,.closure-calendar-course{display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:850;color:#3658b2;background:#e3ebff;border:1px solid #c3d2fb;border-radius:5px;padding:2px 5px}
+.closure-calendar-day.is-course-period:not(.is-closed):not(.is-outside){background:#eef3ff;border-color:#acbff3}
+.closure-calendar-day.is-course-period.is-closed{border-left:3px solid #6983dc}
+.closure-calendar-day.is-course-period.is-outside{border-left:3px solid #b2c0e9}
+.closure-calendar-course{max-width:100%;font-size:9px}
+.closure-selected-course{background:#ecf2ff;border-left:3px solid #536bce;border-radius:7px;padding:10px 12px;margin:10px 0 3px;font-size:12px;font-weight:750;color:#405b9c;line-height:1.6}
+@media(max-width:680px){.availability-period-controls{width:100%;flex-basis:100%}.availability-overview-count{margin-left:0}.availability-grid-wrap{max-height:72vh}.availability-table thead .availability-corner,.availability-table tbody .availability-period-head{min-width:132px;width:132px;font-size:11px}.availability-table thead .availability-date-header,.availability-table tbody .availability-day-cell{min-width:99px;width:99px}.availability-table .availability-date-main{font-size:11px}.availability-period-overview{padding:11px 12px}}
+@media(max-width:510px){.closure-calendar-course{font-size:8px;padding:2px 3px}.closure-calendar-course-legend{font-size:9px}}

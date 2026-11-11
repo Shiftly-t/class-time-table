@@ -126,6 +126,8 @@ function isVisibleEntry(entry){
 function courseFor(date){
   return state.courses.find(c=>c.startDate<=date && date<=c.endDate) || null;
 }
+// Existing courses may retain the former winter label in Firestore. Display only.
+function courseDisplayName(course){return String(course?.name||'講習').replace(/冬季講習/g,'冬期講習');}
 function hasCourseConflict(date){
   return state.courses.filter(c=>c.startDate<=date && date<=c.endDate).length>1;
 }
@@ -852,7 +854,7 @@ function courseBanner(date, compact=false){
   const course=courseFor(date);
   if(!course)return null;
   const banner=make('div',compact?'course-banner compact':'course-banner');
-  banner.append(make('strong','',`${course.name}期間`));
+  banner.append(make('strong','',`${courseDisplayName(course)}期間`));
   if(!compact)banner.append(make('span','',`${prettyDate(course.startDate)}〜${prettyDate(course.endDate)}　通常授業は表示せず、講習専用の授業だけを表示しています。`));
   if(hasCourseConflict(date))banner.append(make('span','course-overlap-warning','講習期間が重複しています。管理者に確認してください。'));
   return banner;
@@ -913,6 +915,14 @@ function renderMonthSchedule(parent){
   const leading=(new Date(year,month,1).getDay()+6)%7;
   const cells=Math.ceil((leading+days)/7)*7;
   const calendar=make('div','month-calendar');
+  const monthStart=dateKey(new Date(year,month,1)),monthEnd=dateKey(new Date(year,month+1,0));
+  const relevantCourses=state.courses.filter(c=>c.startDate<=monthEnd&&c.endDate>=monthStart);
+  if(relevantCourses.length){
+    const summary=make('div','month-course-summary');
+    summary.append(make('strong','', '講習期間'));
+    for(const c of relevantCourses)summary.append(make('span','',`${courseDisplayName(c)}：${c.startDate.slice(0,4)}年${prettyDate(c.startDate)} 〜 ${c.endDate.slice(0,4)}年${prettyDate(c.endDate)}`));
+    parent.append(summary);
+  }
   for(const dayName of ['月','火','水','木','金','土','日'])calendar.append(make('div','month-weekday',dayName));
   for(let index=0;index<cells;index++){
     const day=index-leading+1;
@@ -927,7 +937,7 @@ function renderMonthSchedule(parent){
     header.title=closure?'休校日の詳細を見る':'この日の時間割を見る';header.setAttribute('aria-label',closure?`${prettyDate(date)}は休校`: `${prettyDate(date)}の時間割 ${rows.length}コマ`);
     header.append(make('span','month-day-number',String(day)));
     const course=courseFor(date);
-    if(course)header.append(make('span','month-course-label',`${course.name}期間`));
+    if(course){cell.classList.add('is-course-period');header.append(make('span','month-course-label',date===course.startDate?'講習開始':date===course.endDate?'講習終了':`${courseDisplayName(course)}期間`));}
     if(closure)header.append(make('span','month-closed-label','休校'));
     if(openDayFor(date))header.append(make('span','month-open-label','開校'));
     else if(rows.length)header.append(make('span','month-day-count',`${rows.length}コマ`));
@@ -1101,6 +1111,7 @@ function renderClosures(){
     $('closureSelectedTitle').textContent=prettyDate(closureCalendarView.selected);
     $('closureSelectedStatus').textContent='読み込み中';
     $('closureSelectedStatus').className='closure-selected-status';
+    $('closureSelectedCourse').hidden=true;
     $('closureSelectedNote').textContent=text;
     $('closureSelectedExamInfo').textContent='';
     $('closureSelectedAction').disabled=true;
@@ -1121,12 +1132,17 @@ function renderClosures(){
   for(let i=0;i<42;i++){
     const date=datePlus(start,i-firstWeekday),record=closureFor(date),exam=examFor(date),opened=openDayFor(date);
     const outside=!date.startsWith(closureCalendarView.month),selected=date===closureCalendarView.selected;
-    const cell=make('button',`closure-calendar-day${outside?' is-outside':''}${record?' is-closed':''}${record?.automatic?' is-automatic':''}${opened?' is-open-override':''}${exam?' has-exam':''}${date===todayKey()?' is-today':''}${selected?' is-selected':''}`);
+    const course=state.coursesStatus==='ready'?courseFor(date):null;
+    const cell=make('button',`closure-calendar-day${outside?' is-outside':''}${record?' is-closed':''}${record?.automatic?' is-automatic':''}${opened?' is-open-override':''}${exam?' has-exam':''}${course?' is-course-period':''}${date===todayKey()?' is-today':''}${selected?' is-selected':''}`);
     cell.type='button';cell.setAttribute('aria-pressed',String(selected));
-    cell.setAttribute('aria-label',`${prettyDate(date)}${record?'、休校':''}${opened?'、特別開校日':''}${record?.note?'、'+record.note:''}${exam?'、'+exam.title+'実施':''}`);
+    cell.setAttribute('aria-label',`${prettyDate(date)}${record?'、休校':''}${opened?'、特別開校日':''}${record?.note?'、'+record.note:''}${exam?'、'+exam.title+'実施':''}${course?'、'+courseDisplayName(course)+'期間':''}`);
     cell.append(make('span','closure-calendar-number',String(Number(date.slice(-2)))));
     if(record)cell.append(make('span','closure-calendar-closed','休校'));
     if(opened)cell.append(make('span','closure-calendar-open','開校'));
+    if(course){
+      const flag=date===course.startDate?'開始':date===course.endDate?'終了':'';
+      const pill=make('span','closure-calendar-course',flag?`講習${flag}`:'講習');pill.title=`${courseDisplayName(course)}：${prettyDate(course.startDate)} 〜 ${prettyDate(course.endDate)}`;cell.append(pill);
+    }
     if(exam)cell.append(make('span','closure-calendar-exam','模試'));
     if(record?.note)cell.append(make('span','closure-calendar-day-note',record.note));
     cell.addEventListener('click',()=>{closureCalendarView.selected=date;closureCalendarView.month=date.slice(0,7);renderClosures();});
@@ -1141,6 +1157,9 @@ function renderClosures(){
   $('closureSelectedTitle').textContent=prettyDate(selected);
   $('closureSelectedStatus').textContent=opened?'特別開校日':exam?'模試実施日':record?'休校':'通常営業日';
   $('closureSelectedStatus').className='closure-selected-status'+(record?' is-closed':'');
+  const selectedCourse=state.coursesStatus==='ready'?courseFor(selected):null;
+  $('closureSelectedCourse').hidden=!selectedCourse;
+  $('closureSelectedCourse').textContent=selectedCourse?`${courseDisplayName(selectedCourse)}：${selectedCourse.startDate.slice(0,4)}年${prettyDate(selectedCourse.startDate)} 〜 ${selectedCourse.endDate.slice(0,4)}年${prettyDate(selectedCourse.endDate)}${selected===selectedCourse.startDate?'（講習開始日）':selected===selectedCourse.endDate?'（講習最終日）':''}`:'';
   $('closureSelectedNote').textContent=opened?('休校指定を解除して開校しています。'+(opened.note?' '+opened.note:'')):exam?'模試・テストを実施するため、休校扱いを解除しています。':record?(record.note||'備考の登録はありません。'):'この日は休校登録されていません。';
   $('closureSelectedExamInfo').textContent=exam?`📝 ${exam.title}｜${exam.start}〜${exam.end}${exam.note?'｜'+exam.note:''}`:'模試・テストの予定はありません。';
   $('closureSelectedAction').textContent=explicit?'休校内容を編集・登録解除':record?.automatic?'休校日の備考を追加':'この日を休校にする';
@@ -1254,7 +1273,7 @@ function renderCourses(){
   for(const course of courses){
     const record=make('div','course-list-item');
     const info=make('div','course-list-info');
-    info.append(make('strong','',course.name+'期間'));
+    info.append(make('strong','',courseDisplayName(course)+'期間'));
     info.append(make('span','',`${prettyDate(course.startDate)} 〜 ${prettyDate(course.endDate)}`));
     info.append(make('span','',`${course.periods.length}コマ構成 / 講習授業 ${state.entriesStatus==='ready'?courseLessons(course.id).length+'件':'読込中'}`));
     info.append(make('span','',course.periods.map((r,i)=>`${i+1}限 ${r.start}〜${r.end}`).join(' · ')));
@@ -1297,7 +1316,7 @@ function openCourseDeadlineEditor(courseId){
   if(!course){showMessage('講習期間が見つかりません。');return;}
   $('courseDeadlineForm').reset();
   $('deadlineEditCourseId').value=course.id;
-  $('deadlineEditCourseLabel').textContent=`${course.name}：${prettyDate(course.startDate)}〜${prettyDate(course.endDate)}`;
+  $('deadlineEditCourseLabel').textContent=`${courseDisplayName(course)}：${prettyDate(course.startDate)}〜${prettyDate(course.endDate)}`;
   $('deadlineEditValue').value=availabilityDeadlineDate(course)?localDateTimeInput(availabilityDeadlineDate(course)):'';
   showDialog('courseDeadlineDialog');
 }
@@ -1351,7 +1370,7 @@ $('deleteCourse').addEventListener('click',async()=>{
   if(state.entriesStatus!=='ready'){showMessage('時間割データの読込完了後に操作してください。');return;}
   const id=$('courseId').value,course=state.courses.find(c=>c.id===id);if(!course)return;
   if(courseLessons(id).length){showMessage('講習授業が登録されています。削除前に講習授業をすべて削除してください。');return;}
-  if(!confirm(`${course.name}（${prettyDate(course.startDate)}〜${prettyDate(course.endDate)}）を削除しますか？期間内の通常授業が再表示されます。`))return;
+  if(!confirm(`${courseDisplayName(course)}（${prettyDate(course.startDate)}〜${prettyDate(course.endDate)}）を削除しますか？期間内の通常授業が再表示されます。`))return;
   const button=$('deleteCourse');button.disabled=true;
   try{
     const availabilityDocs=await getDocs(collection(db,'specialCourses',id,'teacherAvailability'));
@@ -1731,7 +1750,7 @@ function syncLessonCoursePeriod(lesson=null){
   $('lessonEnd').required=!course;
   $('lessonCoursePeriod').replaceChildren();
   if(course){
-    $('lessonCourseHint').textContent=`${course.name}期間：この日は講習専用の授業を登録します。通常授業は保存済みのまま非表示です。`;
+    $('lessonCourseHint').textContent=`${courseDisplayName(course)}期間：この日は講習専用の授業を登録します。通常授業は保存済みのまま非表示です。`;
     course.periods.forEach((p,i)=>{const option=make('option','',`${i+1}限　${p.start}〜${p.end}`);option.value=String(i);$('lessonCoursePeriod').append(option);});
     const current=course.periods.findIndex(p=>p.start===(lesson?.start||$('lessonStart').value) && p.end===(lesson?.end||$('lessonEnd').value));
     $('lessonCoursePeriod').value=String(Math.max(0,current));
@@ -2013,7 +2032,7 @@ function renderAvailabilityHome(){
     const cardState=!ready?'loading':overdue?'closed':isSubmitted?'submitted':'pending';
     const card=make('article',`availability-home-card is-${cardState}`);
     const heading=make('div','availability-home-card-head');
-    const name=make('strong','availability-home-course-name',course.name||'講習');
+    const name=make('strong','availability-home-course-name',courseDisplayName(course));
     const badgeText=!ready?'確認中':isAdmin()
       ?`${item.submittedCount} / ${item.total}名提出`
       :isSubmitted?'✓ 提出済み':overdue?'未提出（締切終了）':'！未提出';
@@ -2082,7 +2101,7 @@ function subscribeAvailabilityCourses(){
 }
 let availabilityEditor;
 function resetAvailabilityEditor(){
-  availabilityEditor={courseId:'',uid:'',weekDate:'',draft:new Set(),sourceKey:'[]',busy:false};
+  availabilityEditor={courseId:'',uid:'',draft:new Set(),sourceKey:'[]',busy:false,renderedKey:''};
 }
 resetAvailabilityEditor();
 const availabilitySetKey=slots=>JSON.stringify([...slots].sort());
@@ -2095,7 +2114,7 @@ function syncAvailabilityDraft(courseId,uid,force=false){
   }
   if(force||courseId!==availabilityEditor.courseId||uid!==availabilityEditor.uid){
     availabilityEditor.courseId=courseId;availabilityEditor.uid=uid;
-    availabilityEditor.weekDate=state.courses.find(c=>c.id===courseId)?.startDate||todayKey();
+    availabilityEditor.renderedKey='';
     availabilityEditor.draft=new Set(availabilityRecord(courseId,uid)?.slots||[]);
     availabilityEditor.sourceKey=key;
   }else if(!dirty && availabilityEditor.sourceKey!==key){
@@ -2112,7 +2131,7 @@ function renderAvailabilityPage(){
   if(!state.user||state.page!=='availability')return;
   const courseSelect=$('availabilityCourse'),oldCourse=availabilityEditor.courseId;
   courseSelect.replaceChildren();
-  for(const c of state.courses){const opt=make('option','',`${c.name}　${prettyDate(c.startDate)}〜${prettyDate(c.endDate)}`);opt.value=c.id;courseSelect.append(opt);}
+  for(const c of state.courses){const opt=make('option','',`${courseDisplayName(c)}　${prettyDate(c.startDate)}〜${prettyDate(c.endDate)}`);opt.value=c.id;courseSelect.append(opt);}
   if(!state.courses.length){$('availabilityGrid').replaceChildren(make('p','empty','講習期間が未登録です。'));$('availabilitySubmit').disabled=true;return;}
   const course=state.courses.find(c=>c.id===oldCourse)||state.courses.find(c=>c.endDate>=todayKey())||state.courses.at(-1);
   const people=state.people.filter(p=>isAssignableTeacher(p.role)).sort((a,b)=>a.role===b.role?collator.compare(a.name||'',b.name||''):a.role==='employee'?-1:1);
@@ -2123,56 +2142,98 @@ function renderAvailabilityPage(){
   if(!uid){$('availabilityGrid').replaceChildren(make('p','empty','講師アカウントがありません。'));return;}
   if(state.availabilityStatus[course.id]==='ready')syncAvailabilityDraft(course.id,uid);
   else if(course.id!==availabilityEditor.courseId||uid!==availabilityEditor.uid){
-    availabilityEditor.courseId=course.id;availabilityEditor.uid=uid;availabilityEditor.weekDate=course.startDate;
+    availabilityEditor.courseId=course.id;availabilityEditor.uid=uid;availabilityEditor.renderedKey='';
     availabilityEditor.draft=new Set();availabilityEditor.sourceKey='';
   }
   courseSelect.value=course.id;personSelect.value=uid;
-  const week=availabilityEditor.weekDate||course.startDate;
-  const first=startOfWeek(week);
-  const dates=Array.from({length:7},(_,i)=>datePlus(first,i));
-  $('availabilityWeekLabel').textContent=`${prettyDate(dates[0])} 〜 ${prettyDate(dates[6])}`;
-  $('availabilityPrev').disabled=dates[0]<=startOfWeek(course.startDate);
-  $('availabilityNext').disabled=dates[6]>=datePlus(startOfWeek(course.endDate),6);
+  // Build every course day, including dates across months and year boundaries.
+  const dates=[];
+  for(let day=course.startDate;day<=course.endDate;day=datePlus(day,1))dates.push(day);
+  $('availabilityWeekLabel').textContent=`${course.startDate.slice(0,4)}年${prettyDate(course.startDate)} 〜 ${course.endDate.slice(0,4)}年${prettyDate(course.endDate)}`;
+  const closedDays=new Set(dates.filter(date=>Boolean(closureFor(date))));
   const deadline=availabilityDeadlineDate(course);
   const canEdit=availabilityCanEdit(course)&&!availabilityEditor.busy;
-  const submitted=Boolean(availabilityRecord(course.id,uid));
-  const changed=availabilityEditor.sourceKey!==availabilitySetKey(availabilityEditor.draft);
-  const sourceNow=availabilitySetKey(availabilityRecord(course.id,uid)?.slots||[]);
-  const conflict=changed&&sourceNow!==availabilityEditor.sourceKey;
   $('availabilityDeadlineInfo').textContent=`勤務希望提出締切：${formatDeadline(course)}　｜　${countdownUntil(deadline)}　｜　${!deadline?'未設定':deadline.getTime()<=Date.now()?'受付終了':canEdit?'受付中・編集可能':'読込中'}`;
-  $('availabilityEditingState').textContent=conflict?'⚠ 別の端末で希望が変更されています。破棄して読み直してください。':changed?'保存前の変更あり':submitted?'提出済み':'未提出';
-  $('availabilitySubmit').disabled=!canEdit||(!changed&&Boolean(availabilityRecord(course.id,uid)))||conflict;
   $('availabilitySubmit').textContent=availabilityEditor.busy?'保存中…':isAdmin()?'この講師の勤務希望を保存':'勤務希望を提出・更新';
-  $('availabilityReset').disabled=!changed||availabilityEditor.busy;
-  const host=$('availabilityGrid');host.replaceChildren();
-  if(state.availabilityStatus[course.id]!=='ready'){host.append(make('div','empty','勤務希望のデータを読み込んでいます…'));return;}
-  const table=make('table','availability-table'),thead=make('thead'),top=make('tr');
-  top.append(make('th','', 'コマ'));
-  for(const date of dates)top.append(make('th','',prettyDate(date)));
-  thead.append(top);table.append(thead);
+  function updateDraftDisplay(){
+    const submitted=Boolean(availabilityRecord(course.id,uid));
+    const changed=availabilityEditor.sourceKey!==availabilitySetKey(availabilityEditor.draft);
+    const currentSource=availabilitySetKey(availabilityRecord(course.id,uid)?.slots||[]);
+    const conflict=changed&&currentSource!==availabilityEditor.sourceKey;
+    $('availabilityEditingState').textContent=conflict?'⚠ 別の端末で希望が変更されています。破棄して読み直してください。':changed?'保存前の変更あり':submitted?'提出済み':'未提出';
+    $('availabilitySubmit').disabled=!canEdit||(!changed&&submitted)||conflict;
+    $('availabilityReset').disabled=!changed||availabilityEditor.busy;
+    const summary=$('availabilityPeriodOverview');summary.replaceChildren();
+    const headline=make('div','availability-overview-main');
+    headline.append(make('strong','availability-overview-course',courseDisplayName(course)));
+    headline.append(make('span','availability-overview-dates',`${course.startDate.slice(0,4)}年${prettyDate(course.startDate)} 〜 ${course.endDate.slice(0,4)}年${prettyDate(course.endDate)}`));
+    const availableCount=[...availabilityEditor.draft].filter(key=>{
+      const day=key.slice(0,10);return day>=course.startDate&&day<=course.endDate&&!closedDays.has(day);
+    }).length;
+    headline.append(make('span','availability-overview-count',`全${dates.length}日・休校${closedDays.size}日 ｜ 出勤可能 ${availableCount}コマ`));
+    summary.append(headline);
+  }
+  updateDraftDisplay();
+  const host=$('availabilityGrid');
+  const newGridKey=`${course.id}:${uid}`;
+  const oldScrollLeft=availabilityEditor.renderedKey===newGridKey?host.scrollLeft:0;
+  const oldScrollTop=availabilityEditor.renderedKey===newGridKey?host.scrollTop:0;
+  host.replaceChildren();
+  if(state.availabilityStatus[course.id]!=='ready'){
+    host.append(make('div','empty','勤務希望のデータを読み込んでいます…'));
+    availabilityEditor.renderedKey='';return;
+  }
+  const table=make('table','availability-table');
+  const thead=make('thead'),monthHead=make('tr','availability-month-head'),dateHead=make('tr','availability-date-head');
+  const corner=make('th','availability-corner','コマ / 時間');corner.rowSpan=2;corner.scope='col';monthHead.append(corner);
+  // Month labels make the full-width timeline easy to navigate on iPad.
+  for(let i=0;i<dates.length;){
+    const month=dates[i].slice(0,7);let end=i+1;
+    while(end<dates.length&&dates[end].startsWith(month))end++;
+    const monthTitle=make('th','availability-month-label',`${month.slice(0,4)}年${Number(month.slice(5))}月`);
+    monthTitle.colSpan=end-i;monthTitle.scope='colgroup';monthHead.append(monthTitle);i=end;
+  }
+  for(const date of dates){
+    const isStart=date===course.startDate,isEnd=date===course.endDate;
+    const header=make('th','availability-date-header'+(isStart?' is-course-start':'')+(isEnd?' is-course-end':'')+(closedDays.has(date)?' is-closed-date':'')+(jsDate(date).getDay()===0?' is-sunday':''));
+    header.scope='col';
+    header.append(make('span','availability-date-main',prettyDate(date)));
+    if(isStart||isEnd)header.append(make('span','availability-boundary-label',isStart&&isEnd?'初日・最終日':isStart?'講習初日':'講習最終日'));
+    else if(closedDays.has(date))header.append(make('span','availability-closed-label','休校'));
+    dateHead.append(header);
+  }
+  thead.append(monthHead,dateHead);table.append(thead);
   const body=make('tbody');
   course.periods.forEach((period,i)=>{
-    const row=make('tr');row.append(make('th','',`${i+1}限　${period.start}〜${period.end}`));
+    const row=make('tr');const periodHead=make('th','availability-period-head',`${i+1}限　${period.start}〜${period.end}`);periodHead.scope='row';row.append(periodHead);
     for(const date of dates){
-      const td=make('td');
-      const inCourse=date>=course.startDate&&date<=course.endDate;
-      const closed=Boolean(closureFor(date));
-      if(inCourse&&!closed){
+      const closed=closedDays.has(date);
+      const td=make('td','availability-day-cell'+(closed?' is-closed':'')+(date===course.startDate?' is-course-start':'')+(date===course.endDate?' is-course-end':''));
+      if(!closed){
         const key=availabilitySlotKey(date,i),checked=availabilityEditor.draft.has(key);
         const btn=make('button','availability-slot'+(checked?' is-available':''),checked?'✓':'');
-        btn.type='button';btn.disabled=!canEdit||conflict;
+        btn.type='button';btn.disabled=!canEdit||($('availabilityEditingState').textContent.startsWith('⚠'));
         btn.setAttribute('aria-pressed',String(checked));
         btn.setAttribute('aria-label',`${prettyDate(date)} ${i+1}限 ${checked?'出勤可能':'出勤不可'}`);
         btn.addEventListener('click',()=>{
-          if(availabilityEditor.draft.has(key))availabilityEditor.draft.delete(key);else availabilityEditor.draft.add(key);
-          renderAvailabilityPage();
-        });td.append(btn);
-      }else td.append(make('span','availability-outside',closed?'休校':'—'));
+          if(availabilityEditor.draft.has(key))availabilityEditor.draft.delete(key);
+          else availabilityEditor.draft.add(key);
+          const selected=availabilityEditor.draft.has(key);
+          btn.classList.toggle('is-available',selected);
+          btn.textContent=selected?'✓':'';
+          btn.setAttribute('aria-pressed',String(selected));
+          btn.setAttribute('aria-label',`${prettyDate(date)} ${i+1}限 ${selected?'出勤可能':'出勤不可'}`);
+          updateDraftDisplay(); // Keep focus and horizontal scroll position while editing.
+        });
+        td.append(btn);
+      }else td.append(make('span','availability-outside','休校'));
       row.append(td);
     }
     body.append(row);
   });
   table.append(body);host.append(table);
+  host.scrollLeft=oldScrollLeft;host.scrollTop=oldScrollTop;
+  availabilityEditor.renderedKey=newGridKey;
 }
 $('availabilityCourse').addEventListener('change',event=>{
   const uid=isAdmin()?($('availabilityPerson').value||state.user.uid):state.user.uid;
@@ -2183,8 +2244,6 @@ $('availabilityPerson').addEventListener('change',event=>{
   if(!syncAvailabilityDraft($('availabilityCourse').value,event.target.value)){event.target.value=availabilityEditor.uid;return;}
   renderAvailabilityPage();
 });
-$('availabilityPrev').addEventListener('click',()=>{availabilityEditor.weekDate=datePlus(availabilityEditor.weekDate,-7);renderAvailabilityPage();});
-$('availabilityNext').addEventListener('click',()=>{availabilityEditor.weekDate=datePlus(availabilityEditor.weekDate,7);renderAvailabilityPage();});
 $('availabilityReset').addEventListener('click',()=>{
   if(!confirm('未提出の勤務希望の変更を破棄しますか？'))return;
   syncAvailabilityDraft(availabilityEditor.courseId,availabilityEditor.uid,true);renderAvailabilityPage();
@@ -2462,7 +2521,7 @@ function renderCourseEditor(){
   if(!isAdmin()||state.page!=='courseEditor')return;
   const chooser=$('editorCourse'),keep=courseEditor.courseId;
   chooser.replaceChildren();
-  for(const c of state.courses){const opt=make('option','',`${c.name}　${prettyDate(c.startDate)}〜${prettyDate(c.endDate)}`);opt.value=c.id;chooser.append(opt);}
+  for(const c of state.courses){const opt=make('option','',`${courseDisplayName(c)}　${prettyDate(c.startDate)}〜${prettyDate(c.endDate)}`);opt.value=c.id;chooser.append(opt);}
   if(!courseEditor.courseId && state.courses.length && state.entriesStatus==='ready' && state.coursesStatus==='ready')openCourseEditor(state.courses.find(c=>c.endDate>=todayKey())?.id||state.courses.at(-1).id);
   if(courseEditor.courseId && !state.courses.some(c=>c.id===courseEditor.courseId))resetCourseEditor();
   chooser.value=courseEditor.courseId||'';
