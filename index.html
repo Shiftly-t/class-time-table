@@ -158,6 +158,10 @@
 <p class="muted">通常の17:30〜21:25とは別の時刻を設定できます。時間が重ならないように入力してください。</p><div id="coursePeriodRows" class="course-period-rows"></div></div></div>
 <p class="muted">期間を設定しても、通常授業の記録は削除しません。期間終了の翌日から通常授業の表示に戻ります。</p>
 <div class="modal-actions"><button id="deleteCourse" class="danger" type="button" hidden>講習期間を解除</button><button class="primary" type="submit">講習期間を保存</button></div>
+<div id="courseDeleteNotice" class="course-delete-notice" role="alert" hidden>
+  <strong id="courseDeleteNoticeTitle"></strong>
+  <p id="courseDeleteNoticeMessage"></p>
+</div>
 </form></dialog>
 <dialog id="studentDialog" class="modal"><form id="studentForm" class="modal-content"><div class="modal-head"><h2 id="studentDialogTitle">生徒を登録</h2><button type="button" class="close-modal" data-close="studentDialog" aria-label="閉じる">×</button></div><input type="hidden" id="studentId"><div class="form-grid"><label>生徒名<input id="studentName" maxlength="80" required></label><label>学年<input id="studentGrade" maxlength="30" list="gradePresets" required placeholder="例：中2"><datalist id="gradePresets"><option value="小1"><option value="小2"><option value="小3"><option value="小4"><option value="小5"><option value="小6"><option value="中1"><option value="中2"><option value="中3"><option value="高1"><option value="高2"><option value="高3"></datalist></label><label>学校<input id="studentSchool" maxlength="80" placeholder="学校名"></label><div class="regular-editor full"><div class="regular-heading"><div><strong>通常授業（毎週の時間割へ自動反映）</strong><p class="muted">曜日・時間・担当教師・教科を登録してください。複数登録できます。</p></div><button id="addRegularRow" type="button" class="mini-button">＋ 通常授業を追加</button></div><div id="regularRows" class="regular-rows"></div><p id="legacyRegularNote" class="legacy-note" hidden></p></div><label class="full">教材<input id="studentTextbook" maxlength="300"></label><label class="full">備考（全教師に公開）<textarea id="studentRemarks" maxlength="1500" rows="3"></textarea></label></div><div class="modal-actions"><button id="deleteStudent" class="danger" type="button" hidden>生徒を削除</button><button class="primary" type="submit">保存する</button></div></form></dialog>
 
