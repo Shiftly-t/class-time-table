@@ -283,7 +283,7 @@ document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if
 // required-field validation and the existing Firebase save handlers.
 function enableOneTapSave(formId) {
   const form = $(formId);
-  const save = form.querySelector('button[type="submit"]');
+  const save = form?.querySelector('button[type="submit"]');
   if (!save) return;
 
   function submitFromFocusedField(event) {
@@ -1032,6 +1032,7 @@ openDayDialog.innerHTML=`<form id="openDayForm" class="modal-content">
 <div class="modal-actions"><button id="cancelOpenDay" class="ghost" type="button">キャンセル</button><button class="primary" type="submit">この日を開校にする</button></div>
 </form>`;
 document.body.append(openDayDialog);
+enableOneTapSave('openDayForm');
 $('closeOpenDayDialog').addEventListener('click',()=>closeDialog('openDayDialog'));
 $('cancelOpenDay').addEventListener('click',()=>closeDialog('openDayDialog'));
 const openDayStyle=document.createElement('style');
