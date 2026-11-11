@@ -16,3 +16,31 @@
     break-before: page;
   }
 }
+@media print {
+  .printsheet {
+    height: auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    break-before: auto !important;
+    page-break-before: auto !important;
+    break-after: auto !important;
+    page-break-after: auto !important;
+    break-inside: avoid !important;
+  }
+
+  .printsheet:not(:last-child) {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
+  .printsheet .printitem {
+    height: auto !important;
+    min-height: 180mm;
+  }
+
+  .printsheet.four .printitem {
+    min-height: 75mm;
+  }
+}
