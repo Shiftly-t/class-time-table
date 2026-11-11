@@ -1240,7 +1240,7 @@ $('deleteExam').addEventListener('click',async()=>{
 
 // Seasonal courses are separate from normal recurring lessons.
 // Never delete normal timetable entries when the course becomes active.
-const COURSE_NAMES={spring:'春期講習',summer:'夏期講習',winter:'冬季講習'};
+const COURSE_NAMES={spring:'春期講習',summer:'夏期講習',winter:'冬期講習'};
 function courseLessons(courseId){return state.entries.filter(e=>e.courseId===courseId);}
 function renderCourses(){
   if(!isAdmin())return;

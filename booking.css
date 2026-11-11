@@ -44,3 +44,20 @@
     min-height: 75mm;
   }
 }
+
+
+/* Shiftly-T custom fixes 2026-11-11 */
+#printReadyWrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;margin-bottom:18px}
+#printReadyWrap[hidden]{display:none!important}
+#printReadyWrap>button{width:100%}
+.admin-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px;align-items:end}
+.admin-detail-grid .field{margin:0}
+.admin-grid-button{display:flex;align-items:end}
+.admin-grid-button > button{width:100%}
+@media(max-width:760px){#printReadyWrap,.admin-detail-grid{grid-template-columns:minmax(0,1fr)}}
+@media print{
+  .printsheet{display:block!important;height:auto!important;min-height:0!important;width:100%!important;padding:0!important;margin:0!important;break-after:page!important;page-break-after:always!important}
+  .printsheet:last-child{break-after:auto!important;page-break-after:auto!important}
+  .printitem{min-height:0!important;height:auto!important;padding:10mm 8mm!important}
+  .printitem svg{width:min(85mm,100%)!important}
+}
