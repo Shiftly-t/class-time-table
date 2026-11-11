@@ -2,6 +2,9 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/fireba
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import { getFirestore, collection, doc, getDoc, getDocs, query, where, setDoc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, writeBatch, runTransaction, increment, arrayUnion, Timestamp, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
+import { bookingAppCheckSiteKey } from './booking-config.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
 
 // A staging build must never contact the production Firebase project.
 const IS_TEST_BUILD = document.documentElement.dataset.shiftlyEnvironment === 'test';
@@ -10,6 +13,10 @@ if(IS_TEST_BUILD && (!firebaseConfig.projectId || JSON.stringify(firebaseConfig)
   throw new Error('テスト用のFirebase設定が未完了、または本番のprojectIdを指定しています。');
 }
 const fbApp = initializeApp(firebaseConfig);
+if (bookingAppCheckSiteKey && !bookingAppCheckSiteKey.startsWith('REPLACE_')) {
+  initializeAppCheck(fbApp,{provider:new ReCaptchaEnterpriseProvider(bookingAppCheckSiteKey),isTokenAutoRefreshEnabled:true});
+}
+const bookingEditorCall=httpsCallable(getFunctions(fbApp,'asia-northeast1'),'bookingAdminApi');
 const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
 const $ = id => document.getElementById(id);
@@ -1308,6 +1315,8 @@ function openCourseForm(courseId=''){
   $('coursePeriodRows').replaceChildren();
   (course?.periods||[{start:'09:00',end:'09:55'},{start:'10:00',end:'10:55'},{start:'11:00',end:'11:55'}]).forEach(addCoursePeriodRow);
   $('deleteCourse').hidden=!course;
+  $('courseDeleteNotice').hidden=true;
+  $('courseDeleteNoticeMessage').textContent='';
   showDialog('courseDialog');
 }
 function openCourseDeadlineEditor(courseId){
@@ -1372,6 +1381,7 @@ $('deleteCourse').addEventListener('click',async()=>{
   if(courseLessons(id).length){showMessage('講習授業が登録されています。削除前に講習授業をすべて削除してください。');return;}
   if(!confirm(`${courseDisplayName(course)}（${prettyDate(course.startDate)}〜${prettyDate(course.endDate)}）を削除しますか？期間内の通常授業が再表示されます。`))return;
   const button=$('deleteCourse');button.disabled=true;
+  $('courseDeleteNotice').hidden=true;
   try{
     const availabilityDocs=await getDocs(collection(db,'specialCourses',id,'teacherAvailability'));
     if(availabilityDocs.size>170)throw Error('勤務希望が多数あるため一度に削除できません。運営に相談してください。');
@@ -1384,7 +1394,18 @@ $('deleteCourse').addEventListener('click',async()=>{
     await batch.commit();
     closeDialog('courseDialog');showMessage('講習期間と勤務希望を解除しました。通常授業が再表示されます。');
   }
-  catch(e){trapError(e,'講習期間の削除に失敗しました');}finally{button.disabled=false;}
+  catch(e){
+    console.error('講習期間削除エラー',e);
+    const permission=String(e?.code||'').includes('permission-denied');
+    const note=$('courseDeleteNotice');
+    $('courseDeleteNoticeTitle').textContent=permission?'予約設定またはアクセス権限により削除できません':'講習期間の解除に失敗しました';
+    $('courseDeleteNoticeMessage').textContent=permission
+      ?'この講習に「講習予約の受付設定（bookingSettings）」が存在すると、講習授業が0件でもFirestoreの保護ルールで削除が拒否されます。予約・QR・受付枠などの関連データはサーバー側で安全に整理する必要があります。設定がない場合は管理者権限とFirestoreルールを確認してください。'
+      :String(e?.message||'Firebaseとの通信または関連データの確認に失敗しました。').slice(0,300);
+    note.hidden=false;
+    note.scrollIntoView({block:'nearest',behavior:'smooth'});
+    showMessage(permission?'予約設定が残っている可能性があります。下の説明を確認してください。':'講習期間を解除できませんでした。下の説明を確認してください。');
+  }finally{button.disabled=false;}
 });
 
 function renderTeacherStudents(){
@@ -1860,14 +1881,23 @@ $('lessonForm').addEventListener('submit',async event=>{
   if(old?.regularId)data.regularId=old.regularId;
   if(course)data.courseId=course.id;
   if(!isAssignableTeacher(teacher.role)){showMessage('運営アカウントは担当講師に設定できません。');return;}
-  // A student can attend at most one class in a given course period; a
-  // teacher can handle up to two students in the same period (1:2 maximum).
+  // Single-lesson editing must honor the same server-stored teacher limit as
+  // the course editor (0–4 per slot, default 2). Never silently assume 2.
   if(course && data.status!=='cancelled'){
     const periodIndex=course.periods.findIndex(p=>p.start===start&&p.end===end);
     if(periodIndex<0||!availabilityAllows(course.id,teacher.id,date,periodIndex)){showMessage('この講師は指定された日時の勤務希望を提出していません。講師勤務希望画面で先に登録してください。');return;}
+    let teacherLimit=2;
+    try{
+      const response=(await bookingEditorCall({action:'teachers',courseId:course.id})).data;
+      const settings=(response.teachers||[]).find(x=>x.id===teacher.id);
+      if(!settings){showMessage('担当講師の予約上限を確認できません。');return;}
+      const slotKey=`${course.id}__${date}__${periodIndex}`;
+      const n=settings.perSlot?.[slotKey]??settings.defaultCapacity??2;
+      teacherLimit=Number.isInteger(n)?Math.max(0,Math.min(4,n)):2;
+    }catch(error){showMessage('担当講師の予約上限を取得できません：'+String(error?.message||'エラー'));return;}
     const peers=lessonsOnDate(date).filter(e=>e.id!==id && e.status!=='cancelled' && e.start===start && e.end===end);
     if(peers.some(e=>e.studentId===student.id)){showMessage('同じ生徒が同じ講習コマで重複しています。');return;}
-    if(peers.filter(e=>e.teacherUid===teacher.id).length>=2){showMessage('このコマの担当講師はすでに2人の生徒を担当しています。');return;}
+    if(peers.filter(e=>e.teacherUid===teacher.id).length>=teacherLimit){showMessage(`このコマの担当講師の設定上限（${teacherLimit}人）を超えています。`);return;}
   }
   const btn=event.submitter;btn.disabled=true;
   try{
@@ -2290,7 +2320,7 @@ $('availabilitySubmit').addEventListener('click',async()=>{
 function openEditorNewLesson({date,periodIndex,teacherUid}={}){
   if(!isAdmin()||courseEditor.busy)return;
   const course=state.courses.find(c=>c.id===courseEditor.courseId);
-  if(!course||state.availabilityStatus[course.id]!=='ready')return;
+  if(!course||state.availabilityStatus[course.id]!=='ready'||!courseEditorCapacity.ready)return;
   if(!state.students.length){showMessage('先に生徒を登録してください。');return;}
   const chosenDate=date||courseEditor.date;
   if(chosenDate<course.startDate||chosenDate>course.endDate||closureFor(chosenDate)){showMessage('講習期間内の休校日以外を選択してください。');return;}
@@ -2313,8 +2343,9 @@ function updateEditorNewTeachers(preferred=''){
   const matching=courseEditorSortedTeachers(date).filter(p=>availabilityAllows(course.id,p.id,date,i));
   for(const teacher of matching){
     const active=courseEditorEntries().filter(e=>e.date===date&&e.teacherUid===teacher.id&&e.status!=='cancelled'&&e.start===course.periods[i]?.start&&e.end===course.periods[i]?.end).length;
-    if(active>=2)continue;
-    const opt=make('option','',`${teacher.name||teacher.id}${teacher.role==='owner'?'（運営）':teacher.role==='admin'?'（管理者）':''}　${active}/2人`);opt.value=teacher.id;teacherSelect.append(opt);
+    const teacherLimit=courseTeacherLimit(course,teacher.id,date,i);
+    if(active>=teacherLimit)continue;
+    const opt=make('option','',`${teacher.name||teacher.id}${teacher.role==='owner'?'（運営）':teacher.role==='admin'?'（管理者）':''}　${active}/${teacherLimit}人`);opt.value=teacher.id;teacherSelect.append(opt);
   }
   if([...teacherSelect.options].some(o=>o.value===old))teacherSelect.value=old;
   $('editorNewHelp').textContent=teacherSelect.options.length?'講師の出勤希望があるコマだけ登録できます。登録後は「確定して反映」で保存してください。':'この時間帯に出勤可能で空きがある講師がいません。勤務希望または日時を確認してください。';
@@ -2376,6 +2407,7 @@ function openCourseEditor(id){
   if(!course||courseEditor.busy)return false;
   if(courseEditorChanges().length&&!confirm('講習配置の未反映の変更があります。破棄して別の講習を開きますか？'))return false;
   courseEditor.courseId=id;
+  loadCourseEditorCapacity(id);
   courseEditor.date=course.startDate;
   courseEditor.originals=new Map(courseLessons(id).map(e=>[e.id,{...e}]));
   courseEditor.draft=new Map(courseLessons(id).map(e=>[e.id,{...e}]));
@@ -2384,9 +2416,51 @@ function openCourseEditor(id){
 }
 function courseEditorEntries(){return [...courseEditor.draft.values()];}
 function courseEditorPeriod(course,entry){return course.periods.findIndex(p=>p.start===entry.start&&p.end===entry.end);}
+// Limits are stored server-side; the public app reads only the admin callable's safe summary.
+const courseEditorCapacity={courseId:'',teachers:new Map(),ready:false,busy:false,error:'',version:0};
+function courseTeacherLimit(course,uid,date,index){
+  if(!course||!Number.isInteger(index)||index<0)return 2;
+  const item=courseEditorCapacity.courseId===course.id?courseEditorCapacity.teachers.get(uid):null;
+  const key=`${course.id}__${date}__${index}`;
+  const n=item?.perSlot?.[key]??item?.defaultCapacity??2;
+  return Number.isInteger(n)?Math.max(0,Math.min(4,n)):2;
+}
+async function loadCourseEditorCapacity(id){
+  const seq=++courseEditorCapacity.version;
+  courseEditorCapacity.courseId=id;courseEditorCapacity.teachers=new Map();
+  courseEditorCapacity.ready=false;courseEditorCapacity.error='';
+  try{
+    const response=(await bookingEditorCall({action:'teachers',courseId:id})).data;
+    if(seq!==courseEditorCapacity.version||id!==courseEditor.courseId)return;
+    courseEditorCapacity.teachers=new Map((response.teachers||[]).map(item=>[item.id,item]));
+    courseEditorCapacity.ready=true;
+  }catch(error){
+    if(seq!==courseEditorCapacity.version||id!==courseEditor.courseId)return;
+    courseEditorCapacity.error=String(error?.message||'担当上限を取得できませんでした');
+    console.error('講師の担当上限を取得できません',error);
+  }
+  if(state.page==='courseEditor')renderCourseEditor();
+}
+async function saveCourseEditorLimit(course,uid,date,index,value){
+  if(!isAdmin()||courseEditorCapacity.busy||!courseEditorCapacity.ready)return;
+  if(!Number.isInteger(value)||value<0||value>4){showMessage('担当上限は0〜4人です。');return;}
+  const chosen=courseEditorEntries().filter(e=>e.teacherUid===uid&&e.date===date&&e.status!=='cancelled'&&e.start===course.periods[index].start&&e.end===course.periods[index].end).length;
+  if(value<chosen){showMessage(`仮配置の授業が${chosen}人分あります。先に授業を調整してください。`);renderCourseEditor();return;}
+  courseEditorCapacity.busy=true;
+  const key=`${course.id}__${date}__${index}`;
+  try{
+    await bookingEditorCall({action:'setTeacherLimit',courseId:course.id,teacherUid:uid,slotId:key,capacity:value});
+    const item=courseEditorCapacity.teachers.get(uid);
+    if(item)item.perSlot={...(item.perSlot||{}),[key]:value};
+    showMessage(`${prettyDate(date)}の${state.people.find(p=>p.id===uid)?.name||'講師'}の上限を${value}人に変更しました。予約枠にも自動反映されます。`);
+  }catch(error){
+    console.error(error);showMessage('担当上限を変更できません：'+String(error?.message||'エラー'));
+  }finally{courseEditorCapacity.busy=false;renderCourseEditor();}
+}
 function courseEditorValidate(id,target){
   const item=courseEditor.draft.get(id),course=state.courses.find(c=>c.id===courseEditor.courseId);
   if(!item||!course)return '講習または授業が見つかりません。';
+  if(!courseEditorCapacity.ready||courseEditorCapacity.courseId!==course.id)return '講師の担当上限を取得中です。しばらくしてから再操作してください。';
   if(item.status!=='scheduled')return '実施済み・欠席の授業はこの画面から移動できません。';
   if(courseEditorSettings(course)!==courseEditor.courseSignature)return '講習期間・コマ設定が変更されています。変更を破棄して読み直してください。';
   if(target.date<course.startDate||target.date>course.endDate||courseFor(target.date)?.id!==course.id||hasCourseConflict(target.date))return '指定日は、この講習期間に含まれていません。';
@@ -2397,7 +2471,7 @@ function courseEditorValidate(id,target){
   if(!availabilityAllows(course.id,target.teacherUid,target.date,periodIndex))return 'この講師は指定されたコマの勤務希望を提出していません。';
   const peer=courseEditorEntries().filter(e=>e.id!==id&&e.status!=='cancelled'&&e.date===target.date&&e.start<target.end&&e.end>target.start);
   if(peer.some(e=>e.studentId===item.studentId))return 'この時間帯は、同じ生徒の授業がすでに登録されています。';
-  if(peer.filter(e=>e.teacherUid===target.teacherUid).length>=2)return '担当講師の同時指導は最大2人までです。';
+  if(peer.filter(e=>e.teacherUid===target.teacherUid).length>=courseTeacherLimit(course,target.teacherUid,target.date,periodIndex))return '担当講師の設定上限を超えています（初期値2人・最大4人）。';
   return '';
 }
 function courseEditorGapCount(entries,teacherUid,date,course){
@@ -2508,9 +2582,25 @@ function courseEditorCell(date,periodIndex,teacherUid=''){
   cell.tabIndex=0;cell.setAttribute('role','button');
   cell.title=closed?'休校日':outside?'講習期間外':unavailable?'勤務希望なし（登録・移動不可）':`${prettyDate(date)} ${periodIndex+1}限：タップで授業登録、または移動先`; 
   const contained=courseEditorEntries().filter(e=>e.date===date&&e.start===period.start&&e.end===period.end&&(!teacherUid||e.teacherUid===teacherUid));
-  if(teacherUid && contained.filter(e=>e.status!=='cancelled').length>=2)cell.classList.add('is-full');
-  const title=make('div','editor-slot-note',closed?'休校':outside?'期間外':unavailable?(contained.length?'⚠ 勤務希望外':''):teacherUid?`${contained.filter(e=>e.status!=='cancelled').length}/2人`:contained.length?`${contained.length}件`:'');
+  const localLimit=teacherUid?courseTeacherLimit(course,teacherUid,date,periodIndex):null;
+  if(teacherUid && contained.filter(e=>e.status!=='cancelled').length>=localLimit)cell.classList.add('is-full');
+  const title=make('div','editor-slot-note',closed?'休校':outside?'期間外':unavailable?(contained.length?'⚠ 勤務希望外':''):teacherUid?`${contained.filter(e=>e.status!=='cancelled').length}/${localLimit}人`:contained.length?`${contained.length}件`:'');
   cell.append(title);
+  // One per teacher/slot in the DAY view. Event propagation must not create a lesson.
+  if(teacherUid && !closed && !outside && !unavailable && courseEditorCapacity.ready){
+    const control=make('label','editor-limit-control');control.append(make('span','','担当上限'));
+    const select=make('select','editor-limit-select');select.setAttribute('aria-label',`${prettyDate(date)} ${state.people.find(p=>p.id===teacherUid)?.name||'講師'}の担当上限`);
+    for(let n=0;n<=4;n++){const opt=make('option','',`${n}人`);opt.value=String(n);select.append(opt);}
+    select.value=String(localLimit);select.disabled=courseEditorCapacity.busy;
+    select.addEventListener('click',e=>e.stopPropagation());
+    select.addEventListener('pointerdown',e=>e.stopPropagation());
+    select.addEventListener('keydown',e=>e.stopPropagation());
+    select.addEventListener('change',e=>{e.stopPropagation();saveCourseEditorLimit(course,teacherUid,date,periodIndex,Number(select.value));});
+    control.addEventListener('click',e=>e.stopPropagation());
+    control.addEventListener('pointerdown',e=>e.stopPropagation());
+    control.addEventListener('keydown',e=>e.stopPropagation());
+    control.append(select);cell.append(control);
+  }
   const bag=make('div','editor-slot-bag');contained.forEach(item=>bag.append(courseEditorCard(item)));cell.append(bag);
   if(!contained.length&&!unavailable)cell.append(make('div','editor-slot-empty',closed?'休校':outside?'—':'+ 授業を登録 / 移動')); 
   cell.addEventListener('click',()=>{if(!closed&&!outside&&!unavailable){if(courseEditor.selectedId)courseEditorFromCell(cell);else openEditorNewLesson({date,periodIndex,teacherUid});}});
@@ -2527,7 +2617,7 @@ function renderCourseEditor(){
   chooser.value=courseEditor.courseId||'';
   const course=state.courses.find(c=>c.id===courseEditor.courseId);
   const host=$('editorGrid');host.replaceChildren();
-  const ok=Boolean(course&&state.entriesStatus==='ready'&&state.coursesStatus==='ready'&&state.closuresStatus==='ready'&&state.openDaysStatus==='ready'&&state.availabilityStatus[course.id]==='ready');
+  const ok=Boolean(course&&state.entriesStatus==='ready'&&state.coursesStatus==='ready'&&state.closuresStatus==='ready'&&state.openDaysStatus==='ready'&&state.availabilityStatus[course.id]==='ready'&&courseEditorCapacity.ready&&courseEditorCapacity.courseId===course.id);
   $('editorDayMode').classList.toggle('active',courseEditor.mode==='day');$('editorWeekMode').classList.toggle('active',courseEditor.mode==='week');
   $('editorDayMode').setAttribute('aria-pressed',String(courseEditor.mode==='day'));
   $('editorWeekMode').setAttribute('aria-pressed',String(courseEditor.mode==='week'));
@@ -2544,13 +2634,13 @@ function renderCourseEditor(){
   $('editorReset').disabled=!changes.length||courseEditor.busy;
   $('editorSave').disabled=!changes.length||!ok||courseEditor.busy;
   $('editorSave').textContent=courseEditor.busy?'反映中…':`確定して反映${changes.length?'（'+changes.length+'件）':''}`;
-  $('editorStatus').textContent=!ok?(state.coursesStatus==='error'||state.entriesStatus==='error'||state.availabilityStatus[course?.id]==='error'?'講習・授業・勤務希望の読み込みに失敗しました':'講習・授業・勤務希望の読込中です'):courseEditor.selectedId?'授業を選択中：日付を変更してから移動先をタップできます':changes.length?`未反映の変更：${changes.length}件（講師にはまだ公開されていません）`:'変更なし・講師に公開中の時間割';
+  $('editorStatus').textContent=!ok?(state.coursesStatus==='error'||state.entriesStatus==='error'||state.availabilityStatus[course?.id]==='error'?'講習・授業・勤務希望の読み込みに失敗しました':courseEditorCapacity.error?'担当上限を読み込めません：'+courseEditorCapacity.error:'講習・授業・勤務希望・担当上限の読込中です'):courseEditor.selectedId?'授業を選択中：日付を変更してから移動先をタップできます':changes.length?`未反映の変更：${changes.length}件（講師にはまだ公開されていません）`:'変更なし・講師に公開中の時間割';
   const otherEdits=changes.some(e=>{if(!courseEditor.originals.has(e.id))return false;const current=state.entries.find(x=>x.id===e.id);return !current||courseEditorKey(current)!==courseEditorKey(courseEditor.originals.get(e.id));});
   const changedCourse=course&&courseEditorSettings(course)!==courseEditor.courseSignature;
   const mismatched=course?courseEditorEntries().filter(e=>e.status!=='cancelled'&&courseEditorPeriod(course,e)>=0&&!availabilityAllows(course.id,e.teacherUid,e.date,courseEditorPeriod(course,e))):[];
   $('editorWarning').hidden=!(otherEdits||changedCourse||courseEditor.warning||mismatched.length);
   $('editorWarning').textContent=changedCourse?'講習期間またはコマ設定が変わりました。変更を破棄して読み直してください。':otherEdits?'別の管理者が同じ授業を変更しました。古い内容は上書きせず、保存時に停止します。':courseEditor.warning|| (mismatched.length?`${mismatched.length}件の授業が最新の勤務希望から外れています。該当する授業を勤務可能なコマへ移動するか、管理者が勤務希望を修正してください。`:'');
-  if(!ok){host.append(make('p','empty',state.courses.length?'時間割と講習・休校情報を読み込んでいます…':'講習期間がありません。「講習期間管理」で登録してください。'));return;}
+  if(!ok){host.append(make('p','empty',courseEditorCapacity.error?'講師の担当上限が取得できません。Firebase Functionsの更新・App Check設定を確認してください。':state.courses.length?'時間割と講習・休校・担当上限情報を読み込んでいます…':'講習期間がありません。「講習期間管理」で登録してください。'));return;}
   const teachers=courseEditorSortedTeachers(courseEditor.date);
   if(courseEditor.mode==='day'&&!teachers.length){host.append(make('p','empty','講師が登録されていません。'));return;}
   const isDay=courseEditor.mode==='day';
@@ -2657,7 +2747,8 @@ async function publishCourseEditor(){
             if(e.studentId===f.studentId)throw Error('同じ生徒の授業が重複しています。');
           }
           const count=rows.filter(x=>x.teacherUid===e.teacherUid&&x.start<e.end&&x.end>e.start).length;
-          if(count>2)throw Error('担当講師が同時に3人以上の生徒を担当しています。');
+          const limit=courseTeacherLimit(course,e.teacherUid,e.date,courseEditorPeriod(course,e));
+          if(count>limit)throw Error(`担当講師が設定上限（${limit}人）を超えています。`);
         }
       }
       const auditGroup=doc(collection(db,'auditLogs')).id;
@@ -2710,7 +2801,7 @@ function loggedOut(){
   $('maintenancePanel').hidden=true;
   auditState.logs=[];auditState.archives=[];auditState.loaded=false;auditState.busy=false;
   $('ownerAuditList').replaceChildren();$('ownerArchiveList').replaceChildren();$('ownerAuditMessage').textContent='';
-  resetSubscriptions();state.user=null;state.profile=null;syncBookingManagementShortcut();state.entries=[];state.entriesStatus='loading';state.students=[];state.people=[];state.closures={};state.closuresStatus='loading';state.openDays={};state.openDaysStatus='loading';state.examEvents={};state.examStatus='loading';state.courses=[];state.coursesStatus='loading';state.notices=[];state.officialAnnouncements=[];state.officialSeenIds=new Set();state.officialSeenReady=false;clearAvailabilitySubscriptions();state.availability=new Map();state.availabilityStatus={};resetCourseEditor();resetAvailabilityEditor();
+  resetSubscriptions();state.user=null;state.profile=null;courseEditorCapacity.version++;courseEditorCapacity.ready=false;courseEditorCapacity.teachers.clear();syncBookingManagementShortcut();state.entries=[];state.entriesStatus='loading';state.students=[];state.people=[];state.closures={};state.closuresStatus='loading';state.openDays={};state.openDaysStatus='loading';state.examEvents={};state.examStatus='loading';state.courses=[];state.coursesStatus='loading';state.notices=[];state.officialAnnouncements=[];state.officialSeenIds=new Set();state.officialSeenReady=false;clearAvailabilitySubscriptions();state.availability=new Map();state.availabilityStatus={};resetCourseEditor();resetAvailabilityEditor();
   $('availabilityHomePanel').hidden=true;$('availabilityHomeCards').replaceChildren();
   $('loginPanel').hidden=false;$('appPanel').hidden=true;$('logout').hidden=true;$('notificationButton').hidden=true;$('identity').textContent='';$('password').value='';$('noticeCount').hidden=true;
   for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();

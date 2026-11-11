@@ -554,3 +554,25 @@
 .closure-selected-course{background:#ecf2ff;border-left:3px solid #536bce;border-radius:7px;padding:10px 12px;margin:10px 0 3px;font-size:12px;font-weight:750;color:#405b9c;line-height:1.6}
 @media(max-width:680px){.availability-period-controls{width:100%;flex-basis:100%}.availability-overview-count{margin-left:0}.availability-grid-wrap{max-height:72vh}.availability-table thead .availability-corner,.availability-table tbody .availability-period-head{min-width:132px;width:132px;font-size:11px}.availability-table thead .availability-date-header,.availability-table tbody .availability-day-cell{min-width:99px;width:99px}.availability-table .availability-date-main{font-size:11px}.availability-period-overview{padding:11px 12px}}
 @media(max-width:510px){.closure-calendar-course{font-size:8px;padding:2px 3px}.closure-calendar-course-legend{font-size:9px}}
+
+/* Seasonal-course deletion: persistent, actionable error instead of a 7s toast. */
+.course-delete-notice{margin:16px 0 0;padding:13px 15px;background:#fff7ed;border:1px solid #f3c99d;border-radius:12px;color:#713f14;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.course-delete-notice[hidden]{display:none!important}
+.course-delete-notice strong{font-size:13px}
+.course-delete-notice p{margin:6px 0 8px}
+.course-delete-notice a{color:#304fb6;text-decoration:underline;text-underline-offset:2px;font-weight:750}
+
+/* 2026-11-11 capacity editor: max four per available teacher and slot */
+.editor-limit-control{display:flex;align-items:center;justify-content:space-between;gap:5px;margin:5px 0 8px;padding:6px 7px;background:#eff3ff;border:1px solid #d4dff7;border-radius:8px;color:#3b518a;font-size:10px;font-weight:750}
+.editor-limit-select{min-height:32px;min-width:66px;width:auto;max-width:96px;margin:0;padding:5px 6px;border:1px solid #bdccee;border-radius:6px;background:#fff;color:#25385d;font-size:12px;font-weight:800}
+.editor-limit-select:focus-visible{outline:2px solid #596ee7;outline-offset:1px}
+/* End of course appears at right, start of course at left */
+.availability-table thead .availability-date-header.is-course-end{border-right:3px solid #667ee4}
+.availability-table tbody .availability-day-cell.is-course-end{box-shadow:inset -3px 0 0 #a6b6f2}
+/* Mobile student controls and contained horizontal table scrolling */
+@media(max-width:650px){
+ .student-toolbar{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;width:100%}
+ .student-toolbar label,.student-toolbar label.grow{width:100%;min-width:0;max-width:none;margin:0}
+ .student-toolbar input,.student-toolbar select{width:100%;min-width:0;box-sizing:border-box}
+ #adminCountPage .table-wrap{max-width:100%;width:100%;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+}

@@ -61,3 +61,10 @@
   .printitem{min-height:0!important;height:auto!important;padding:10mm 8mm!important}
   .printitem svg{width:min(85mm,100%)!important}
 }
+
+/* Booking setup: date/time inputs must fit narrow iPhones without overlap. */
+@media(max-width:700px){
+ .booking-setup-dates{grid-template-columns:minmax(0,1fr)}
+ .booking-setup-dates .field{min-width:0;width:100%}
+ .booking-setup-dates .field input{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+}
