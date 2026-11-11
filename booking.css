@@ -4,3 +4,15 @@
 @media(max-width:600px){.slotgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}.rightcol{grid-template-columns:minmax(0,1fr)}.main{padding:17px 12px 62px}.topbar{padding:11px 13px}.brand{font-size:19px}.panel{padding:16px}.calendar>div{padding:5px 3px;min-height:64px}}
 @media(max-width:390px){.slotgrid{grid-template-columns:minmax(0,1fr)}.grid2,.grid3{grid-template-columns:minmax(0,1fr)}.actions{flex-direction:column}.actions>button{width:100%;flex:auto}.calendar>div{min-height:55px}.calendar small{font-size:9px}}
 @media print{@page{size:A4;margin:8mm}body{background:#fff!important}.topbar,.main,.dialog{display:none!important}.printarea{display:block!important}.printsheet{height:calc(297mm - 16mm);width:calc(210mm - 16mm);padding:3mm;margin:0 auto;page-break-after:always}.printsheet.four{grid-template-rows:repeat(2,1fr)}.printitem{break-inside:avoid}.printsheet:not(.four) .printitem{height:100%}}
+@media print {
+  .printsheet {
+    height: 270mm;
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .printsheet + .printsheet {
+    page-break-before: always;
+    break-before: page;
+  }
+}
