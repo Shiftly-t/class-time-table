@@ -55,11 +55,34 @@ match /teacherDayAbsences/{absenceId} {
 
 **重複する関数名が既存ルールにある場合**は関数名を変更するか既存の `isAdmin()` / `signedIn()` を再利用してください。管理者認証が曖昧な `request.auth != null` だけの書き込みルールにはしないでください。
 
+## 既存 `timetableEntries` の変更：黒いコマへのサーバー側配置禁止
+
+管理者画面の黒いコマを無効化するだけでなく、Firestoreに直接書き込む操作も拒否するため、上位スコープに下記関数を追加します（`isAdmin()` の近くでよい）。
+
+```javascript
+function teacherAbsencePath(date, uid) {
+  return /databases/$(database)/documents/teacherDayAbsences/$(date + '_' + uid);
+}
+function regularAssignmentAllowed(d) {
+  let path = teacherAbsencePath(d.date, d.teacherUid);
+  return d.get('courseId', '') != '' || d.status == 'cancelled'
+    || !existsAfter(path)
+    || !(
+      (d.start < '18:25' && d.end > '17:30' && getAfter(path).data.absentPeriods.hasAny([1]))
+      || (d.start < '19:25' && d.end > '18:30' && getAfter(path).data.absentPeriods.hasAny([2]))
+      || (d.start < '20:25' && d.end > '19:30' && getAfter(path).data.absentPeriods.hasAny([3]))
+      || (d.start < '21:25' && d.end > '20:30' && getAfter(path).data.absentPeriods.hasAny([4]))
+    );
+}
+```
+
+既存 `match /timetableEntries/{id}` の create に `&& regularAssignmentAllowed(request.resource.data)` を追加します。updateには `&& (sameAssignment(resource.data, request.resource.data) || regularAssignmentAllowed(request.resource.data))` を追加します。これにより、すでに欠席枠に残っている授業の伝達事項などの変更は許しつつ、**担当講師を欠席枠へ新たに変更する操作**を禁止できます。
+
 ## 既存 `specialCourses` ルールの確認
 
-保存データの検証で許可フィールドを列挙している場合、`archived`（boolean）を追加してください。既存の `startDate` / `endDate` / `periods` / `type` / `name` / `availabilityDeadline` を維持してください。講習の表示／非表示は管理者（`admin` または `owner`）だけが書き換え可能としてください。
+現在のルールの `keys().hasOnly([...])` に `'archived'` を追加し、`&& request.resource.data.get('archived', false) is bool` を加えます。既存の `startDate` / `endDate` / `periods` / `type` / `name` / `availabilityDeadline` を維持してください。講習の表示／非表示は管理者（`admin` または `owner`）だけが書き換え可能としてください。
 
-可能なら講師の `teacherAvailability` 書き込みルールにも、親講習 `archived != true` のときだけ登録可能な条件を入れてください（既存の管理者例外を維持）。
+講師の `teacherAvailability` 書き込みルールには、親講習の存在確認後に `&& get(coursePath(courseId)).data.get('archived', false) != true` を追加します。管理者による復元・既存データの読み取りは維持されます。
 
 ## 動作確認（テストデータで実施）
 
