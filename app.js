@@ -658,8 +658,10 @@ $('maintenanceRecord').addEventListener('click',()=>changeMaintenance('update'))
 $('maintenanceHistoryRefresh').addEventListener('click',loadMaintenanceHistory);
 
 function nav(page) {
-  if(state.page==='adminLessons'&&page!=='adminLessons'&&regularEditor?.hasChanges()
-    &&!confirm('未確定の講師欠席・担当振替があります。破棄して画面を移動しますか？'))return;
+  if(state.page==='adminLessons'&&page!=='adminLessons'&&regularEditor?.hasChanges()){
+    if(!confirm('未確定の講師欠席・担当振替があります。破棄して画面を移動しますか？'))return;
+    regularEditor.reset();
+  }
   state.page=page;
   $('adminCountPage').hidden=page!=='count';
   $('teacherStudentsPage').hidden=page!=='students';
