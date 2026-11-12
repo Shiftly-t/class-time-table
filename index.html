@@ -33,7 +33,7 @@
 </section>
 <section id="ownerHistoryPage" class="page owner-tools-page" hidden>
   <div class="section-title"><div><p class="eyebrow">OWNER ONLY · DATA SAFETY</p><h2>変更履歴・バックアップ</h2><p class="muted">運営専用。誰が・いつ・何を変更したか確認し、特定の変更前／変更後の内容に復元できます。</p></div><button id="ownerRefresh" class="ghost" type="button">↻ 最新を取得</button></div>
-  <div class="owner-safety-banner"><strong>安全な復元のために</strong><span>復元は二重確認後に実行し、直前の業務データを自動バックアップします。対象は生徒・授業・講習・勤務希望・休校日・模試など。Firebase Authenticationのアカウント情報や個人の通知は対象外です。全体復元は複数回に分けて保存するため途中失敗の可能性があり、バックアップを確認してから実行してください。</span></div>
+  <div class="owner-safety-banner"><strong>安全な復元のために</strong><span>復元は二重確認後に実行し、直前の業務データを自動バックアップします。対象は生徒・授業・講習・勤務希望・休校日・模試など。Firebase Authenticationのアカウント情報や個人の通知は対象外です。全体復元はシステム管理でメンテナンスを開始してから実行してください。予約台帳・QR情報は対象外です。全体復元は複数回に分けて保存するため途中失敗の可能性があり、バックアップを確認してから実行してください。</span></div>
   <section class="panel owner-backup-panel"><div class="owner-section-header"><div><p class="eyebrow">CLOUD BACKUP</p><h3>クラウドバックアップ</h3></div></div><div class="owner-backup-actions"><label>バックアップ名<input id="ownerBackupLabel" type="text" maxlength="100" placeholder="例：講習編成前・2026年冬" value="手動バックアップ"></label><button id="ownerCreateBackup" class="primary" type="button">＋ 今のデータをバックアップ</button></div><p class="owner-help">作成したバックアップは運営だけが閲覧・JSON保存・全体復元できます。定期的にJSONファイルを安全な場所にも保管してください。</p><div id="ownerArchiveList" class="owner-archive-list"></div></section>
   <section class="panel owner-history-panel"><div class="owner-section-header"><div><p class="eyebrow">CHANGE HISTORY</p><h3>変更履歴（新しい順・最大150件）</h3></div></div><p id="ownerAuditMessage" class="owner-help" role="status">変更履歴を取得しています…</p><div id="ownerAuditList" class="owner-audit-list"></div></section>
 </section>

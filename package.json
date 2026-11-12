@@ -1,0 +1,10 @@
+{
+  "name": "shiftly-t-quality-checks",
+  "private": true,
+  "scripts": {
+    "test": "node tests/config-guard.cjs && node tests/pr1-review.cjs && node tests/audit.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

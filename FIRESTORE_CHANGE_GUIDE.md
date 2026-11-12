@@ -30,10 +30,18 @@ function shiftlyIsManager() {
        in ['owner', 'admin'];
 }
 
-match /teacherDayAbsences/{absenceId} {
-  allow read: if shiftlyIsRegistered();
+// Maintenance must be enforced here as well: UI hiding does not revoke access.
+function shiftlyServiceAvailable() {
+  let maintenance = /databases/$(database)/documents/systemConfig/maintenance;
+  return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner'
+    || !exists(maintenance)
+    || get(maintenance).data.get('enabled', false) != true;
+}
 
-  allow create, update: if shiftlyIsManager()
+match /teacherDayAbsences/{absenceId} {
+  allow read: if shiftlyIsRegistered() && shiftlyServiceAvailable();
+
+  allow create, update: if shiftlyIsManager() && shiftlyServiceAvailable()
     && request.resource.data.keys().hasOnly([
       'date', 'teacherUid', 'absentPeriods', 'updatedBy', 'updatedAt'
     ])
@@ -54,7 +62,7 @@ match /teacherDayAbsences/{absenceId} {
     && request.resource.data.updatedBy == request.auth.uid
     && request.resource.data.updatedAt == request.time;
 
-  allow delete: if shiftlyIsManager();
+  allow delete: if shiftlyIsManager() && shiftlyServiceAvailable();
 }
 ```
 
@@ -122,3 +130,11 @@ function regularAssignmentAllowed(d) {
 - 現時点ではFirebase実環境の画面操作・Firestoreルールのデプロイは行っていません。
 - 通常授業エディターの移動は**同じ日付・同じ時間帯の他講師への担当振替**です。授業時間・教科・生徒欠席の変更は従来の詳細編集で行います。
 - この実装は本番導入前の開発版です。利用者によるiPad動作確認とFirestoreルールの統合後にのみmainへマージしてください。
+
+## 総合品質検査での補足（2026-11-12）
+
+- 上のコマ別欠席ルールにもメンテナンス条件を追加しました。この例は**現行ルール全文との統合・Emulatorコンパイルが未検証**です。
+- Firestoreのallowは複数のmatchで許可されるとORで評価されます。広いパスの既存allowがある場合、この追加だけでアクセスを制限できません。現行ルール全文を用いた拒否テストが必須です。
+- 生徒情報・個別授業・伝達事項の保存は読み取り比較を伴うトランザクションになりました。管理者の対象ドキュメントreadと、同一コミット内の監査ログ・通知のwriteを許可する必要があります。
+- 複数授業の担当上限・予約台帳との整合性は、この欠席ルールやクライアント側の入力検査だけでは保証しません。全ての配置経路を共通のサーバー処理に統一して検証してください。
+- 全体復元の画面操作にはメンテナンス開始が必要です。予約台帳・QR情報は現行の業務バックアップに含まれないため、予約システム全体の復旧用途には使用できません。
