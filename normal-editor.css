@@ -1,0 +1,78 @@
+/* Shiftly-T 2026-11-12: admin regular timetable editor and course archive */
+.normal-editor-page{min-width:0}
+.normal-editor-title{gap:14px}
+.normal-editor-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:14px 0}
+.normal-date-nav,.normal-editor-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.normal-date-nav input[type=date]{min-height:42px;width:174px;max-width:100%;padding:8px 10px;border:1px solid #cad5e7;border-radius:9px;background:#fff;color:#24344f}
+.normal-date-nav .ghost{min-width:41px;min-height:42px}
+.normal-editor-actions .ghost,.normal-editor-actions .primary{min-height:40px;white-space:normal}
+.normal-editor-warning{font-size:13px;font-weight:700;color:#98530a;line-height:1.65;overflow-wrap:anywhere;margin:8px 0 12px}
+.normal-editor-warning:empty{display:none}
+.normal-editor-scroll{max-width:100%;overflow-x:auto;overflow-y:visible;border:1px solid #dae3ef;border-radius:13px;background:#fff;-webkit-overflow-scrolling:touch}
+.normal-table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.normal-table th,.normal-table td{border-right:1px solid #e5eaf1;border-bottom:1px solid #e5eaf1;vertical-align:top}
+.normal-table tr:last-child td,.normal-table tr:last-child th{border-bottom:0}
+.normal-table tr>*:last-child{border-right:0}
+.normal-table thead th{position:sticky;top:0;z-index:3;background:#f1f5ff}
+.normal-table .normal-time-head{position:sticky;left:0;top:0;z-index:5;width:114px;min-width:114px;text-align:left;padding:14px 10px;color:#364766;font-size:12px}
+.normal-teacher-head{min-width:186px;width:198px;padding:9px 7px;text-align:center}
+.normal-teacher-head.has-absences{background:#edf0f6}
+.normal-teacher-head small{display:block;color:#667690;font-size:10px;line-height:1.4;margin-top:3px}
+.normal-teacher-button{appearance:none;display:block;width:100%;border:1px solid #c6d5f8;background:#fff;color:#263f7f;border-radius:8px;padding:9px 5px;font-size:13px;line-height:1.45;font-weight:800;cursor:pointer;min-height:42px;overflow-wrap:anywhere}
+.normal-teacher-button:focus-visible,.normal-cell:focus-visible,.normal-entry:focus-visible{outline:3px solid #637fe0;outline-offset:-2px}
+.normal-period{position:sticky;left:0;z-index:2;background:#f7f9fd;min-width:114px;width:114px;padding:12px 9px;vertical-align:middle!important;text-align:center}
+.normal-period strong,.normal-period small{display:block}
+.normal-period strong{font-size:13px;color:#20314d}
+.normal-period small{font-size:10px;font-weight:500;color:#718098;margin-top:4px}
+.normal-cell{position:relative;width:198px;min-width:186px;height:98px;padding:7px;background:#fff;transition:background .1s ease;cursor:pointer}
+.normal-cell:not(.is-absent):hover{background:#f3f7ff}
+.normal-cell.is-absent{background:#272e3b;color:#fff;cursor:not-allowed}
+.normal-cell.is-drop-target{background:#e0edff!important;outline:3px solid #5180d7;outline-offset:-4px}
+.normal-cell-label{font-size:11px;font-weight:800;line-height:1.4;margin:0 0 6px;min-height:15px}
+.normal-cell.is-absent .normal-cell-label{color:#ffe0e0}
+.normal-empty{color:#9cacc2;text-align:center;font-size:11px;padding:12px 3px}
+.normal-entry{appearance:none;display:block;width:100%;border:1px solid #c4d5f4;background:#edf3ff;color:#284166;border-radius:9px;padding:9px 8px;text-align:left;margin-bottom:6px;cursor:grab;overflow-wrap:anywhere;touch-action:none;user-select:none}
+.normal-entry strong,.normal-entry small{display:block;line-height:1.45}
+.normal-entry strong{font-size:12px;font-weight:800}
+.normal-entry small{font-size:10px;color:#546787;margin-top:2px}
+.normal-entry.is-selected{border-color:#345ce3;box-shadow:0 0 0 2px #7190fa}
+.normal-entry.is-dragging{opacity:.5}
+.normal-entry.is-cancelled{background:#fff0f1;border-color:#e8b9c2;color:#9d4157;cursor:default}
+.normal-entry.is-pending{border:2px solid #e2a34c;background:#fff1d8}
+.normal-entry.is-pending small{color:#82541a}
+.normal-cell.is-absent .normal-entry{cursor:grab}
+.normal-editor-banner{margin:12px;padding:20px;background:#f0f5fc;border:1px solid #cddbf1;border-radius:11px;color:#2c4366;font-weight:700;line-height:1.7}
+.normal-editor-scroll>.primary{margin:0 12px 12px}
+.normal-editor-footnote{font-size:12px;color:#66758f;line-height:1.7;margin:10px 1px 18px}
+.normal-extra{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px;padding:12px;background:#f6f8fe;border-radius:8px}
+.normal-extra strong{width:100%;font-size:12px}
+.normal-absence-options{display:grid;gap:9px;margin:14px 0}
+.normal-absence-row{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #d9e0ee;padding:11px 13px;border-radius:10px;cursor:pointer}
+.normal-absence-row strong{font-size:13px}
+.normal-absence-row span{margin-left:auto;color:#7c8699;font-size:12px}
+.normal-absence-row input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;accent-color:#394864}
+.normal-absence-quick{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0 14px}
+.normal-absence-quick .mini-button{min-height:37px}
+.normal-teacher-alert{display:inline-block;border-radius:7px;padding:3px 6px;background:#fff0d5;color:#8b520a;font-size:11px;font-weight:800}
+.lesson-card.is-teacher-absent{border-color:#edb65c;background:#fffbf1}
+.course-archive-switch{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0 16px}
+.course-archive-tab{border:1px solid #c9d7ef;border-radius:10px;min-height:41px;padding:10px 14px;background:#fff;color:#485979;font-weight:750;cursor:pointer;font-size:13px}
+.course-archive-tab.active{background:#2c4dab;border-color:#2c4dab;color:#fff}
+.course-list-item.is-archived{opacity:.85;background:#f5f7fa}
+.course-list-actions .course-archive-action{border-color:#c5cddc}
+.course-list-actions .course-archive-action:disabled{opacity:.5;cursor:not-allowed}
+.availability-overview-emphasis{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:11px;padding:12px 14px;background:#e9f0ff;border:1px solid #bed0f5;border-radius:11px;color:#203e79}
+.availability-overview-emphasis strong{font-size:14px;line-height:1.5;flex:1 1 250px}
+.availability-overview-emphasis span{font-size:12px;font-weight:800;border-radius:7px;background:#fff;padding:5px 8px;border:1px solid #c6d4ee}
+@media(max-width:740px){
+ .normal-editor-toolbar{align-items:stretch}
+ .normal-date-nav{width:100%}
+ .normal-date-nav input[type=date]{flex:1;min-width:135px}
+ .normal-editor-actions{width:100%}
+ .normal-editor-actions>*{flex:1 1 130px}
+ .normal-table .normal-time-head,.normal-period{min-width:98px;width:98px}
+ .normal-teacher-head,.normal-cell{min-width:168px;width:168px}
+ .normal-cell{height:90px}
+ .normal-editor-title .ghost{width:100%}
+ .availability-overview-emphasis strong{flex-basis:100%}
+}
