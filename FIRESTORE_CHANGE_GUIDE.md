@@ -61,7 +61,8 @@ match /teacherDayAbsences/{absenceId} {
 
 ```javascript
 function teacherAbsencePath(date, uid) {
-  return /databases/$(database)/documents/teacherDayAbsences/$(date + '_' + uid);
+  let absenceId = date + '_' + uid;
+  return /databases/$(database)/documents/teacherDayAbsences/$(absenceId);
 }
 function regularAssignmentAllowed(d) {
   let path = teacherAbsencePath(d.date, d.teacherUid);
