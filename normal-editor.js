@@ -59,7 +59,7 @@ export function installNormalEditor(ctx){
   document.body.append(absenceDialog);
   const m={date:todayKey(),loadedDate:'',draft:new Map(),originals:new Map(),
     absent:new Map(),absentOriginals:new Map(),baseline:'',history:[],
-    selected:'',drag:null,suppressClick:false,busy:false,external:false,openUid:''};
+    selected:'',drag:null,busy:false,external:false,openUid:''};
   const cloneLessons=map=>new Map([...map].map(([id,e])=>[id,{...e}]));
   const cloneAbsences=map=>new Map([...map].map(([uid,periods])=>[uid,new Set(periods)]));
   const teacherList=()=>state.people.filter(p=>isAssignableTeacher(p.role))
@@ -149,6 +149,7 @@ export function installNormalEditor(ctx){
     render();
   }
   function changeDate(date){
+    if(m.busy)return false;
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return false;
     if(m.date===date)return true;
     if(hasChanges()&&!confirm('未確定の授業振替・欠席設定があります。破棄して日付を変えますか？'))return false;
@@ -177,9 +178,10 @@ export function installNormalEditor(ctx){
     b.append(make('small','',`${entry.subject||'教科未設定'}${blocked?' / ⚠ 要振替':''}${entry.status==='cancelled'?' / 生徒欠席':''}`));
     b.title='タップで選択、移動先をタップ。iPadではドラッグ操作も可能です。';
     b.setAttribute('aria-pressed',String(selected));
+    let suppressClick=false;
     b.addEventListener('click',event=>{
       event.stopPropagation();
-      if(m.suppressClick){m.suppressClick=false;return;}
+      if(suppressClick){suppressClick=false;return;}
       selectLesson(entry.id);
     });
     if(entry.status!=='scheduled')return b;
@@ -206,12 +208,15 @@ export function installNormalEditor(ctx){
       m.drag=null;b.classList.remove('is-dragging');
       document.querySelectorAll('.normal-cell.is-drop-target').forEach(el=>el.classList.remove('is-drop-target'));
       if(drag.moved){
-        m.suppressClick=true;
+        suppressClick=true;
         if(drag.target)move(entry.id,drag.target.dataset.uid,Number(drag.target.dataset.period));
         else showMessage('移動先の講師の出勤可能なコマまでドラッグしてください。');
       }
     });
-    b.addEventListener('pointercancel',()=>{m.drag=null;b.classList.remove('is-dragging');});
+    b.addEventListener('pointercancel',()=>{
+      m.drag=null;b.classList.remove('is-dragging');
+      document.querySelectorAll('.normal-cell.is-drop-target').forEach(el=>el.classList.remove('is-drop-target'));
+    });
     return b;
   }
   function renderGrid(teachers){
@@ -289,6 +294,7 @@ export function installNormalEditor(ctx){
   function render(){
     if(!isAdmin()||state.page!=='adminLessons')return;
     if(m.date!==state.date) m.date=state.date;
+    for(const id of ['normalDate','normalPrev','normalNext','normalToday','normalPreview'])$(id).disabled=m.busy;
     $('normalDate').value=m.date;
     $('normalGrid').replaceChildren();
     $('normalEditorWarning').textContent='';
@@ -360,7 +366,7 @@ export function installNormalEditor(ctx){
   }));
   $('normalAbsenceForm').addEventListener('submit',event=>{
     event.preventDefault();
-    const uid=m.openUid;if(!uid)return;
+    const uid=m.openUid;if(!uid||m.busy||!isAdmin())return;
     const next=new Set([...$('normalAbsenceOptions').querySelectorAll('input:checked')].map(e=>Number(e.value)));
     if(normalizedAbsence(next)!==normalizedAbsence(m.absent.get(uid)||new Set())){
       snapshot();m.absent.set(uid,next);
@@ -391,6 +397,7 @@ export function installNormalEditor(ctx){
     try{
       // Re-read currently stored lessons for this day before any write.
       const latest=await getDocs(query(collection(db,'timetableEntries'),where('date','==',m.date)));
+      if(m.baseline!==liveSignature())throw Error('保存中に時間割が変更されました。変更を破棄して再読み込みしてください。');
       const currentDateRows=state.entries.filter(e=>e.date===m.date);
       const live=latest.docs.map(s=>({id:s.id,...s.data()}));
       const key=rows=>JSON.stringify(rows.map(e=>[e.id,e.teacherUid,e.date,e.start,e.end,e.status,e.regularId||'',e.courseId||'']).sort((a,b)=>a[0].localeCompare(b[0])));
@@ -399,6 +406,7 @@ export function installNormalEditor(ctx){
       const oldAbs=Object.values(state.teacherAbsences||{}).filter(e=>e.date===m.date);
       const absKey=rows=>JSON.stringify(rows.map(e=>[e.teacherUid,[...(e.absentPeriods||[])].sort()]).sort((a,b)=>a[0].localeCompare(b[0])));
       if(absKey(absFresh.docs.map(x=>x.data()))!==absKey(oldAbs))throw Error('別の端末で講師の欠席情報が変更されました。');
+      if(m.baseline!==liveSignature())throw Error('保存中に時間割が変更されました。変更を破棄して再読み込みしてください。');
       for(const entry of moves){
         for(const p of periodNumbers(entry)){
           if(teacherAbsent(entry.teacherUid,p))throw Error('欠席コマの講師へ授業を移動できません。');
@@ -448,5 +456,5 @@ export function installNormalEditor(ctx){
     }finally{m.busy=false;render();}
   }
   $('normalPublish').addEventListener('click',publish);
-  return {open,render,onData,reset,hasChanges};
+  return {open,render,onData,reset,hasChanges,isBusy:()=>m.busy};
 }

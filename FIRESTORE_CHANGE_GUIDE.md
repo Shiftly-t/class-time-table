@@ -19,7 +19,9 @@
 ```javascript
 function shiftlyIsRegistered() {
   return request.auth != null
-    && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+       in ['owner', 'admin', 'employee'];
 }
 
 function shiftlyIsManager() {
@@ -42,6 +44,9 @@ match /teacherDayAbsences/{absenceId} {
     && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
     && request.resource.data.teacherUid is string
     && request.resource.data.teacherUid.size() > 0
+    && exists(/databases/$(database)/documents/users/$(request.resource.data.teacherUid))
+    && get(/databases/$(database)/documents/users/$(request.resource.data.teacherUid)).data.role
+       in ['admin', 'employee']
     && absenceId == request.resource.data.date + '_' + request.resource.data.teacherUid
     && request.resource.data.absentPeriods is list
     && request.resource.data.absentPeriods.size() <= 4
@@ -64,6 +69,12 @@ function teacherAbsencePath(date, uid) {
   let absenceId = date + '_' + uid;
   return /databases/$(database)/documents/teacherDayAbsences/$(absenceId);
 }
+function shiftlySameAssignment(before, after) {
+  return before.date == after.date && before.start == after.start
+    && before.end == after.end && before.teacherUid == after.teacherUid
+    && before.status == after.status
+    && before.get('courseId', '') == after.get('courseId', '');
+}
 function regularAssignmentAllowed(d) {
   let path = teacherAbsencePath(d.date, d.teacherUid);
   return d.get('courseId', '') != '' || d.status == 'cancelled'
@@ -77,7 +88,11 @@ function regularAssignmentAllowed(d) {
 }
 ```
 
-既存 `match /timetableEntries/{id}` の create に `&& regularAssignmentAllowed(request.resource.data)` を追加します。updateには `&& (sameAssignment(resource.data, request.resource.data) || regularAssignmentAllowed(request.resource.data))` を追加します。これにより、すでに欠席枠に残っている授業の伝達事項などの変更は許しつつ、**担当講師を欠席枠へ新たに変更する操作**を禁止できます。
+既存 `match /timetableEntries/{id}` の create に `&& regularAssignmentAllowed(request.resource.data)` を追加します。updateには `&& (shiftlySameAssignment(resource.data, request.resource.data) || regularAssignmentAllowed(request.resource.data))` を追加します。これにより、すでに欠席枠に残っている授業の伝達事項などの変更は許しつつ、**担当講師を欠席枠へ新たに変更する操作**を禁止できます。
+
+## 既存の監査ログ・復元ルール
+
+`auditLogs` の対象パスを制限している場合は `teacherDayAbsences/{id}` を追加してください。欠席変更は監査ログと同一バッチなので、ログが拒否されると欠席も保存されません。運営のバックアップ・復元にも欠席記録を含めます。復元時の `updatedAt` / `updatedBy` は現在の値で再設定されます。通知の既存の書き込み許可も確認してください。
 
 ## 既存 `specialCourses` ルールの確認
 

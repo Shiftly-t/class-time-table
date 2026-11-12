@@ -336,7 +336,7 @@ function enableOneTapSave(formId) {
 // so accidental deletes can be reversed. Records are written atomically with
 // application changes wherever possible; Firebase Console edits are NOT traced.
 // ────────────────────────────────────────────────────────────────────────────
-const OWNER_ROOT_COLLECTIONS=['schoolStudents','timetableEntries','monthlyTargets','specialCourses','schoolClosures','schoolOpenDays','schoolEvents'];
+const OWNER_ROOT_COLLECTIONS=['schoolStudents','timetableEntries','monthlyTargets','specialCourses','schoolClosures','schoolOpenDays','schoolEvents','teacherDayAbsences'];
 const auditState={logs:[],archives:[],busy:false,loaded:false};
 function archivedValue(value){
   if(value===null||value===undefined)return null;
@@ -377,7 +377,7 @@ function auditChange(writer,path,before,after,action,summary,groupId=''){
 function stampedRestoreData(path,data){
   const restored=unarchiveValue(data);
   if(restored==null)return null;
-  if(/^(specialCourses\/[^/]+|schoolClosures\/[^/]+|schoolOpenDays\/[^/]+|schoolEvents\/[^/]+|specialCourses\/[^/]+\/teacherAvailability\/[^/]+|specialCourses\/[^/]+\/scheduleMeta\/[^/]+)$/.test(path)){
+  if(/^(teacherDayAbsences\/[^/]+|specialCourses\/[^/]+|schoolClosures\/[^/]+|schoolOpenDays\/[^/]+|schoolEvents\/[^/]+|specialCourses\/[^/]+\/teacherAvailability\/[^/]+|specialCourses\/[^/]+\/scheduleMeta\/[^/]+)$/.test(path)){
     restored.updatedAt=serverTimestamp();restored.updatedBy=state.user.uid;
   }
   return restored;
@@ -658,6 +658,7 @@ $('maintenanceRecord').addEventListener('click',()=>changeMaintenance('update'))
 $('maintenanceHistoryRefresh').addEventListener('click',loadMaintenanceHistory);
 
 function nav(page) {
+  if(regularEditor?.isBusy()){showMessage('保存中です。完了してから画面を移動してください。');return;}
   if(state.page==='adminLessons'&&page!=='adminLessons'&&regularEditor?.hasChanges()){
     if(!confirm('未確定の講師欠席・担当振替があります。破棄して画面を移動しますか？'))return;
     regularEditor.reset();
@@ -838,8 +839,8 @@ function visibleLessonsOnDate(date){
   if(closureFor(date))return [];
   return lessonsOnDate(date)
     .filter(e=>isAdmin() || $('teacherFilter').value==='all' || e.teacherUid===state.user.uid)
-    .map(e=>({...e,teacherAbsent:isTeacherAbsentForLesson(e)}))
     .flatMap(splitLessonForDisplay)
+    .map(e=>({...e,teacherAbsent:isTeacherAbsentForLesson(e)}))
     .sort((a,b)=>a.start.localeCompare(b.start)||a.teacherName.localeCompare(b.teacherName)||a.studentName.localeCompare(b.studentName));
 }
 function openScheduleDay(date){state.date=date;selectScheduleView('day');}
@@ -2182,7 +2183,12 @@ function renderAvailabilityPage(){
   courseSelect.replaceChildren();
   const activeCourses=state.courses.filter(c=>c.archived!==true);
   for(const c of activeCourses){const opt=make('option','',`${courseDisplayName(c)}　${prettyDate(c.startDate)}〜${prettyDate(c.endDate)}`);opt.value=c.id;courseSelect.append(opt);}
-  if(!activeCourses.length){$('availabilityGrid').replaceChildren(make('p','empty','表示中の講習はありません。管理者は講習期間管理の非表示一覧から復元できます。'));$('availabilitySubmit').disabled=true;return;}
+  if(!activeCourses.length){
+    $('availabilityGrid').replaceChildren(make('p','empty','表示中の講習はありません。管理者は講習期間管理の非表示一覧から復元できます。'));
+    for(const id of ['availabilityPeriodOverview','availabilityWeekLabel','availabilityDeadlineInfo','availabilityEditingState'])$(id).replaceChildren();
+    $('availabilityPerson').replaceChildren();
+    $('availabilitySubmit').disabled=true;$('availabilityReset').disabled=true;return;
+  }
   const course=activeCourses.find(c=>c.id===oldCourse)||activeCourses.find(c=>c.endDate>=todayKey())||activeCourses.at(-1);
   const people=state.people.filter(p=>isAssignableTeacher(p.role)).sort((a,b)=>a.role===b.role?collator.compare(a.name||'',b.name||''):a.role==='employee'?-1:1);
   const personSelect=$('availabilityPerson');personSelect.replaceChildren();
