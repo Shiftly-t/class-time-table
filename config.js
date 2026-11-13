@@ -7,3 +7,6 @@ export const firebaseConfig = {
   messagingSenderId: "85446950632",
   appId: "1:85446950632:web:2d0394a4052c8ac53f935d"
 };
+
+// Draft feature: enable only after isolated rule/backup validation and rollout review.
+export const teacherWorkFeatureEnabled = false;
