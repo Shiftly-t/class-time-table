@@ -22,7 +22,11 @@
 - 講習期間の勤務希望・配置は**別システム**。通常勤務曜日設定によって講習枠は増減しない。
 - 2コレクションを運営バックアップ／復元・変更履歴の対象に追加。
 
-## Firestoreルールに追加が必要
+## Firestoreルール候補（サーバー制御案で更新）
+
+**最新の追加開発は `NORMAL_AUTHORITY_IMPLEMENTATION_REVIEW_20261113.md` と `server-candidates/normal-authority/README.md` を参照してください。** 完全ルール候補はserver-onlyの書込境界です。以下の旧CRUD案と同時に適用してはいけません。画面の全更新経路をAPIへ移すまで、機能フラグを有効化しないでください。
+
+### 旧CRUD案（比較資料のみ）
 
 **まだ本番で貼り付けないでください。** 現行ルール全文と突き合わせ、Firebase Emulator等でコンパイル・許可拒否を検証してから適用します。下記は**審査用の追加案**であり、既存 `match /databases/{database}/documents` 内に置く前提です。`isMember()` / `isAdmin()` は現在のルールの実装を使用し、メンテナンス中のアクセス条件も統一してください。
 

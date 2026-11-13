@@ -8,5 +8,6 @@ export const firebaseConfig = {
   appId: "1:85446950632:web:2d0394a4052c8ac53f935d"
 };
 
-// Draft feature: enable only after isolated rule/backup validation and rollout review.
+// Draft feature: keep disabled until ALL write/restore paths use the server authority.
+// See server-candidates/normal-authority/README.md; CRUD rules alone are insufficient.
 export const teacherWorkFeatureEnabled = false;

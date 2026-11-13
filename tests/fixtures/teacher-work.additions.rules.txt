@@ -1,3 +1,4 @@
+// SUPERSEDED comparison fixture. Never combine with server-candidates/normal-authority/firestore.candidate.rules.
 // UNDEPLOYED REVIEW CANDIDATE. CRUD only; does not enforce timetable assignment.
 match /teacherWeeklyWork/{teacherUid} {
   allow read: if isMember();

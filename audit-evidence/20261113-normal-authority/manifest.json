@@ -1,0 +1,36 @@
+{
+  "input_pr4_commit": "1787200b0c5cdba0a85176eed4ec5d4de383152c",
+  "server_model_tests": {
+    "passed": 28,
+    "real_firestore": false,
+    "frontend_policy_combinations": 504
+  },
+  "browser_mock_tests": {
+    "passed": 60,
+    "engine": "Chromium",
+    "real_devices": false
+  },
+  "production_config_guards_passed": 3,
+  "static_rule_source_assertions_passed": 20,
+  "unverified": [
+    "Firestore candidate compilation and access evaluation",
+    "Admin SDK transaction concurrency on actual Firestore",
+    "deployed callable and App Check",
+    "API-connected frontend end-to-end",
+    "Safari/WebKit and physical iPad/phone",
+    "production Firebase usage/cost",
+    "private booking API fixes and ledger recovery"
+  ],
+  "production_actions": false,
+  "feature_enabled": false,
+  "sha256": {
+    "server-candidates/normal-authority/policy.cjs": "6c62604e260085751203c66323b160342f54c8aaae8755abf161c0bf034827cb",
+    "server-candidates/normal-authority/callable.cjs": "9c3327b4435f7c67408cc1d2a79cd41fb1ac030d74cf1dfa2b46354f0aff7804",
+    "server-candidates/normal-authority/README.md": "6192dd199d0e38d0bc0062da7abc7ec1434bf07eea3f7131b1cc5e7bd3373414",
+    "server-candidates/normal-authority/service.cjs": "7c168afcfc05916c8ef107b2b513b52d686fafb5005f83d571d4c9fdfdd38bf2",
+    "server-candidates/normal-authority/build-rules.cjs": "efc41e8b277813a1e54f06fea5d3ba731afc8e4da2546cf4844f7b885d99c165",
+    "server-candidates/normal-authority/firestore.candidate.rules": "a8c4c548648be71caaa57d88e4ff25ac54cc800c2b6bebd55d670fdb00bc19ed",
+    "tests/server/normal-authority.test.cjs": "7b5a424c8f33d65625ff04a3a85454f706b420df1b59f24340bd612daa9922a7",
+    "tests/server/mvcc-store.cjs": "2e8c4c6b1d861914d1b09299f226459109fb8c53e8db38195c0b5f0bd5eb01c6"
+  }
+}
