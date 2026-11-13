@@ -1,3 +1,4 @@
+import {createBookingTransport} from './booking-transport.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import { getFirestore, collection, doc, getDoc, getDocs, query, where, setDoc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, writeBatch, runTransaction, increment, arrayUnion, Timestamp, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
@@ -19,7 +20,8 @@ const fbApp = initializeApp(firebaseConfig);
 if (bookingAppCheckSiteKey && !bookingAppCheckSiteKey.startsWith('REPLACE_')) {
   initializeAppCheck(fbApp,{provider:new ReCaptchaEnterpriseProvider(bookingAppCheckSiteKey),isTokenAutoRefreshEnabled:true});
 }
-const bookingEditorCall=httpsCallable(getFunctions(fbApp,'asia-northeast1'),'bookingAdminApi');
+const bookingEditorTransport=createBookingTransport({call:httpsCallable(getFunctions(fbApp,'asia-northeast1'),'bookingAdminApi'),getSession:()=>state.user?.uid});
+const bookingEditorCall=fields=>bookingEditorTransport.call(fields);
 const normalAuthorityCall=httpsCallable(getFunctions(fbApp,'asia-northeast1'),'normalAuthorityApi');
 const normalAuthority=createNormalAuthorityClient({enabled:normalAuthorityApiEnabled,call:normalAuthorityCall,getSession:()=>state.user?.uid});
 const auth = getAuth(fbApp);
@@ -299,6 +301,12 @@ let messageTimer;
 function showMessage(message) {
   $('message').textContent=message;clearTimeout(messageTimer);
   document.getElementById('normalAuthorityRetry')?.remove();
+  document.getElementById('bookingResultCheck')?.remove();
+  if(bookingEditorTransport.hasPending()){
+    const check=make('button','ghost','送信結果を確認');check.id='bookingResultCheck';check.type='button';
+    check.addEventListener('click',async()=>{check.disabled=true;try{await bookingEditorTransport.confirmPending();showMessage('保存済みです。再送せず、画面を開き直して最新の内容を確認してください。');}catch(e){showMessage(e.message);}});
+    (document.querySelector('dialog[open]')||$('message').parentElement).append(check);
+  }
   if(normalAuthority.hasPending()){
     const retry=make('button','ghost','保存結果を確認・同じ処理を再送');retry.id='normalAuthorityRetry';retry.type='button';
     retry.addEventListener('click',async()=>{retry.disabled=true;try{await normalAuthority.retryPending();showMessage('保存済みの結果を確認しました。画面を閉じて最新の内容を確認してください。');}catch(e){trapError(e,'保存結果を確認できません。同じ処理を再送できます');}});
@@ -2073,7 +2081,7 @@ $('lessonForm').addEventListener('submit',async event=>{
       if(!settings){showMessage('担当講師の予約上限を確認できません。');return;}
       const slotKey=`${course.id}__${date}__${periodIndex}`;
       const n=settings.perSlot?.[slotKey]??settings.defaultCapacity??2;
-      teacherLimit=Number.isInteger(n)?Math.max(0,Math.min(4,n)):2;
+      teacherLimit=Number.isInteger(n)?Math.max(0,Math.min(courseEditorCapacity.maxTeacherCapacity,n)):2;
     }catch(error){showMessage('担当講師の予約上限を取得できません：'+String(error?.message||'エラー'));return;}
     const peers=lessonsOnDate(date).filter(e=>e.id!==id && e.status!=='cancelled' && e.start===start && e.end===end);
     if(peers.some(e=>e.studentId===student.id)){showMessage('同じ生徒が同じ講習コマで重複しています。');return;}
@@ -2598,13 +2606,13 @@ function openCourseEditor(id){
 function courseEditorEntries(){return [...courseEditor.draft.values()];}
 function courseEditorPeriod(course,entry){return course.periods.findIndex(p=>p.start===entry.start&&p.end===entry.end);}
 // Limits are stored server-side; the public app reads only the admin callable's safe summary.
-const courseEditorCapacity={courseId:'',teachers:new Map(),ready:false,busy:false,error:'',version:0};
+const courseEditorCapacity={courseId:'',teachers:new Map(),ready:false,busy:false,error:'',version:0,maxTeacherCapacity:4};
 function courseTeacherLimit(course,uid,date,index){
   if(!course||!Number.isInteger(index)||index<0)return 2;
   const item=courseEditorCapacity.courseId===course.id?courseEditorCapacity.teachers.get(uid):null;
   const key=`${course.id}__${date}__${index}`;
   const n=item?.perSlot?.[key]??item?.defaultCapacity??2;
-  return Number.isInteger(n)?Math.max(0,Math.min(4,n)):2;
+  return Number.isInteger(n)?Math.max(0,Math.min(courseEditorCapacity.maxTeacherCapacity,n)):2;
 }
 async function loadCourseEditorCapacity(id){
   const seq=++courseEditorCapacity.version;
@@ -2613,6 +2621,7 @@ async function loadCourseEditorCapacity(id){
   try{
     const response=(await bookingEditorCall({action:'teachers',courseId:id})).data;
     if(seq!==courseEditorCapacity.version||id!==courseEditor.courseId)return;
+    courseEditorCapacity.maxTeacherCapacity=response.maxTeacherCapacity===2?2:4;
     courseEditorCapacity.teachers=new Map((response.teachers||[]).map(item=>[item.id,item]));
     courseEditorCapacity.ready=true;
   }catch(error){
@@ -2624,7 +2633,7 @@ async function loadCourseEditorCapacity(id){
 }
 async function saveCourseEditorLimit(course,uid,date,index,value){
   if(!isAdmin()||courseEditorCapacity.busy||!courseEditorCapacity.ready)return;
-  if(!Number.isInteger(value)||value<0||value>4){showMessage('担当上限は0〜4人です。');return;}
+  if(!Number.isInteger(value)||value<0||value>courseEditorCapacity.maxTeacherCapacity){showMessage('担当上限は0〜'+courseEditorCapacity.maxTeacherCapacity+'人です。');return;}
   const chosen=courseEditorEntries().filter(e=>e.teacherUid===uid&&e.date===date&&e.status!=='cancelled'&&e.start===course.periods[index].start&&e.end===course.periods[index].end).length;
   if(value<chosen){showMessage(`仮配置の授業が${chosen}人分あります。先に授業を調整してください。`);renderCourseEditor();return;}
   courseEditorCapacity.busy=true;
@@ -2776,7 +2785,7 @@ function courseEditorCell(date,periodIndex,teacherUid=''){
   if(teacherUid && !closed && !outside && !unavailable && courseEditorCapacity.ready){
     const control=make('label','editor-limit-control');control.append(make('span','','担当上限'));
     const select=make('select','editor-limit-select');select.setAttribute('aria-label',`${prettyDate(date)} ${state.people.find(p=>p.id===teacherUid)?.name||'講師'}の担当上限`);
-    for(let n=0;n<=4;n++){const opt=make('option','',`${n}人`);opt.value=String(n);select.append(opt);}
+    for(let n=0;n<=courseEditorCapacity.maxTeacherCapacity;n++){const opt=make('option','',`${n}人`);opt.value=String(n);select.append(opt);}
     select.value=String(localLimit);select.disabled=courseEditorCapacity.busy;
     select.addEventListener('click',e=>e.stopPropagation());
     select.addEventListener('pointerdown',e=>e.stopPropagation());
@@ -2984,7 +2993,7 @@ async function canDirectlyWriteLessons(entries){
     try{
       const response=(await bookingEditorCall({action:'getSettings',courseId})).data;
       if(!response||!Object.prototype.hasOwnProperty.call(response,'settings'))throw Error('予約設定の応答を確認できません');
-      if(response.settings?.enabled===true){showMessage(BOOKING_WRITE_MESSAGE);return false;}
+      if(response.serverOwnsTimetable===true||response.settings?.enabled===true){showMessage(BOOKING_WRITE_MESSAGE);return false;}
     }catch(error){showMessage('予約設定を確認できません。通信状態を確認し、講習予約管理で操作してください。');return false;}
   }
   return true;
@@ -3012,7 +3021,7 @@ function syncBookingManagementShortcut(){
   $('navCourses').after(link);
 }
 function loggedOut(){
-  normalAuthority.reset();document.getElementById('normalAuthorityRetry')?.remove();
+  bookingEditorTransport.reset();document.getElementById('bookingResultCheck')?.remove();normalAuthority.reset();document.getElementById('normalAuthorityRetry')?.remove();
   pendingStudentDeletion=null;studentEditBaseline=null;
   if(maintenanceState.unsub){maintenanceState.unsub();maintenanceState.unsub=null;}
   maintenanceState.loaded=false;maintenanceState.dataStarted=false;maintenanceState.enabled=false;maintenanceState.history=[];
@@ -3025,7 +3034,7 @@ function loggedOut(){
   for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();
 }
 async function loggedIn(user){
-  normalAuthority.reset();document.getElementById('normalAuthorityRetry')?.remove();
+  bookingEditorTransport.reset();document.getElementById('bookingResultCheck')?.remove();normalAuthority.reset();document.getElementById('normalAuthorityRetry')?.remove();
   if(maintenanceState.unsub){maintenanceState.unsub();maintenanceState.unsub=null;}
   resetSubscriptions();clearAvailabilitySubscriptions();state.availability=new Map();state.availabilityStatus={};state.user=user;state.notices=[];state.officialAnnouncements=[];state.officialSeenIds=new Set();state.officialSeenReady=false;state.entries=[];state.entriesStatus='loading';state.closures={};state.closuresStatus='loading';state.openDays={};state.openDaysStatus='loading';state.examEvents={};state.examStatus='loading';state.courses=[];state.coursesStatus='loading';state.teacherAbsences={};state.teacherAbsencesStatus='loading';state.teacherWeeklyWork={};state.teacherWeeklyWorkStatus=teacherWorkFeatureEnabled?'loading':'disabled';state.teacherDateWork={};state.teacherDateWorkStatus=teacherWorkFeatureEnabled?'loading':'disabled';regularEditor?.reset();teacherWorkPage?.reset();
   const profileSnap=await getDoc(doc(db,'users',user.uid));
@@ -3067,7 +3076,7 @@ async function loggedIn(user){
     $('maintenanceNoticeInput').value=maintenanceState.message;
     if(maintenanceState.version)$('maintenanceVersionInput').value=maintenanceState.version;
     if(maintenanceState.enabled&&!isOwner()){
-      normalAuthority.reset();document.getElementById('normalAuthorityRetry')?.remove();
+      bookingEditorTransport.reset();document.getElementById('bookingResultCheck')?.remove();normalAuthority.reset();document.getElementById('normalAuthorityRetry')?.remove();
       if(maintenanceState.dataStarted){resetSubscriptions();clearAvailabilitySubscriptions();maintenanceState.dataStarted=false;}
       for(const dialog of document.querySelectorAll('dialog'))if(dialog.open)dialog.close();
       state.teacherWeeklyWork={};state.teacherDateWork={};state.teacherWeeklyWorkStatus=teacherWorkFeatureEnabled?'loading':'disabled';state.teacherDateWorkStatus=teacherWorkFeatureEnabled?'loading':'disabled';teacherWorkPage?.reset();regularEditor?.reset();
