@@ -4,10 +4,10 @@
 
 ## 仕様
 
-- 「講師管理」ページを管理者（\`admin\` / \`owner\`）だけに表示する。
-- \`teacherWeeklyWork/{teacherUid}\` に \`weekdays: [0..6]\` を保存する。0=日曜、1=月曜、...6=土曜。未登録の講師は従来の全曜日出勤可能扱い。
-- \`teacherDateWork/{YYYY-MM-DD}_{teacherUid}\` に \`date,teacherUid,availablePeriods:[1..4]\` を保存する。その日だけ通常曜日を上書き。例：通常は月木、火曜日の1・2限だけ臨時出勤。
-- 既存の \`teacherDayAbsences\` の \`absentPeriods\` は引き続き最優先で欠席扱い。臨時出勤設定でも欠席コマには配置不可。
+- 「講師管理」ページを管理者（`admin` / `owner`）だけに表示する。
+- `teacherWeeklyWork/{teacherUid}` に `weekdays: [0..6]` を保存する。0=日曜、1=月曜、...6=土曜。未登録の講師は従来の全曜日出勤可能扱い。
+- `teacherDateWork/{YYYY-MM-DD}_{teacherUid}` に `date,teacherUid,availablePeriods:[1..4]` を保存する。その日だけ通常曜日を上書き。例：通常は月木、火曜日の1・2限だけ臨時出勤。
+- 既存の `teacherDayAbsences` の `absentPeriods` は引き続き最優先で欠席扱い。臨時出勤設定でも欠席コマには配置不可。
 - 通常授業エディターでは勤務不可の枠が黒になり、授業の配置先にできない。黒枠に残る既存授業は削除せず「要振替」とし、移動は可能。
 - 生徒の新規・変更された毎週の授業も、講師の通常勤務曜日と合わない場合はフロント側で拒否。既存の不一致設定は生徒の他フィールド編集時に自動削除せず保持する。
 - 講習期間の勤務希望・配置は**別システム**。通常勤務曜日設定によって講習枠は増減しない。
@@ -15,9 +15,9 @@
 
 ## Firestoreルールに追加が必要
 
-**まだ本番で貼り付けないでください。** 現行ルール全文と突き合わせ、Firebase Emulator等でコンパイル・許可拒否を検証してから適用します。下記は**審査用の追加案**であり、既存 \`match /databases/{database}/documents\` 内に置く前提です。\`isMember()\` / \`isAdmin()\` は現在のルールの実装を使用し、メンテナンス中のアクセス条件も統一してください。
+**まだ本番で貼り付けないでください。** 現行ルール全文と突き合わせ、Firebase Emulator等でコンパイル・許可拒否を検証してから適用します。下記は**審査用の追加案**であり、既存 `match /databases/{database}/documents` 内に置く前提です。`isMember()` / `isAdmin()` は現在のルールの実装を使用し、メンテナンス中のアクセス条件も統一してください。
 
-\`\`\`javascript
+```javascript
 match /teacherWeeklyWork/{teacherUid} {
   allow read: if isMember();
   allow create, update: if isAdmin()
@@ -49,13 +49,13 @@ match /teacherDateWork/{overrideId} {
     && request.resource.data.updatedAt == request.time;
   allow delete: if isAdmin();
 }
-\`\`\`
+```
 
-\`auditLogs\` の作成時に \`teacherWeeklyWork/uid\` および \`teacherDateWork/日付_uid\` の変更履歴が拒否されないことを確認すること。変更履歴への書込みは講師本人には許可しない。
+`auditLogs` の作成時に `teacherWeeklyWork/uid` および `teacherDateWork/日付_uid` の変更履歴が拒否されないことを確認すること。変更履歴への書込みは講師本人には許可しない。
 
 ### サーバー側で未保証の点
 
-このPRの曜日判定は**クライアント側**。現状のFirestore \`timetableEntries\` ルールは新しい曜日の条件を検証しません。APIや既存の直接書込から勤務不可日に配置を作れる余地があるため、全編集経路で共通制約が必要です。曜日の算出はサーバー側の信頼できる年月日計算で行うこと。Firestoreルールの簡易文字列条件だけで済ませず、既存の予約API・予約台帳の整合検査（PR #2）と一緒にレビューしてください。
+このPRの曜日判定は**クライアント側**。現状のFirestore `timetableEntries` ルールは新しい曜日の条件を検証しません。APIや既存の直接書込から勤務不可日に配置を作れる余地があるため、全編集経路で共通制約が必要です。曜日の算出はサーバー側の信頼できる年月日計算で行うこと。Firestoreルールの簡易文字列条件だけで済ませず、既存の予約API・予約台帳の整合検査（PR #2）と一緒にレビューしてください。
 
 ## 重要な受入テスト
 
@@ -72,4 +72,4 @@ match /teacherDateWork/{overrideId} {
 
 ## マージ順
 
-PR #2（全面品質検査）とこのPRは両方 \`main\` 起点で \`app.js\` 等に変更があります。**必ず競合を解消してからテスト**してください。両方のPRを未検証のまま続けてマージしないこと。Firestoreルール・予約API・バックアップの結合検証が終わるまでは正式導入を保留してください。
+PR #2（全面品質検査）とこのPRは両方 `main` 起点で `app.js` 等に変更があります。**必ず競合を解消してからテスト**してください。両方のPRを未検証のまま続けてマージしないこと。Firestoreルール・予約API・バックアップの結合検証が終わるまでは正式導入を保留してください。
