@@ -4,7 +4,7 @@
 export function installNormalEditor(ctx){
   const {state,$,make,db,collection,doc,getDocs,query,where,writeBatch,serverTimestamp,
     auditChange,lessonNoticePayload,isAdmin,isAssignableTeacher,lessonsOnDate,
-    courseFor,closureFor,CLASS_PERIODS,todayKey,prettyDate,showMessage,
+    courseFor,closureFor,CLASS_PERIODS,todayKey,prettyDate,canTeacherWork,showMessage,
     trapError,openLessonForm,openCourseEditor,nav,renderAll}=ctx;
   const capacity=2;
   const page=document.createElement('section');
@@ -46,7 +46,7 @@ export function installNormalEditor(ctx){
       <div class="modal-head"><h2 id="normalAbsenceTitle">講師の欠席コマ</h2>
       <button type="button" id="normalAbsenceClose" class="close-modal" aria-label="閉じる">×</button></div>
       <p class="muted" id="normalAbsenceDate"></p>
-      <p class="muted">欠席にすると該当コマが黒くなり、新たな授業は配置できません。ここでの選択は「変更を確定」するまで仮変更です。</p>
+      <p class="muted">欠席にすると該当コマが黒くなり、新たな授業は配置できません。ここでの選択は「変更を確定」するまで仮変更です。</p><p class="normal-editor-warning" id="normalAbsenceScheduleHint"></p>
       <div class="normal-absence-options" id="normalAbsenceOptions"></div>
       <div class="normal-absence-quick">
         <button type="button" class="mini-button" data-normal-preset="none">全コマ出勤可能</button>
@@ -68,7 +68,8 @@ export function installNormalEditor(ctx){
   const absentKey=(date,uid)=>`${date}_${uid}`;
   const statusReady=()=>state.entriesStatus==='ready'&&state.coursesStatus==='ready'
     &&state.closuresStatus==='ready'&&state.openDaysStatus==='ready'
-    &&state.teacherAbsencesStatus==='ready';
+    &&state.teacherAbsencesStatus==='ready'
+    &&state.teacherWeeklyWorkStatus!=='loading'&&state.teacherDateWorkStatus!=='loading';
   const activeEntries=()=>lessonsOnDate(m.date).filter(e=>!e.courseId);
   function absenceSource(){
     const out=new Map();
@@ -82,7 +83,8 @@ export function installNormalEditor(ctx){
     const lessons=activeEntries().map(e=>[e.id,e.studentId,e.start,e.end,e.teacherUid,e.status,e.subject,e.studentName,e.teacherName])
       .sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
     const absent=[...absenceSource()].map(([uid,set])=>[uid,[...set].sort()]).sort((a,b)=>a[0].localeCompare(b[0]));
-    return JSON.stringify([lessons,absent]);
+    const weekly=teacherList().map(p=>[p.id,CLASS_PERIODS.map(period=>canTeacherWork(p.id,m.date,period.number))]);
+    return JSON.stringify([lessons,absent,weekly]);
   }
   function load(){
     if(!statusReady())return false;
@@ -110,7 +112,7 @@ export function installNormalEditor(ctx){
     if(m.history.length>40)m.history.shift();
   }
   function teacherAbsent(uid,number){
-    return m.absent.get(uid)?.has(number)===true;
+    return m.absent.get(uid)?.has(number)===true || !canTeacherWork(uid,m.date,number);
   }
   function pendingLessons(){
     return [...m.draft.values()].filter(e=>e.status!=='cancelled'&&periodNumbers(e).some(n=>teacherAbsent(e.teacherUid,n)));
@@ -348,6 +350,8 @@ export function installNormalEditor(ctx){
     const teacher=state.people.find(p=>p.id===uid);
     $('normalAbsenceTitle').textContent=`${teacher?.name||'講師'}｜コマ別欠席`;
     $('normalAbsenceDate').textContent=`${m.date.slice(0,4)}年${prettyDate(m.date)}`;
+    const off=CLASS_PERIODS.filter(p=>!canTeacherWork(uid,m.date,p.number));
+    $('normalAbsenceScheduleHint').textContent=off.length?'通常勤務曜日・臨時出勤設定により'+off.map(p=>p.number+'限').join('・')+'は勤務不可です。出勤を認める場合は「講師管理」でこの日の臨時出勤を設定してください。':'';
     const options=$('normalAbsenceOptions');options.replaceChildren();
     for(const p of CLASS_PERIODS){
       const row=make('label','normal-absence-row');
