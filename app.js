@@ -1695,7 +1695,7 @@ function collectRegularSlots(){
     // Historical mismatches may be kept while other student fields are edited.
     const previousStudent=state.students.find(x=>x.id===$('studentId').value);
     const previous=previousStudent?.regularSlots?.[info.id];
-    const assignmentChanged=!previous || Number(previous.weekday)!==info.weekday || previous.teacherUid!==info.teacherUid;
+    const assignmentChanged=!previous || Number(previous.weekday)!==info.weekday || previous.teacherUid!==info.teacherUid || previous.start!==info.start || previous.end!==info.end;
     const weekly=state.teacherWeeklyWorkStatus==='ready'?state.teacherWeeklyWork?.[info.teacherUid]:null;
     if(assignmentChanged && weekly && !weekly.weekdays?.includes(info.weekday)){
       throw Error('担当講師の通常勤務曜日ではありません。講師管理で曜日を確認するか、別の担当講師を選んでください。');
