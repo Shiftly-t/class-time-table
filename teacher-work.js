@@ -1,5 +1,17 @@
 // Teacher weekly working days and date-specific temporary attendance.
 // The module never changes schoolStudents.regularSlots or seasonal course availability.
+// The date key is local calendar date (YYYY-MM-DD); using UTC date-only arithmetic avoids time-zone drift.
+export function teacherCanWork(weeklyRecords,exceptionRecords,weekStatus,dayStatus,uid,date,period){
+  if(weekStatus!=='ready'||dayStatus!=='ready')return true; // preserve legacy behavior until setup succeeds
+  const exception=exceptionRecords?.[date+'_'+uid];
+  if(exception)return Array.isArray(exception.availablePeriods)&&exception.availablePeriods.includes(period);
+  const weekly=weeklyRecords?.[uid];
+  if(!weekly)return true;
+  const [year,month,day]=String(date||'').split('-').map(Number);
+  const weekday=new Date(Date.UTC(year,month-1,day)).getUTCDay();
+  return Array.isArray(weekly.weekdays)&&weekly.weekdays.includes(weekday);
+}
+
 export function installTeacherWorkPage(ctx){
   const {state,$,db,collection,doc,runTransaction,serverTimestamp,auditChange,isAdmin,
     isAssignableTeacher,showMessage,trapError,nav,prettyDate,todayKey,CLASS_PERIODS}=ctx;
@@ -19,11 +31,8 @@ export function installTeacherWorkPage(ctx){
   const dayOfWeek=date=>{const v=String(date||'').split('-').map(Number);return new Date(v[0],v[1]-1,v[2]).getDay();};
   // An unconfigured teacher retains the old "all weekdays permitted" behavior.
   function works(uid,date,period){
-    if(state.teacherWeeklyWorkStatus!=='ready'||state.teacherDateWorkStatus!=='ready')return true;
-    const exception=storedDay(date,uid);
-    if(exception)return Array.isArray(exception.availablePeriods)&&exception.availablePeriods.includes(period);
-    const weekly=storedWeek(uid);
-    return !weekly||Array.isArray(weekly.weekdays)&&weekly.weekdays.includes(dayOfWeek(date));
+    return teacherCanWork(state.teacherWeeklyWork,state.teacherDateWork,
+      state.teacherWeeklyWorkStatus,state.teacherDateWorkStatus,uid,date,period);
   }
   const navButton=document.createElement('button');
   navButton.id='navTeacherManagement';navButton.type='button';
