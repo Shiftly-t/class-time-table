@@ -3,6 +3,11 @@ import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/11.
 import {firebaseConfig} from './config.js';
 import {bookingAppCheckSiteKey} from './booking-config.js';
 import {initializeAppCheck,ReCaptchaEnterpriseProvider} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
+// Fail closed before initializing any SDK in a test-marked build.
+if(document.documentElement.dataset.shiftlyEnvironment==='test' && (!firebaseConfig.projectId || JSON.stringify(firebaseConfig).includes('shiftly-d02f6') || firebaseConfig.projectId.startsWith('REPLACE_'))){
+  document.body.textContent='Shiftly-T TEST：テスト専用Firebase設定が必要です。本番には接続しません。';
+  throw Error('本番Firebaseへのテスト接続は禁止されています。');
+}
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const params=new URLSearchParams(location.hash.slice(1));
 const ids={courseId:params.get('c')||'',studentId:params.get('s')||'',token:params.get('t')||''};
@@ -19,7 +24,7 @@ function dateText(d){const p=d.split('-').map(Number),day=new Date(p[0],p[1]-1,p
 function datetime(x){if(!x)return'未設定';return new Date(x).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});}
 const slots=()=>new Map((data?.slots||[]).map(x=>[x.id,x]));
 function label(id){const s=slots().get(id);if(s)return `${dateText(s.date)} ${s.start}〜${s.end}`;const m=/__(\d{4}-\d{2}-\d{2})__(\d+)$/.exec(id);if(m&&data?.course?.periods?.[+m[2]]){const p=data.course.periods[+m[2]];return `${dateText(m[1])} ${p.start}〜${p.end}`;}return id;}
-function btn(action,title,cls='secondary',disabled=false){return `<button type="button" class="${cls}" data-act="${action}" ${disabled?'disabled data-disabled="1"':''}>${esc(title)}</button>`;}
+function btn(action,title,cls='secondary',disabled=false){return `<button type="button" class="${cls}" data-act="${esc(action)}" ${disabled?'disabled data-disabled="1"':''}>${esc(title)}</button>`;}
 function lis(arr){return `<ul class="entrylist">${arr.map(id=>`<li>${esc(label(id))}</li>`).join('')}</ul>`;}
 async function reload(){data=await api('view');$('title').textContent=`${data.course.name}｜予約・確認`;render();}
 function login(){return `<h2>生徒情報の確認</h2><p class="muted">QRコードに記載されている生徒のお名前を入力してください。</p><form id="nameForm"><label class="field">生徒氏名<input id="nameInput" type="text" autocomplete="name" required maxlength="100" placeholder="例：山田 太郎"></label><div class="actions"><button class="primary">確認して次へ</button></div></form><p class="hint">氏名入力は確認用です。QRコードは他人と共有しないでください。</p>`;}

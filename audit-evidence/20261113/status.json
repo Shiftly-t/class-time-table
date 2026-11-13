@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-13",
+  "ruleSource": "user-provided full rules; comments and whitespace normalized; same allow predicates",
+  "ruleFixture": "tests/fixtures/firestore.supplied.rules",
+  "sha256": "9c210ab272571909ae27da0d082c5d41592ed2d65c58dd5fb2e0441528c4dbba",
+  "staticAssertions": {
+    "status": "passed",
+    "count": 20,
+    "rulesEvaluated": false
+  },
+  "firestoreEmulator": {
+    "compilation": "UNVERIFIED",
+    "allowDenyTests": "UNVERIFIED",
+    "downloadAttempt": "blocked",
+    "downloadUrl": "https://storage.googleapis.com/firebase-preview-drop/emulator/cloud-firestore-emulator-v1.22.0.jar",
+    "httpStatus": 403,
+    "furtherAttempts": "stopped per user instruction"
+  },
+  "productionAccess": false,
+  "deployment": false
+}

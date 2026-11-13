@@ -161,7 +161,7 @@ export function installNormalEditor(ctx){
     changeDate(date||state.date||todayKey());
     render();
   }
-  function reset(){m.loadedDate='';m.history=[];m.selected='';m.draft=new Map();m.originals=new Map();
+  function reset(){m.renderedDate='';m.loadedDate='';m.history=[];m.selected='';m.draft=new Map();m.originals=new Map();
     m.absent=new Map();m.absentOriginals=new Map();m.external=false;}
   function onData(){
     if(!isAdmin())return;
@@ -211,6 +211,8 @@ export function installNormalEditor(ctx){
         suppressClick=true;
         if(drag.target)move(entry.id,drag.target.dataset.uid,Number(drag.target.dataset.period));
         else showMessage('移動先の講師の出勤可能なコマまでドラッグしてください。');
+      }else if(event.pointerType==='touch'){
+        suppressClick=true;event.preventDefault();selectLesson(entry.id);
       }
     });
     b.addEventListener('pointercancel',()=>{
@@ -296,7 +298,9 @@ export function installNormalEditor(ctx){
     if(m.date!==state.date) m.date=state.date;
     for(const id of ['normalDate','normalPrev','normalNext','normalToday','normalPreview'])$(id).disabled=m.busy;
     $('normalDate').value=m.date;
-    $('normalGrid').replaceChildren();
+    const grid=$('normalGrid'),keepScroll=m.renderedDate===m.date;
+    const scrollLeft=keepScroll?grid.scrollLeft:0,scrollTop=keepScroll?grid.scrollTop:0;
+    grid.replaceChildren();
     $('normalEditorWarning').textContent='';
     $('normalAdd').disabled=m.busy;
     if(!statusReady()){
@@ -329,6 +333,7 @@ export function installNormalEditor(ctx){
       $('normalPublish').disabled=true;return;
     }
     renderGrid(teachers);
+    grid.scrollLeft=scrollLeft;grid.scrollTop=scrollTop;m.renderedDate=m.date;
     const changes=entryChanges(),aChanges=absenceChanges(),pending=pendingLessons();
     const warnings=[];
     if(m.external)warnings.push('⚠ 他の端末で時間割または欠席設定が変更されました。変更を破棄して再読み込みしてください。');
