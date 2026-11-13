@@ -1,0 +1,396 @@
+{
+  "kind": "real-firebase-integration-test-plan",
+  "executionStatus": "NOT_RUN",
+  "productionAccess": false,
+  "projectCreated": false,
+  "billingChanged": false,
+  "cases": [
+    {
+      "id": "ENV-01",
+      "area": "環境",
+      "scenario": "project ID/number・Web App・Admin credentials・Secret・Hosting・Auth issuerを照合",
+      "expected": "全て承認したテストproject。本番権限/設定/鍵なし",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "ENV-02",
+      "area": "環境",
+      "scenario": "projectIdだけテスト、authDomain/API key/App ID/originだけ別設定に置換",
+      "expected": "SDK初期化前に停止。実サービスへのwriteゼロ",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "AUTH-01",
+      "area": "認証",
+      "scenario": "owner/admin2名/employee/登録外/未認証で全callableを呼ぶ",
+      "expected": "各ロールの許可範囲だけ。職員Auth tokenのtest project issuerを確認",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "AUTH-02",
+      "area": "認証",
+      "scenario": "maintenance中にownerを含む全業務APIを呼ぶ",
+      "expected": "許可したsnapshot制御以外は停止。旧APIも別freeze手段で停止",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "APP-01",
+      "area": "App Check",
+      "scenario": "正規provider、欠落、不正、別projectのApp Checkで呼ぶ",
+      "expected": "正規だけ通過。拒否された要求は業務データ無変更",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "APP-02",
+      "area": "App Check",
+      "scenario": "自動試験debug providerと実iPad providerを別々に検査",
+      "expected": "debugの成功を実provider検証に流用しない。終了後debug token失効",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "RULE-01",
+      "area": "ルール",
+      "scenario": "未認証/employee/admin/ownerで全API専用パスへSDK直接write",
+      "expected": "ownerを含め最終版で拒否。Admin SDK認可は別に検査",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "RULE-02",
+      "area": "ルール",
+      "scenario": "古いWebを残し、生徒/通常/講習/勤務希望/カレンダー/復元を直接保存",
+      "expected": "無書込で拒否。旧API直呼びも停止。部分更新やルール緩和なし",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "RULE-03",
+      "area": "ルール",
+      "scenario": "本人の通知既読/削除、他人の既読、お知らせ掲載、監査readを検査",
+      "expected": "本人/ownerなど現行の狭い独立許可だけ。未移行機能を壊さない",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "NORMAL-01",
+      "area": "通常授業",
+      "scenario": "毎週設定から今週・翌週を生成し今週だけ担当振替",
+      "expected": "元の毎週設定と翌週は不変。日別変更/通知/監査のみ一括commit",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "NORMAL-02",
+      "area": "通常授業",
+      "scenario": "勤務不可曜日/半端な時間重複/欠席コマへ直接callable登録",
+      "expected": "配置を拒否。正常な備考・既存授業は破壊しない",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "NORMAL-03",
+      "area": "通常授業",
+      "scenario": "担当1人の講師へ2管理者が別生徒を同時追加",
+      "expected": "最大2人。1要求だけ成立し、他方は拒否/再読込。監査/通知も二重化なし",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "NORMAL-04",
+      "area": "勤務",
+      "scenario": "週勤務なし→当日臨時出勤→同じコマ欠席、空の臨時設定も試す",
+      "expected": "欠席＞日別明示コマ＞毎週勤務＞未設定互換既定。空の日別は勤務不可",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "NORMAL-05",
+      "area": "勤務",
+      "scenario": "毎週曜日を変更し、既存授業・翌週・regularSlotsを比較",
+      "expected": "授業/毎週生徒設定の自動削除なし。要振替表示。変更と新規配置の競合は直列化",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "NORMAL-06",
+      "area": "通常授業",
+      "scenario": "別日移動と他管理者の移動先編集/休校変更を同時実行",
+      "expected": "両端が原子的。満席なら両端無変更。元毎週の翌週とmemo等を保持",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "COURSE-01",
+      "area": "講習勤務希望",
+      "scenario": "本人/代理で締切前後・非表示・不正コマ・版競合を提出",
+      "expected": "本人/代理権限を区別。最新定員と既存確保を守る。通常勤務曜日は参照しない",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "COURSE-02",
+      "area": "講習勤務希望",
+      "scenario": "通常勤務を全曜日不可にして講習希望と枠を比較",
+      "expected": "講習希望/講習定員が勝手に変わらない。逆方向の変更も通常勤務を変えない",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "COURSE-03",
+      "area": "講習配置",
+      "scenario": "手動配置/振替と親予約/管理確定/上限変更を同時実行",
+      "expected": "受付停止中も共通lock。全枠と各講師2人上限を守り台帳と一致",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "COURSE-04",
+      "area": "講習設定",
+      "scenario": "期間/コマ/非表示/復元/締切を予約・配置と競合させる",
+      "expected": "既存通常授業と確保を勝手に削除しない。未対応変更は無書込停止",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "COURSE-05",
+      "area": "営業カレンダー",
+      "scenario": "講習中に休校/特別開校/模試を変更し同時に予約/移動",
+      "expected": "commit時の最新開閉を使用。閉校後の新配置なし。既存希望は勝手に消さない",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "BOOK-01",
+      "area": "同時予約",
+      "scenario": "講師2名×2=4枠、3枠を確保済みにし20人が最後1枠へ同時submit",
+      "expected": "成功1人、used=4。失敗者に台帳/負荷/授業の部分commitなし",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "BOOK-02",
+      "area": "二重送信",
+      "scenario": "同じprincipal/requestId/入力で10並列要求",
+      "expected": "同じ結果1回分。used/負荷/監査/通知は二重加算なし。別入力の同IDは拒否",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "BOOK-03",
+      "area": "二重予約",
+      "scenario": "同じ生徒が複数端末から異なるrequestIdで同じ/重複時間を要求",
+      "expected": "同生徒の重複確保なし。受付けた最終台帳とカウンターが一致",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "BOOK-04",
+      "area": "生徒情報",
+      "scenario": "生徒改名/学校/学年変更と最初のQR発行・予約を同時実行",
+      "expected": "現在のstudent/ledger/時間割表示が一致。改名前QRトークンは維持しても最新氏名で照合",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "BOOK-05",
+      "area": "配置",
+      "scenario": "移動先の講師希望/手動授業/定員/休校を更新し移動・公開",
+      "expected": "古いcapacityで通さず最新状態で拒否/成立。変更前後の枠解放は1回",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "BOOK-06",
+      "area": "重複",
+      "scenario": "別講習の重複時間へ同生徒予約、同講師3人目を確定",
+      "expected": "生徒重複と講師2人超過を拒否。異なるコマ表記で定員が増えない",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "BOOK-07",
+      "area": "授業保持",
+      "scenario": "公開済み授業の科目/担当編集、done授業の移動/削除",
+      "expected": "memo/status/nextDatesを保持。done移動/削除は対応外として全体拒否",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "QR-01",
+      "area": "QR",
+      "scenario": "再発行/失効/改名/削除後に旧QRと新QRで照会",
+      "expected": "旧失効QRは拒否。URL tokenで職員APIや他生徒のデータにアクセス不可",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "QR-02",
+      "area": "QR印刷",
+      "scenario": "印刷準備後に別端末で改名/失効/削除し印刷ボタンを押す",
+      "expected": "最新氏名/QRへ更新。取得不可なら印刷なし。古い印刷済みQRもサーバー拒否",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "DELETE-01",
+      "area": "削除",
+      "scenario": "予約なしでQRだけ発行した生徒を削除・同ID要求を再送",
+      "expected": "QRも必ず失効しtoken削除。tombstoneを残し二重解放しない",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "DELETE-02",
+      "area": "削除",
+      "scenario": "未確定/確定/公開予約を持つ生徒を削除。負カウンターも作って試す",
+      "expected": "全取消・枠/負荷解放・授業/生徒削除が一括。不正状態は全体無変更",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "DELETE-03",
+      "area": "削除競合",
+      "scenario": "削除とsubmit/change/issue/reissue/cancelを別端末で同時実行",
+      "expected": "成立順に直列化。削除後の孤児予約/有効QRなし。二重解放なし",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "DELETE-04",
+      "area": "削除制限",
+      "scenario": "done履歴あり、関連80超、全体query上限超の生徒を削除",
+      "expected": "対応外を明示し、部分削除しない。予定済みの履歴を自動消去しない",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "RESTORE-01",
+      "area": "復元",
+      "scenario": "maintenance/ownerで新形式完全snapshot→変更→小規模復元",
+      "expected": "業務スコープが一括復元し台帳/授業/カウンター一致。全旧QR失効・再発行必須",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "RESTORE-02",
+      "area": "復元拒否",
+      "scenario": "旧形式/欠落scope/部品/改ざん/不正used/表示不一致/古いrevision",
+      "expected": "復元前後の全業務fingerprint同一。安全コピー作成だけを成功と呼ばない",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "RESTORE-03",
+      "area": "遅延イベント",
+      "scenario": "復元後に削除イベントを遅延/重複配送",
+      "expected": "復元データにwriteしない。旧トリガーの再有効化なし",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "RESTORE-04",
+      "area": "復元競合",
+      "scenario": "復元と全API・旧端末・勤務希望・カレンダー・ジョブを競合",
+      "expected": "全writer停止を実証。1つでも旧writerが通れば切替不可",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "RESTORE-05",
+      "area": "復元制限",
+      "scenario": "snapshot150超/600KB超、現行+対象240超、write/size上限を試す",
+      "expected": "全体拒否で部分復元なし。手動分割batchへフォールバックしない",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "OPS-01",
+      "area": "通信",
+      "scenario": "サーバーcommit後に応答を喪失し結果確認、ログアウト中に遅延応答",
+      "expected": "変更再送なし。自分のreceiptだけ照会。旧セッションの個人情報復活なし",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "OPS-02",
+      "area": "復旧",
+      "scenario": "新版業務commit前に故障し旧リリース組へ戻すリハーサル",
+      "expected": "停止/基準hash一致後だけ復旧。旧破壊トリガーなし。再試験後に再開",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "OPS-03",
+      "area": "復旧",
+      "scenario": "新版commit後に故障し停止→整合修正または小規模完全復元",
+      "expected": "旧schema/APIを安易に再有効化しない。epoch/receipt/鍵を巻戻さず突合後に再開",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "UI-01",
+      "area": "実端末",
+      "scenario": "iPad Safariのタップ/ドラッグ/スクロール/モーダル/回転/再読込を実行",
+      "expected": "重要操作で横はみ出し・誤二重送信なし。スマホ/PCも実環境で確認",
+      "implementationBlocked": true,
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "COST-01",
+      "area": "運用",
+      "scenario": "小規模→20並列でread/write/遅延/再試行/instance/費用を観測",
+      "expected": "予算/停止判断を記録。アラートを費用上限と誤認しない。追加負荷は別判断",
+      "implementationBlocked": false,
+      "status": "NOT_RUN",
+      "evidence": null
+    }
+  ]
+}

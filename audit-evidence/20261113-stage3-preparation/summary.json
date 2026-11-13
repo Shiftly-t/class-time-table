@@ -1,0 +1,28 @@
+{
+  "preparationUnitTests": 21,
+  "preparationBrowserGuardTests": 9,
+  "existingBookingTransportTests": 12,
+  "existingNormalServerTests": 29,
+  "existingNormalClientTests": 19,
+  "existingExtendedTests": 41,
+  "existingChromiumScreenTests": 98,
+  "staticRulesAssertions": 20,
+  "writeOperationGroups": 36,
+  "writeCallSitesIncludingConstructorsAndCommits": 122,
+  "realFirebaseTestPlanCases": 43,
+  "realFirebaseTestsExecuted": 0,
+  "implementationBlockedRealCases": 11,
+  "projectCreated": false,
+  "billingChanged": false,
+  "firebaseAccess": false,
+  "productionChanges": false,
+  "featureFlagsEnabled": false,
+  "privateFunctionsSourceIncluded": false,
+  "unverified": [
+    "real Firestore/Auth/Functions/App Check",
+    "rules compilation/evaluation",
+    "physical iPad/Safari",
+    "real cost/performance",
+    "cutover and recovery rehearsal"
+  ]
+}
