@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-13",
+  "confidentialSourcesUploaded": false,
+  "confidentialTestCodeUploaded": false,
+  "embeddedCredentialCandidatesDetected": 0,
+  "privateIsolatedHandlerChecks": {
+    "method": "supplied code with networkless SDK replacement and in-memory optimistic transactions",
+    "behaviorCases": 16,
+    "problemReproductionCases": 14,
+    "problemReproductionMeansSafe": false,
+    "firestoreSemanticsVerified": false
+  },
+  "publicFrontendChecks": {
+    "passed": 39,
+    "firebaseSDK": "mock"
+  },
+  "staticSourceAssertions": 20,
+  "unverified": [
+    "Firestore rules evaluation",
+    "real Firestore transaction conflicts and limits",
+    "Functions runtime and trigger delivery",
+    "deployed App Check and IAM settings",
+    "iPad Safari hardware",
+    "full reservation backup/restore",
+    "production dependency advisories"
+  ],
+  "productionAccess": false,
+  "productionDeployment": false,
+  "mainMerged": false
+}

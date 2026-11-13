@@ -511,6 +511,7 @@ async function downloadOwnerArchive(id){
 async function restoreOwnerHistory(log,key){
   if(!isOwner()||auditState.busy||log.action==='全体復元')return;
   if(!validOwnerDocPath(log.path)){showMessage('復元対象のパスが不正です。');return;}
+  if(/^timetableEntries\/b_/.test(log.path)){showMessage(BOOKING_WRITE_MESSAGE);return;}
   if(!doubleConfirmRecovery(`${log.summary||log.path}\n${key==='beforeJson'?'変更前':'変更後'}の状態に復元します。`))return;
   ownerOperationBusy(true,'安全バックアップを作成してから、選択した履歴を復元しています…');
   try{
@@ -534,11 +535,15 @@ async function restoreOwnerArchive(archive){
   if(!doubleConfirmRecovery(`「${archive.label}」（${archive.recordCount}件）に業務データ全体を戻します。\n現在の登録内容のうちバックアップにないものは削除されます。`))return;
   ownerOperationBusy(true,'復元データを検証しています…');
   try{
-    const {records}=await readOwnerArchive(archive.id);
+    const {records}=await readOwnerArchive(archive.id),existing=await gatherOwnerRecords();
+    const blocker=clientRestoreBlocker(records)||(existing.some(r=>/^timetableEntries\/b_/.test(r.path))?BOOKING_WRITE_MESSAGE:'');
+    if(blocker){showMessage(blocker);return;}
+    const entries=[...records,...existing].filter(r=>r.path.startsWith('timetableEntries/')).map(r=>({...r.data,id:r.path.split('/')[1]}));
+    if(!await canDirectlyWriteLessons(entries))return;
     // Safety copy of the current live data is committed BEFORE the first restore write.
     const safety=await createOwnerArchive(`[自動] 全体復元前 ${archive.label}`);
     $('ownerAuditMessage').textContent=`復元前の安全バックアップ（${safety.id}）を保存しました。データを順番に復元しています…`;
-    const existing=await gatherOwnerRecords(),wanted=new Map(records.map(r=>[r.path,r]));
+    const wanted=new Map(records.map(r=>[r.path,r]));
     const obsolete=existing.filter(item=>!wanted.has(item.path));
     const groups=[
       records.filter(r=>r.path.startsWith('schoolStudents/')||r.path.startsWith('specialCourses/')&&r.path.split('/').length===2),
@@ -1735,6 +1740,10 @@ $('studentForm').addEventListener('submit',async event=>{
   const button=event.submitter;button.disabled=true;
   let studentSaved=false,savedStudent=data;
   try{
+    if(wasEditing&&['name','grade','school'].some(key=>before?.[key]!==data[key])){
+      const linked=await getDocs(query(collection(db,'timetableEntries'),where('studentId','==',id)));
+      if(!await canDirectlyWriteLessons(linked.docs.map(snap=>({...snap.data(),id:snap.id}))))return;
+    }
     await runTransaction(db,async tx=>{
       const ref=doc(db,'schoolStudents',id),snap=await tx.get(ref);
       const current=snap.exists()?snap.data():null;
@@ -1799,6 +1808,9 @@ $('confirmStudentDeletion').addEventListener('click', async () => {
   const original=button.textContent;
   button.textContent='削除中…';
   try{
+    if(!await canDirectlyWriteLessons(request.lessons.map(snap=>({...snap.data(),id:snap.id})))){
+      $('deleteStudentSummary').textContent=BOOKING_WRITE_MESSAGE;return;
+    }
     // Keep the student record until all linked records are removed. Use chunks
     // well under Firestore's write-batch limit. If a chunk fails, the student
     // remains and the operation can be retried safely.
@@ -1833,6 +1845,7 @@ function openLessonForm(id=''){
   if(closureFor(state.date)&&!id){showMessage('この日は休校です。休校日を解除してから授業を登録してください。');return;}
   if(!state.students.length||!state.people.length){showMessage('先に生徒と担当教師のアカウントを登録してください。');return;}
   const lesson=lessonById(id);
+  if(isBookingOwnedLesson(lesson)){showMessage(BOOKING_WRITE_MESSAGE);return;}
   lessonEditBaseline=recordFingerprint(lesson?.virtual?null:cleanRecord(lesson));
   $('lessonForm').reset();$('lessonId').value=id;$('lessonFormTitle').textContent=lesson?'授業を編集':'授業を登録';
   const isRegular=Boolean(lesson?.regularId);
@@ -1977,6 +1990,7 @@ $('lessonForm').addEventListener('submit',async event=>{
   }
   // Single-lesson editing must honor the same server-stored teacher limit as
   // the course editor (0–4 per slot, default 2). Never silently assume 2.
+  if(!await canDirectlyWriteLessons([{...data,id},old].filter(Boolean)))return;
   if(course && data.status!=='cancelled'){
     const periodIndex=course.periods.findIndex(p=>p.start===start&&p.end===end);
     if(periodIndex<0||!availabilityAllows(course.id,teacher.id,date,periodIndex)){showMessage('この講師は指定された日時の勤務希望を提出していません。講師勤務希望画面で先に登録してください。');return;}
@@ -2012,6 +2026,7 @@ $('lessonForm').addEventListener('submit',async event=>{
 $('deleteLesson').addEventListener('click',async()=>{
   if(!isAdmin())return;
   const old=state.entries.find(e=>e.id===$('lessonId').value);if(!old)return;
+  if(!await canDirectlyWriteLessons([old]))return;
   if(!confirm('この授業を削除しますか？'))return;
   try{
     const batch=writeBatch(db);batch.delete(doc(db,'timetableEntries',old.id));
@@ -2053,7 +2068,11 @@ function openLessonDetailContents(id){
   $('detailGrade').textContent=[displayLessonGrade(lesson),lesson.school].filter(Boolean).join(' / ');
   renderUpcomingForLesson(lesson);
   // Employees see plain text only; no editable field or save button.
-  const admin=isAdmin();
+  const admin=isAdmin()&&!isBookingOwnedLesson(lesson);
+  let bookingHint=$('detailBookingHint');
+  if(!bookingHint){bookingHint=make('p','muted');bookingHint.id='detailBookingHint';$('memoReadOnly').after(bookingHint);}
+  bookingHint.hidden=!isAdmin()||!isBookingOwnedLesson(lesson);
+  bookingHint.textContent=BOOKING_WRITE_MESSAGE;
   $('memoForm').hidden=!admin;
   $('memoReadOnly').hidden=admin;
   $('memoReadOnly').textContent=lesson.memo?.trim()||'伝達事項はありません。';
@@ -2072,6 +2091,7 @@ $('memoForm').addEventListener('submit',async event=>{
   const lesson=lessonById(state.activeLesson);if(!lesson)return;
   const content=$('memoContent').value.trim();const button=event.submitter;button.disabled=true;
   try{
+    if(!await canDirectlyWriteLessons([lesson]))return;
     const expected=memoEditBaseline;
     await runTransaction(db,async tx=>{
       const ref=doc(db,'timetableEntries',lesson.id),snap=await tx.get(ref),current=snap.exists()?snap.data():null;
@@ -2773,6 +2793,7 @@ async function publishCourseEditor(){
   if(!confirm(`${changes.length}件の講習授業の変更を確定し、講師の時間割に反映しますか？`))return;
   courseEditor.busy=true;renderCourseEditor();
   try{
+    if(!await canDirectlyWriteLessons(changes))return;
     const dates=[...new Set(changes.flatMap(e=>[e.date,courseEditor.originals.get(e.id)?.date].filter(Boolean)))];
     // A revision guard catches concurrent creations, which a preflight date query alone cannot detect.
     const metaRef=doc(db,'specialCourses',course.id,'scheduleMeta','state');
@@ -2867,6 +2888,29 @@ async function publishCourseEditor(){
   finally{courseEditor.busy=false;renderCourseEditor();}
 }
 $('editorSave').addEventListener('click',publishCourseEditor);
+
+// Advisory UI guard. Firestore Rules remain the authority if settings change
+// after this preflight. No booking-owned record is ever skipped during deletion.
+const isBookingOwnedLesson=lesson=>String(lesson?.id||'').startsWith('b_');
+const BOOKING_WRITE_MESSAGE='予約管理対象の授業です。変更・取消は「講習予約管理」で行ってください。伝達事項・生徒削除・復元は運営に確認してください。';
+async function canDirectlyWriteLessons(entries){
+  if(entries.some(isBookingOwnedLesson)){showMessage(BOOKING_WRITE_MESSAGE);return false;}
+  for(const courseId of new Set(entries.map(e=>e?.courseId).filter(Boolean))){
+    try{
+      const response=(await bookingEditorCall({action:'getSettings',courseId})).data;
+      if(!response||!Object.prototype.hasOwnProperty.call(response,'settings'))throw Error('予約設定の応答を確認できません');
+      if(response.settings?.enabled===true){showMessage(BOOKING_WRITE_MESSAGE);return false;}
+    }catch(error){showMessage('予約設定を確認できません。通信状態を確認し、講習予約管理で操作してください。');return false;}
+  }
+  return true;
+}
+function clientRestoreBlocker(records){
+  if(records.some(r=>/^timetableEntries\/b_/.test(r.path)))return BOOKING_WRITE_MESSAGE;
+  const parents=new Map(records.filter(r=>/^specialCourses\/[^/]+$/.test(r.path)).map(r=>[r.path.split('/')[1],r.data]));
+  if(records.some(r=>/^specialCourses\/[^/]+\/teacherAvailability\/[^/]+$/.test(r.path)&&parents.get(r.path.split('/')[1])?.archived===true))
+    return '非表示の講習の勤務希望を含むため、この画面では全体復元できません。運営に確認してください。';
+  return '';
+}
 
 function syncBookingManagementShortcut(){
   let link=$('navBookingManagement');
