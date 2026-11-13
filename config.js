@@ -11,3 +11,6 @@ export const firebaseConfig = {
 // Draft feature: keep disabled until ALL write/restore paths use the server authority.
 // See server-candidates/normal-authority/README.md; CRUD rules alone are insufficient.
 export const teacherWorkFeatureEnabled = false;
+
+// Staging-only migration switch. Keep false until deployment/integration validation.
+export const normalAuthorityApiEnabled = false;

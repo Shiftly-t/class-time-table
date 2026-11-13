@@ -175,6 +175,11 @@ export function installTeacherWorkPage(ctx){
       :{date:day,teacherUid:uid,availablePeriods:periods,updatedBy:actorUid,updatedAt:serverTimestamp()};
     busy=true;render();
     try{
+      if(ctx.normalAuthority?.enabled()){
+        const before=type==='weekly'?storedWeek(uid):storedDay(day,uid);
+        if((type==='weekly'?weekKey(before):dateKey(before))!==baseline)throw Error('勤務設定が変更されました。再読み込みしてください。');
+        await ctx.normalAuthority.saveWork({type:type==='weekly'?'weekly':'date',teacherUid:uid,date:type==='weekly'?undefined:day,values:type==='weekly'?week:periods,clear,before});
+      }else{
       const ref=type==='weekly'?doc(db,'teacherWeeklyWork',uid):doc(db,'teacherDateWork',dayId(day,uid));
       await runTransaction(db,async tx=>{
         const snap=await tx.get(ref);
@@ -186,6 +191,7 @@ export function installTeacherWorkPage(ctx){
         if(after||before)auditChange(tx,ref.path,before,after,after?'変更':'解除',
           (state.people.find(p=>p.id===uid)?.name||'講師')+'の'+(type==='weekly'?'通常勤務曜日':prettyDate(day)+'臨時出勤'));
       });
+      }
       if(session!==generation||state.user?.uid!==actorUid)return;
       if(type==='weekly'){state.teacherWeeklyWork={...state.teacherWeeklyWork,[uid]:after};weekDirty=false;weekBaseline=JSON.stringify(week);}
       else {state.teacherDateWork={...state.teacherDateWork};if(after)state.teacherDateWork[dayId(day,uid)]=after;else delete state.teacherDateWork[dayId(day,uid)];dayDirty=false;dayBaseline=clear?'missing':JSON.stringify(periods);if(clear)dateDraft=dateDefaults();}

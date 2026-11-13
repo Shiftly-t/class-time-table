@@ -6,6 +6,7 @@ export function installNormalEditor(ctx){
     auditChange,lessonNoticePayload,isAdmin,isAssignableTeacher,lessonsOnDate,
     courseFor,closureFor,CLASS_PERIODS,todayKey,prettyDate,canTeacherWork,teacherWorkReady,showMessage,
     trapError,openLessonForm,openCourseEditor,nav,renderAll}=ctx;
+  const normalAuthority=ctx.normalAuthority;
   const capacity=2;
   const page=document.createElement('section');
   page.id='normalEditorPage';
@@ -57,6 +58,14 @@ export function installNormalEditor(ctx){
       <div class="modal-actions"><button class="primary" type="submit">仮設定に反映</button></div>
     </form>`;
   document.body.append(absenceDialog);
+  // A touch selection re-renders the card. Its synthesized click may target the
+  // replacement node, so a closure on the removed button cannot suppress it.
+  let pointerClickGuard=null;
+  $('normalGrid').addEventListener('click',event=>{
+    const g=pointerClickGuard;if(!g||performance.now()>g.until)return;
+    const samePointer=('pointerId' in event)?event.pointerId===g.id:Math.hypot(event.clientX-g.x,event.clientY-g.y)<25;
+    if(samePointer&&Math.hypot(event.clientX-g.x,event.clientY-g.y)<25){pointerClickGuard=null;event.preventDefault();event.stopImmediatePropagation();}
+  },true);
   const m={date:todayKey(),loadedDate:'',draft:new Map(),originals:new Map(),
     absent:new Map(),absentOriginals:new Map(),baseline:'',history:[],
     selected:'',drag:null,busy:false,external:false,openUid:''};
@@ -207,6 +216,7 @@ export function installNormalEditor(ctx){
     b.addEventListener('pointerup',event=>{
       const drag=m.drag;
       if(!drag||drag.id!==entry.id||drag.pointerId!==event.pointerId)return;
+      if(drag.moved||event.pointerType==='touch')pointerClickGuard={id:event.pointerId,x:event.clientX,y:event.clientY,until:performance.now()+650};
       m.drag=null;b.classList.remove('is-dragging');
       document.querySelectorAll('.normal-cell.is-drop-target').forEach(el=>el.classList.remove('is-drop-target'));
       if(drag.moved){
@@ -361,7 +371,7 @@ export function installNormalEditor(ctx){
     for(const p of CLASS_PERIODS){
       const row=make('label','normal-absence-row');
       const input=make('input');input.type='checkbox';input.value=String(p.number);
-      input.checked=teacherAbsent(uid,p.number);
+      input.checked=m.absent.get(uid)?.has(p.number)===true; // explicit absence only; weekly off-days stay separate
       row.append(make('strong','',`${p.number}限　${p.start}〜${p.end}`),make('span','', '欠席'),input);
       options.append(row);
     }
@@ -404,6 +414,14 @@ export function installNormalEditor(ctx){
     if(moves.length+absences.length>100){showMessage('変更が多すぎます。数回に分けて保存してください。');return;}
     m.busy=true;render();
     try{
+      if(normalAuthority?.enabled()){
+        await normalAuthority.saveDay({date:m.date,
+          changes:moves.map(entry=>({id:entry.id,before:m.originals.get(entry.id),value:entry})),
+          absences:absences.map(([teacherUid,ps])=>({teacherUid,periods:[...ps].sort(),before:state.teacherAbsences?.[absentKey(m.date,teacherUid)]||null}))});
+        m.history=[];m.selected='';m.external=false;m.loadedDate='';
+        showMessage(`担当振替${moves.length}件、講師欠席設定${absences.length}件を保存しました。毎週の通常授業設定は変更していません。`);
+        renderAll();return;
+      }
       // Re-read currently stored lessons for this day before any write.
       const latest=await getDocs(query(collection(db,'timetableEntries'),where('date','==',m.date)));
       if(m.baseline!==liveSignature())throw Error('保存中に時間割が変更されました。変更を破棄して再読み込みしてください。');

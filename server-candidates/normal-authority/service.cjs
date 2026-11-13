@@ -2,6 +2,7 @@
 // Public, dependency-injected Admin Firestore transaction candidate; NOT deployed.
 const {createHash}=require('node:crypto');
 const P=require('./policy.cjs');
+const {automaticClosure}=require('./calendar.cjs');
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 function archive(value,sentinels=new WeakSet()){
   if(value==null)return null;
@@ -31,7 +32,7 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
   return async function execute(context,command){
     const uid=context?.auth?.uid;if(!P.id(uid))P.fail('unauthenticated','Staff authentication required');
     if(context.app?.appId==null)P.fail('failed-precondition','Verified App Check required');
-    if(!command||!['day','work'].includes(command.kind)||(!P.id(command.requestId)||command.requestId.length>80))P.fail('invalid-argument','Invalid command');
+    if(!command||!['day','work','inspect','calendar'].includes(command.kind)||(!P.id(command.requestId)||command.requestId.length>80))P.fail('invalid-argument','Invalid command');
     const input=JSON.parse(JSON.stringify(command));const hash=digest(canonical(input));
     const sentinels=new WeakSet();const stamp=()=>{const value=serverTimestamp();if(value&&typeof value==='object')sentinels.add(value);return value;};
     const auditJson=value=>{const json=JSON.stringify(archive(value,sentinels));if(json.length>300000)P.fail('resource-exhausted','History exceeds supported size');return json;};
@@ -44,11 +45,46 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
       // Do not replace with a client-side preflight or a counter outside this transaction.
       const lock=await read('normalAuthorityState/global');
       if(lock&&(!Number.isSafeInteger(lock.version)||lock.version<0))P.fail('failed-precondition','Invalid revision');
+      const query=async(col,filter,max)=>{let q=db.collection(col);if(filter)q=q.where(...filter);const snap=await tx.get(q.limit(max+1));if(snap.docs.length>max)P.fail('resource-exhausted','Dataset exceeds validated transaction bound');return snap.docs.map(s=>({id:s.id,...s.data()}));};
+      if(input.kind==='inspect'){
+        const result={protocolVersion:1,version:lock?.version||0,entries:Object.create(null),absences:Object.create(null),calendar:{}};
+        if(input.date){P.date(input.date);
+          for(const e of await query('timetableEntries',['date','==',input.date],400))if(!e.courseId&&!e.id.startsWith('b_'))result.entries[e.id]={value:archive(e),token:entryToken(e)};
+          for(const a of await query('teacherDayAbsences',['date','==',input.date],100))result.absences[a.teacherUid]={value:archive(a),token:entryToken(a)};
+          for(const col of ['schoolClosures','schoolOpenDays','schoolEvents']){const value=await read(col+'/'+input.date);result.calendar[col]={value:archive(value),token:value?entryToken(value):null};}
+        }
+        if(input.work){const {type,teacherUid,date}=input.work;if(!['weekly','date','absence'].includes(type)||!P.id(teacherUid))P.fail('invalid-argument','Invalid inspect target');if(type!=='weekly')P.date(date);const col={weekly:'teacherWeeklyWork',date:'teacherDateWork',absence:'teacherDayAbsences'}[type];const value=await read(col+'/'+(type==='weekly'?teacherUid:date+'_'+teacherUid));result.work={value:archive(value),token:value?entryToken(value):null};}
+        return result;
+      }
       const operationKey=digest([uid,input.requestId]);
       const receiptPath=`normalAuthorityRequests/${operationKey}`,receipt=await read(receiptPath);
       if(receipt){if(receipt.hash!==hash)P.fail('already-exists','Request id reused with different content');return receipt.result;}
       const writes=[],notices=new Map();
-      if(input.kind==='work'){
+      if(input.kind==='calendar'){
+        P.date(input.date);
+        if(!['schoolClosures','schoolOpenDays','schoolEvents'].includes(input.collection))P.fail('invalid-argument','Invalid calendar collection');
+        const courses=await query('specialCourses',null,200);
+        if(courses.some(c=>c.startDate<=input.date&&input.date<=c.endDate))P.fail('failed-precondition','Course calendar migration is not supported');
+        const path=input.collection+'/'+input.date,before=await read(path);
+        if(!own(input,'expected')||input.expected!==(before?entryToken(before):null))P.fail('aborted','Calendar changed; reload');
+        if(own(input,'remove')&&typeof input.remove!=='boolean')P.fail('invalid-argument','Invalid remove flag');
+        const values=input.value;let after=null;
+        if(!input.remove){
+          const keys=input.collection==='schoolEvents'?['title','start','end','note']:['note'];
+          if(!values||Object.keys(values).some(k=>!keys.includes(k))||typeof values.note!=='string'||values.note.length>500)P.fail('invalid-argument','Invalid calendar data');
+          if(input.collection==='schoolEvents'){if(typeof values.title!=='string'||!values.title.trim()||values.title.length>80||P.time(values.start)>=P.time(values.end))P.fail('invalid-argument','Invalid exam data');}
+          after={...values,date:input.date,...(input.collection==='schoolEvents'?{type:'exam'}:{}),updatedBy:uid,updatedAt:stamp()};
+        }
+        const calendar={};
+        for(const col of ['schoolClosures','schoolOpenDays','schoolEvents'])calendar[col]=col===input.collection?after:await read(col+'/'+input.date);
+        const students=await query('schoolStudents',null,1000),stored=await query('timetableEntries',['date','==',input.date],400);
+        const rows=P.effectiveDay(input.date,stored,students,todayKey());
+        const opens=calendar.schoolOpenDays||calendar.schoolEvents?.type==='exam'||(!calendar.schoolClosures&&!automaticClosure(input.date));
+        if(opens)for(const e of rows.filter(e=>e.status!=='cancelled'))P.validatePlacement(e,rows.filter(r=>r.teacherUid===e.teacherUid),{});
+        for(const teacherUid of new Set(rows.map(e=>e.teacherUid))){if(!P.id(teacherUid))P.fail('failed-precondition','Invalid calendar teacher');notices.set(teacherUid,{message:'担当授業の予定が更新されました',date:input.date});}
+        // Calendar edits do not delete or regenerate stored lessons. They share the same lock.
+        writes.push({path,before,after});
+      }else if(input.kind==='work'){
         if(!P.id(input.teacherUid)||!['weekly','date','absence'].includes(input.type))P.fail('invalid-argument','Invalid work target');
         const teacher=await read('users/'+input.teacherUid);if(!['admin','employee'].includes(teacher?.role))P.fail('invalid-argument','Invalid teacher');
         const collection={weekly:'teacherWeeklyWork',date:'teacherDateWork',absence:'teacherDayAbsences'}[input.type];
@@ -67,12 +103,11 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
         P.date(input.date);
         const absenceChanges=input.absences||[];
         if(!Array.isArray(input.changes)||!Array.isArray(absenceChanges)||input.changes.length+absenceChanges.length<1||input.changes.length+absenceChanges.length>20||new Set(input.changes.map(c=>c.id)).size!==input.changes.length||new Set(absenceChanges.map(c=>c.teacherUid)).size!==absenceChanges.length)P.fail('invalid-argument','Use 1..20 distinct lesson/absence changes');
-        const query=async(col,filter,max)=>{let q=db.collection(col);if(filter)q=q.where(...filter);const snap=await tx.get(q.limit(max+1));if(snap.docs.length>max)P.fail('resource-exhausted','Dataset exceeds validated transaction bound');return snap.docs.map(s=>({id:s.id,...s.data()}));};
         const courses=await query('specialCourses',null,200);
         // Same visibility policy as the UI, including archived course periods.
         if(courses.some(c=>c.startDate<=input.date&&input.date<=c.endDate))P.fail('failed-precondition','Use the independent course workflow');
         const [closed,open,exam]=await Promise.all(['schoolClosures/','schoolOpenDays/','schoolEvents/'].map(c=>read(c+input.date)));
-        if(closed&&!open&&exam?.type!=='exam')P.fail('failed-precondition','School is closed');
+        if((closed||automaticClosure(input.date))&&!open&&exam?.type!=='exam')P.fail('failed-precondition','School is closed');
         const students=await query('schoolStudents',null,1000),stored=await query('timetableEntries',['date','==',input.date],400);
         const today=todayKey();P.date(today);
         const initial=P.effectiveDay(input.date,stored,students,today);let final=[...initial];
@@ -96,7 +131,7 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
           if(!own(change,'expected')||change.expected!==(before?entryToken(before):null))P.fail('aborted','Lesson changed; reload');
           if(change.remove){
             if(!before)P.fail('failed-precondition','Cannot delete an unmaterialized weekly occurrence');
-            if(before.regularId)P.fail('failed-precondition','Cancel a weekly occurrence instead of regenerating it');
+            // Removing a daily override reveals its weekly occurrence; validate that result below.
             final=final.filter(e=>e.id!==change.id);writes.push({path:'timetableEntries/'+change.id,before,after:null});
           }else{
             const value=cleanEntry(change.value);
@@ -125,7 +160,9 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
           if(!['admin','employee'].includes(teachers.get(entry.teacherUid)?.role))P.fail('failed-precondition','Invalid generated teacher');
           if(!work.has(entry.teacherUid)){const key=input.date+'_'+entry.teacherUid;const [weekly,daily,absence]=await Promise.all([read('teacherWeeklyWork/'+entry.teacherUid),read('teacherDateWork/'+key),read('teacherDayAbsences/'+key)]);work.set(entry.teacherUid,{weekly,daily,absence:absenceOverrides.has(entry.teacherUid)?absenceOverrides.get(entry.teacherUid):absence});}
           P.validatePlacement(entry,final,work.get(entry.teacherUid));
+          notices.set(entry.teacherUid,{message:'担当授業の予定が更新されました',date:input.date});
         }
+        for(const write of writes)if(!write.after&&write.before?.regularId&&!final.some(e=>e.id===write.path.split('/')[1]))P.fail('failed-precondition','Cannot revert an occurrence without a current weekly parent');
         for(const write of writes)if(write.after?.regularId&&!final.some(e=>e.id===write.path.split('/')[1]))P.fail('failed-precondition','Invisible weekly occurrence');
         // Also validate capacity after deletes/status changes; unchanged legacy work mismatch is retained.
         for(const entry of final.filter(e=>e.status!=='cancelled')){
@@ -134,8 +171,9 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
           P.validatePlacement(entry,[entry,...peers],{});
         }
       }
+      if(notices.size>100)P.fail('resource-exhausted','Too many teachers for one atomic calendar update');
       const version=(lock?.version||0)+1;if(!Number.isSafeInteger(version))P.fail('resource-exhausted','Revision exhausted');
-      const result={version,changed:writes.length};
+      const result={protocolVersion:1,version,changed:writes.length};
       // All reads above precede every write; data, history, notifications and receipt commit atomically.
       for(let i=0;i<writes.length;i++){
         const w=writes[i],ref=db.doc(w.path);if(w.after)tx.set(ref,w.after);else tx.delete(ref);

@@ -2,6 +2,8 @@
 
 > **未導入のDraft機能**。このブランチは検査用です。Firebaseルールの変更、mainマージ、デプロイを自動実行しません。
 
+最新の画面接続・未移行経路は `NORMAL_API_MIGRATION_REVIEW_20261113.md` を参照してください。`teacherWorkFeatureEnabled`・`normalAuthorityApiEnabled`は両方falseであり、ルールだけの先行変更は行いません。
+
 ## 統合検証案での有効化と安全条件
 
 - `config.js`の`teacherWorkFeatureEnabled`は既定で`false`です。本番設定は変更していません。

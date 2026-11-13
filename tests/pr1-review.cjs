@@ -3,7 +3,7 @@ const {chromium,webkit}=require('playwright');
 const fs=require('node:fs');const http=require('node:http');const assert=require('node:assert/strict');
 const root=require('node:path').resolve(__dirname,'..');
 const stub=`
-const teacherWorkFeatureEnabled=false;
+const teacherWorkFeatureEnabled=false,normalAuthorityApiEnabled=false;
 const initializeApp=()=>({}), getAuth=()=>({}),getFirestore=()=>({}),getFunctions=()=>({}),httpsCallable=()=>()=>{},initializeAppCheck=()=>{},ReCaptchaEnterpriseProvider=class{},onAuthStateChanged=()=>{},signInWithEmailAndPassword=()=>{},signOut=()=>{},firebaseConfig={},bookingAppCheckSiteKey='';
 const collection=(...a)=>({path:a.filter(x=>typeof x==='string').join('/')}), doc=(...a)=>({path:a.map(x=>typeof x==='string'?x:x.path||'').filter(Boolean).join('/'),id: 'auto-'+(++window.seq)}),query=(c,...q)=>c,where=()=>{},serverTimestamp=()=>({timestamp:true}),onSnapshot=()=>()=>{},getDoc=async()=>({exists:()=>false}),setDoc=()=>{},deleteDoc=()=>{},updateDoc=()=>{},runTransaction=()=>{},increment=()=>{},arrayUnion=()=>{},Timestamp=class{},orderBy=()=>{},limit=()=>{};
 const getDocs=async ref=>{if(window.pauseReads)await new Promise(r=>window.resumeRead=r);return {docs:(ref.path==='timetableEntries'?state.entries:Object.values(state.teacherAbsences)).map(e=>({id:e.id,data:()=>{const {id,...data}=e;return data}}))}};
@@ -11,7 +11,7 @@ const writeBatch=()=>{const ops=[];return {set:(r,d)=>ops.push(['set',r.path,d])
 window.seq=0;window.writes=[];
 `;
 let app=fs.readFileSync(root+'/app.js','utf8').replace(/^import .*;\n/gm,'');
-app=`import {installNormalEditor} from '/normal-editor.js';\nimport {installTeacherWorkPage} from '/teacher-work.js';\n`+stub+app+`\nwindow.test={state,nav,regularEditor,visibleLessonsOnDate,lessonsOnDate,renderCourses,renderAvailabilityPage,renderCourseEditor,setCourseArchived,courseDisplayName};`;
+app=`import {installNormalEditor} from '/normal-editor.js';\nimport {installTeacherWorkPage} from '/teacher-work.js';\nimport {createNormalAuthorityClient} from '/normal-authority-client.js';\n`+stub+app+`\nwindow.test={state,nav,regularEditor,visibleLessonsOnDate,lessonsOnDate,renderCourses,renderAvailabilityPage,renderCourseEditor,setCourseArchived,courseDisplayName};`;
 const server=http.createServer((req,res)=>{const path=req.url.split('?')[0];res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');try{res.end(path==='/app.js'?app:fs.readFileSync(root+(path==='/'?'/index.html':path)))}catch{res.statusCode=404;res.end('')}});
 (async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));
 for(const [name,type]of Object.entries({chromium,webkit})){
