@@ -1,23 +1,24 @@
 {
   "scope": "All root Web JavaScript files; Firebase SDK sink constructors/mutations/commits, including helper callbacks. Not a general JS taint analysis; private server inventory separate.",
-  "sourceCommit": "82ef57e2e5750e0e172dbab5dce675eac3c8461a",
+  "sourceCommit": "9baa0c69aaf4197f2967db9afcb9fc62bd74c297",
   "sourceHashes": {
-    "app.js": "2e165102fdbb04ed63eb1a5588aa8d2e7e43af43861dee09754074b213f89a9f",
+    "app.js": "9b82afe7e50314e21e082626ce1f867666b803780e1687400a92582e53d32ae7",
     "booking-config.js": "9a2d493cbf36bf2f2fbf34d6bdcd72f82e922517267219ea18679aec153be901",
-    "booking-transport.js": "76eadfeef3570369ff3132d72b7d80ce5d6abc12724a83abb693634d020bfda1",
+    "booking-transport.js": "f4a68f7b64f02b86ba77b8e35464caae80ed872a3c65a5c329ed7362606da93f",
     "config.js": "771ca98683512b7c03684a69534e98aa9ebc8cab0536cd8bb2eced0c1a2339e9",
     "course-booking-admin.js": "1f1b8e4fc335f9aa239ccfa5ec05cd39a9a429cd5e3331d0fa3a15d72c416a04",
     "course-booking.js": "c879ea138cfbd64bb473f0d081b6ca79a3bbc097acb9bce68006d763bffa841d",
     "normal-authority-client.js": "2e0f49a926febb336077f23334053eb89fa20e245ee3d1eac85c2d0adccf72a0",
     "normal-editor.js": "c48e9a946649d9e0beae5716cec2b9398305334f8ca9340908b2b50f8db73c04",
+    "seasonal-authority-client.js": "f70ba3b2be4dd7e34e51e024d9a6f2f7194decd88202cd1eed4c8c88db50603f",
     "teacher-work.js": "6dce1deaa5b319cb2688738a21ece847a8010894af0133702b4e96df4d0978a1"
   },
   "groups": [
     {
       "id": "audit-helper",
       "file": "app.js",
-      "from": 398,
-      "to": 405,
+      "from": 402,
+      "to": 409,
       "operation": "監査履歴の共通ヘルパー",
       "collections": [
         "auditLogs"
@@ -29,22 +30,22 @@
     {
       "id": "archive-create",
       "file": "app.js",
-      "from": 449,
-      "to": 469,
+      "from": 453,
+      "to": 474,
       "operation": "旧形式バックアップ作成",
       "collections": [
         "backupArchives/*/parts",
         "backupArchives"
       ],
-      "status": "replace-or-stop",
-      "requiredChange": "新形式の一貫したサーバースナップショットへ置換。現形式は復元可能な完全コピーではない",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "APIモードはowner+maintenanceの小規模format2。旧形式の生成へフォールバックしない。",
       "siteCount": 4
     },
     {
       "id": "audit-restore",
       "file": "app.js",
-      "from": 529,
-      "to": 560,
+      "from": 537,
+      "to": 572,
       "operation": "変更履歴から単一文書復元",
       "collections": [
         "dynamic: OWNER_ROOT_COLLECTIONS and course subcollections",
@@ -57,36 +58,36 @@
     {
       "id": "archive-restore",
       "file": "app.js",
-      "from": 560,
-      "to": 615,
+      "from": 572,
+      "to": 627,
       "operation": "全体復元",
       "collections": [
         "dynamic: OWNER_ROOT_COLLECTIONS and course subcollections",
         "auditLogs"
       ],
-      "status": "stop-in-api-mode",
-      "requiredChange": "予約を含む新形式の原子的復元へ。既存の分割batchは再開手順に使わない",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "format2だけ計画と適用。旧形式/部分復元/上限超過を停止。",
       "siteCount": 8
     },
     {
       "id": "maintenance",
       "file": "app.js",
-      "from": 666,
-      "to": 699,
+      "from": 678,
+      "to": 712,
       "operation": "メンテナンス変更・イベント記録",
       "collections": [
         "systemConfig/maintenance",
         "maintenanceEvents"
       ],
-      "status": "retain-control-plane-reviewed",
-      "requiredChange": "owner限定制御面。開始前の旧バックアップ呼出しは切替前に置換/分離が必要",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "APIモードの停止前バックアップ依存を除去。再開は全writer移行・独立直接writeロックの検証を要求。",
       "siteCount": 4
     },
     {
       "id": "grade-promotion",
       "file": "app.js",
-      "from": 806,
-      "to": 839,
+      "from": 819,
+      "to": 852,
       "operation": "ログイン/年度境界の学年自動保存",
       "collections": [
         "schoolStudents",
@@ -99,134 +100,134 @@
     {
       "id": "open-delete",
       "file": "app.js",
-      "from": 1135,
-      "to": 1156,
+      "from": 1148,
+      "to": 1169,
       "operation": "特別開校日解除",
       "collections": [
         "schoolOpenDays",
         "auditLogs"
       ],
-      "status": "partially-migrated",
-      "requiredChange": "通常期間はAPI接続済み。講習中の開閉変更は停止中",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "通常・講習の営業カレンダーをseasonal APIで一括保存。既存確保は保持し、新規配置を最新状態で検証。",
       "siteCount": 3
     },
     {
       "id": "open-save",
       "file": "app.js",
-      "from": 1157,
-      "to": 1177,
+      "from": 1170,
+      "to": 1190,
       "operation": "特別開校日登録",
       "collections": [
         "schoolOpenDays",
         "auditLogs"
       ],
-      "status": "partially-migrated",
-      "requiredChange": "同上。予約APIとの最新開校状態・枠同期が必要",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "通常・講習の営業カレンダーをseasonal APIで一括保存。既存確保は保持し、新規配置を最新状態で検証。",
       "siteCount": 3
     },
     {
       "id": "closure-save",
       "file": "app.js",
-      "from": 1278,
-      "to": 1308,
+      "from": 1291,
+      "to": 1321,
       "operation": "休校登録・編集",
       "collections": [
         "schoolClosures",
         "auditLogs"
       ],
-      "status": "partially-migrated",
-      "requiredChange": "通常API接続済み。講習中は開校状態を変えない備考だけ対応",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "通常・講習の営業カレンダーをseasonal APIで一括保存。既存確保は保持し、新規配置を最新状態で検証。",
       "siteCount": 3
     },
     {
       "id": "closure-delete",
       "file": "app.js",
-      "from": 1309,
-      "to": 1322,
+      "from": 1322,
+      "to": 1335,
       "operation": "休校解除",
       "collections": [
         "schoolClosures",
         "auditLogs"
       ],
-      "status": "partially-migrated",
-      "requiredChange": "講習中の開閉変更は停止",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "通常・講習の営業カレンダーをseasonal APIで一括保存。既存確保は保持し、新規配置を最新状態で検証。",
       "siteCount": 3
     },
     {
       "id": "exam-save",
       "file": "app.js",
-      "from": 1323,
-      "to": 1344,
+      "from": 1336,
+      "to": 1357,
       "operation": "模試登録・編集",
       "collections": [
         "schoolEvents",
         "auditLogs"
       ],
-      "status": "partially-migrated",
-      "requiredChange": "通常API接続済み。講習中は時間・開閉を変えない編集だけ対応",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "通常・講習の営業カレンダーをseasonal APIで一括保存。既存確保は保持し、新規配置を最新状態で検証。",
       "siteCount": 3
     },
     {
       "id": "exam-delete",
       "file": "app.js",
-      "from": 1345,
-      "to": 1352,
+      "from": 1358,
+      "to": 1365,
       "operation": "模試削除",
       "collections": [
         "schoolEvents",
         "auditLogs"
       ],
-      "status": "partially-migrated",
-      "requiredChange": "講習中の開閉変更は停止",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "通常・講習の営業カレンダーをseasonal APIで一括保存。既存確保は保持し、新規配置を最新状態で検証。",
       "siteCount": 3
     },
     {
       "id": "course-archive",
       "file": "app.js",
-      "from": 1358,
-      "to": 1374,
+      "from": 1371,
+      "to": 1388,
       "operation": "講習非表示・復元",
       "collections": [
         "specialCourses",
         "auditLogs"
       ],
-      "status": "migration-required",
-      "requiredChange": "通常生成への影響・予約受付停止/再開と同じ境界で検証。既存予約を勝手に削除しない",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "対応済みの状態変更をpatchCourseで保存。進行中の非表示は拒否。",
       "siteCount": 3
     },
     {
       "id": "course-deadline",
       "file": "app.js",
-      "from": 1455,
-      "to": 1472,
+      "from": 1469,
+      "to": 1486,
       "operation": "講習勤務希望締切変更",
       "collections": [
         "specialCourses",
         "auditLogs"
       ],
-      "status": "migration-required",
-      "requiredChange": "講習勤務希望提出・予約/配置と同じtransactionの時刻と版を使う",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "管理者権限でpatchCourse。期限と講師情報を同じ境界で検証。",
       "siteCount": 3
     },
     {
       "id": "course-save",
       "file": "app.js",
-      "from": 1473,
-      "to": 1505,
+      "from": 1487,
+      "to": 1517,
       "operation": "講習登録・期間/コマ変更",
       "collections": [
         "specialCourses",
         "auditLogs"
       ],
-      "status": "migration-required",
-      "requiredChange": "予約設定有無だけでなく保存授業/希望/通常生成も検証",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "空の講習の新規作成と整合性検証。依存データのある構造変更は停止。",
       "siteCount": 3
     },
     {
       "id": "course-delete",
       "file": "app.js",
-      "from": 1506,
-      "to": 1526,
+      "from": 1518,
+      "to": 1539,
       "operation": "講習削除と子文書削除",
       "collections": [
         "specialCourses",
@@ -234,15 +235,15 @@
         "specialCourses/*/scheduleMeta",
         "auditLogs"
       ],
-      "status": "migration-required",
-      "requiredChange": "孤児台帳と通常生成の再出現を防止。未対応時は停止",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "空の講習と子文書だけを原子的削除。予約/QR/履歴があれば拒否。",
       "siteCount": 5
     },
     {
       "id": "announcement-delete",
       "file": "app.js",
-      "from": 1588,
-      "to": 1603,
+      "from": 1601,
+      "to": 1616,
       "operation": "公式お知らせ取消",
       "collections": [
         "officialAnnouncements"
@@ -254,8 +255,8 @@
     {
       "id": "announcement-read",
       "file": "app.js",
-      "from": 1604,
-      "to": 1619,
+      "from": 1617,
+      "to": 1632,
       "operation": "公式お知らせ既読",
       "collections": [
         "announcementReadStates"
@@ -267,8 +268,8 @@
     {
       "id": "notice-prune",
       "file": "app.js",
-      "from": 1625,
-      "to": 1647,
+      "from": 1638,
+      "to": 1660,
       "operation": "通知件数整理",
       "collections": [
         "notifications/*/items"
@@ -280,8 +281,8 @@
     {
       "id": "notice-delete",
       "file": "app.js",
-      "from": 1662,
-      "to": 1680,
+      "from": 1675,
+      "to": 1693,
       "operation": "通知個別削除",
       "collections": [
         "notifications/*/items"
@@ -293,8 +294,8 @@
     {
       "id": "notice-read",
       "file": "app.js",
-      "from": 1681,
-      "to": 1694,
+      "from": 1694,
+      "to": 1707,
       "operation": "通知既読一括",
       "collections": [
         "notifications/*/items"
@@ -306,8 +307,8 @@
     {
       "id": "notice-clear",
       "file": "app.js",
-      "from": 1695,
-      "to": 1710,
+      "from": 1708,
+      "to": 1723,
       "operation": "通知全削除",
       "collections": [
         "notifications/*/items"
@@ -319,8 +320,8 @@
     {
       "id": "announcement-create",
       "file": "app.js",
-      "from": 1711,
-      "to": 1725,
+      "from": 1724,
+      "to": 1738,
       "operation": "公式お知らせ掲載",
       "collections": [
         "officialAnnouncements"
@@ -332,8 +333,8 @@
     {
       "id": "student-labels",
       "file": "app.js",
-      "from": 1780,
-      "to": 1802,
+      "from": 1793,
+      "to": 1815,
       "operation": "生徒表示情報の授業伝播",
       "collections": [
         "timetableEntries",
@@ -346,8 +347,8 @@
     {
       "id": "student-save",
       "file": "app.js",
-      "from": 1803,
-      "to": 1844,
+      "from": 1816,
+      "to": 1857,
       "operation": "生徒登録・編集・毎週設定",
       "collections": [
         "schoolStudents",
@@ -360,8 +361,8 @@
     {
       "id": "student-delete",
       "file": "app.js",
-      "from": 1870,
-      "to": 1911,
+      "from": 1885,
+      "to": 1929,
       "operation": "生徒削除と関連文書削除",
       "collections": [
         "schoolStudents",
@@ -369,15 +370,15 @@
         "monthlyTargets",
         "auditLogs"
       ],
-      "status": "stop-in-api-mode",
-      "requiredChange": "公開候補はplanのみ。私有の小規模一括削除はWeb未接続",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "ownerがrevisionに結び付いた計画確認後に小規模一括削除。QR失効・予約取消・枠解放を一体化。",
       "siteCount": 6
     },
     {
       "id": "lesson-notice",
       "file": "app.js",
-      "from": 1985,
-      "to": 1991,
+      "from": 2003,
+      "to": 2009,
       "operation": "授業通知生成",
       "collections": [
         "notifications/*/items"
@@ -389,8 +390,8 @@
     {
       "id": "student-notice",
       "file": "app.js",
-      "from": 2023,
-      "to": 2031,
+      "from": 2041,
+      "to": 2049,
       "operation": "生徒変更通知生成",
       "collections": [
         "notifications/*/items"
@@ -402,8 +403,8 @@
     {
       "id": "generic-notice",
       "file": "app.js",
-      "from": 2032,
-      "to": 2038,
+      "from": 2050,
+      "to": 2056,
       "operation": "旧定型通知生成",
       "collections": [
         "notifications/*/items"
@@ -415,8 +416,8 @@
     {
       "id": "lesson-save",
       "file": "app.js",
-      "from": 2040,
-      "to": 2114,
+      "from": 2058,
+      "to": 2133,
       "operation": "個別授業登録・編集・担当/別日移動",
       "collections": [
         "timetableEntries",
@@ -424,15 +425,15 @@
         "auditLogs",
         "notifications/*/items"
       ],
-      "status": "partially-migrated",
-      "requiredChange": "通常はAPI接続済み。講習は直接経路が残りAPI管理対象は停止",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "通常はnormal API、講習はseasonal API。予約所有IDの自由編集は拒否。",
       "siteCount": 3
     },
     {
       "id": "lesson-delete",
       "file": "app.js",
-      "from": 2115,
-      "to": 2134,
+      "from": 2134,
+      "to": 2154,
       "operation": "個別授業削除",
       "collections": [
         "timetableEntries",
@@ -440,45 +441,45 @@
         "auditLogs",
         "notifications/*/items"
       ],
-      "status": "partially-migrated",
-      "requiredChange": "通常はday API。講習は専用の台帳整合APIが必要",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "通常はnormal API、manual講習はseasonal API。done/予約所有の自由削除は拒否。",
       "siteCount": 4
     },
     {
       "id": "lesson-memo",
       "file": "app.js",
-      "from": 2170,
-      "to": 2206,
+      "from": 2190,
+      "to": 2227,
       "operation": "伝達事項保存",
       "collections": [
         "timetableEntries",
         "auditLogs",
         "notifications/*/items"
       ],
-      "status": "partially-migrated",
-      "requiredChange": "通常はmemo API。予約授業は停止。予約側専用memo APIは未実装",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "通常はnormal API、講習/予約授業は専用memo API。配置・台帳を変更させない。",
       "siteCount": 2
     },
     {
       "id": "course-availability",
       "file": "app.js",
-      "from": 2465,
-      "to": 2506,
+      "from": 2486,
+      "to": 2529,
       "operation": "講習勤務希望提出・管理者代理保存",
       "collections": [
         "specialCourses/*/teacherAvailability",
         "auditLogs",
         "notifications/*/items"
       ],
-      "status": "migration-required",
-      "requiredChange": "本人/管理者/締切/非表示を検証する専用APIが必要。現在の私有normal wrapperは管理者専用で流用不可",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "employee本人と管理者代理を分け、締切/版/確保済み枠を原子的検証。",
       "siteCount": 4
     },
     {
       "id": "course-publish",
       "file": "app.js",
-      "from": 2881,
-      "to": 2977,
+      "from": 2904,
+      "to": 3001,
       "operation": "講習配置エディター公開",
       "collections": [
         "timetableEntries",
@@ -486,8 +487,8 @@
         "auditLogs",
         "notifications/*/items"
       ],
-      "status": "migration-required",
-      "requiredChange": "予約停止中も共通lockが必要。配置metaだけでは予約APIと排他しない",
+      "status": "api-connected-with-safety-limits",
+      "requiredChange": "手動講習配置は共通lock・版・最新勤務希望・上限2を検証。予約所有IDの任意配置は拒否。",
       "siteCount": 8
     },
     {
@@ -525,784 +526,784 @@
   "sites": [
     {
       "file": "app.js",
-      "line": 402,
+      "line": 406,
       "sink": "writer.set(",
       "group": "audit-helper",
       "lineSha256": "e99235efe432ce7aa6acfda687d0e849a4bc695e151b7e168638b8c0d18fd8db"
     },
     {
       "file": "app.js",
-      "line": 463,
+      "line": 468,
       "sink": "writeBatch(",
       "group": "archive-create",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 464,
+      "line": 469,
       "sink": "batch.set(",
       "group": "archive-create",
       "lineSha256": "158ccaf6b1a4a4ec16f9a61a715bafdc3a50ff4f786e06f6e54b8312a4e80ae0"
     },
     {
       "file": "app.js",
-      "line": 465,
+      "line": 470,
       "sink": "batch.commit(",
       "group": "archive-create",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 467,
+      "line": 472,
       "sink": "setDoc(",
       "group": "archive-create",
       "lineSha256": "e44cde4f69fac85d49d186481178b03f51f81dcde59898e8bfd3ba5f67114a37"
     },
     {
       "file": "app.js",
-      "line": 548,
+      "line": 556,
       "sink": "runTransaction(",
       "group": "audit-restore",
       "lineSha256": "d6c4d58f17a4b227b4dd07f9134904b4611e753434ba0244a492d32c9c8e9cff"
     },
     {
       "file": "app.js",
-      "line": 552,
+      "line": 560,
       "sink": "tx.delete(",
       "group": "audit-restore",
       "lineSha256": "7432b4365ae5f1d60686ee4c7284fe30f7c6cf88df9e267afedd8afcebd01a32"
     },
     {
       "file": "app.js",
-      "line": 552,
+      "line": 560,
       "sink": "tx.set(",
       "group": "audit-restore",
       "lineSha256": "7432b4365ae5f1d60686ee4c7284fe30f7c6cf88df9e267afedd8afcebd01a32"
     },
     {
       "file": "app.js",
-      "line": 553,
+      "line": 561,
       "sink": "tx.set(",
       "group": "audit-restore",
       "lineSha256": "bdebac479c6e03a097a1aa454ea5d68055567f4c5bb3f699421c70ccfe18d128"
     },
     {
       "file": "app.js",
-      "line": 593,
+      "line": 605,
       "sink": "writeBatch(",
       "group": "archive-restore",
       "lineSha256": "adf860cae18e8c15d6558538346ee7b7f5d93aa3e18222f4ee5ac889f2767bee"
     },
     {
       "file": "app.js",
-      "line": 594,
+      "line": 606,
       "sink": "batch.set(",
       "group": "archive-restore",
       "lineSha256": "c80969edc9983bcf72748269981fc1749a46773570440ec88471ff64416c4241"
     },
     {
       "file": "app.js",
-      "line": 595,
+      "line": 607,
       "sink": "batch.commit(",
       "group": "archive-restore",
       "lineSha256": "dc3853614d8f0081bae8202ff75cf5943fbb20da9ce3a16de3e100fd640cf7cf"
     },
     {
       "file": "app.js",
-      "line": 604,
+      "line": 616,
       "sink": "writeBatch(",
       "group": "archive-restore",
       "lineSha256": "981c94c7426634f84de5beef89cf6284d9ab0e123662a4b4bf191e8d15edec7a"
     },
     {
       "file": "app.js",
-      "line": 604,
+      "line": 616,
       "sink": "batch.delete(",
       "group": "archive-restore",
       "lineSha256": "981c94c7426634f84de5beef89cf6284d9ab0e123662a4b4bf191e8d15edec7a"
     },
     {
       "file": "app.js",
-      "line": 604,
+      "line": 616,
       "sink": "batch.commit(",
       "group": "archive-restore",
       "lineSha256": "981c94c7426634f84de5beef89cf6284d9ab0e123662a4b4bf191e8d15edec7a"
     },
     {
       "file": "app.js",
-      "line": 606,
+      "line": 618,
       "sink": "writeBatch(",
       "group": "archive-restore",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 608,
+      "line": 620,
       "sink": "batch.commit(",
       "group": "archive-restore",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 690,
+      "line": 703,
       "sink": "writeBatch(",
       "group": "maintenance",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 691,
+      "line": 704,
       "sink": "batch.set(",
       "group": "maintenance",
       "lineSha256": "8dd31f9de232e6dfd62a35dd89d77ce794892e46cf0a20695066d46fd532f9be"
     },
     {
       "file": "app.js",
-      "line": 692,
+      "line": 705,
       "sink": "batch.set(",
       "group": "maintenance",
       "lineSha256": "cfab44de9813b78f1be1ded2a0a4fb3afd38ace5d0cb340c64532c143e36347e"
     },
     {
       "file": "app.js",
-      "line": 693,
+      "line": 706,
       "sink": "batch.commit(",
       "group": "maintenance",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 822,
+      "line": 835,
       "sink": "runTransaction(",
       "group": "grade-promotion",
       "lineSha256": "3ea89126f702859f863854c8e64beaabacf27657b9980ad3845d8bf8130923f9"
     },
     {
       "file": "app.js",
-      "line": 830,
+      "line": 843,
       "sink": "tx.update(",
       "group": "grade-promotion",
       "lineSha256": "db01ac2e5704ee8d737b24b66975d675b21a099dbf807857f1981ffae45958d4"
     },
     {
       "file": "app.js",
-      "line": 831,
+      "line": 844,
       "sink": "tx.set(",
       "group": "grade-promotion",
       "lineSha256": "072870312cccaaa38a24a959eb8dd03914f4b7e0602f82296def51d12d12e2a2"
     },
     {
       "file": "app.js",
-      "line": 1147,
+      "line": 1160,
       "sink": "writeBatch(",
       "group": "open-delete",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 1148,
+      "line": 1161,
       "sink": "batch.delete(",
       "group": "open-delete",
       "lineSha256": "c6850af7b2ac4bcfaf1a9b1e7b2e7bfcda49a566041e8db44e0a7137cce3a846"
     },
     {
       "file": "app.js",
-      "line": 1150,
+      "line": 1163,
       "sink": "batch.commit(",
       "group": "open-delete",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1167,
+      "line": 1180,
       "sink": "writeBatch(",
       "group": "open-save",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 1168,
+      "line": 1181,
       "sink": "batch.set(",
       "group": "open-save",
       "lineSha256": "79d9925b9de5cfd93fd0619270943a2f760afbaf0495a1d4455c84d39031a98c"
     },
     {
       "file": "app.js",
-      "line": 1170,
+      "line": 1183,
       "sink": "batch.commit(",
       "group": "open-save",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1301,
+      "line": 1314,
       "sink": "writeBatch(",
       "group": "closure-save",
       "lineSha256": "59cdfc8f6661e1161323e540e42073e765be7277d5adf466388bf1fbfceb7e7c"
     },
     {
       "file": "app.js",
-      "line": 1301,
+      "line": 1314,
       "sink": "batch.set(",
       "group": "closure-save",
       "lineSha256": "59cdfc8f6661e1161323e540e42073e765be7277d5adf466388bf1fbfceb7e7c"
     },
     {
       "file": "app.js",
-      "line": 1301,
+      "line": 1314,
       "sink": "batch.commit(",
       "group": "closure-save",
       "lineSha256": "59cdfc8f6661e1161323e540e42073e765be7277d5adf466388bf1fbfceb7e7c"
     },
     {
       "file": "app.js",
-      "line": 1315,
+      "line": 1328,
       "sink": "writeBatch(",
       "group": "closure-delete",
       "lineSha256": "19aa0ba2a23df38bd21341ac830adbb2d3ec7b80be88952d5257b9001f900cd2"
     },
     {
       "file": "app.js",
-      "line": 1315,
+      "line": 1328,
       "sink": "batch.delete(",
       "group": "closure-delete",
       "lineSha256": "19aa0ba2a23df38bd21341ac830adbb2d3ec7b80be88952d5257b9001f900cd2"
     },
     {
       "file": "app.js",
-      "line": 1315,
+      "line": 1328,
       "sink": "batch.commit(",
       "group": "closure-delete",
       "lineSha256": "19aa0ba2a23df38bd21341ac830adbb2d3ec7b80be88952d5257b9001f900cd2"
     },
     {
       "file": "app.js",
-      "line": 1339,
+      "line": 1352,
       "sink": "writeBatch(",
       "group": "exam-save",
       "lineSha256": "4298660c7b3af551ec5057446d523da81f3545a01fb9d2cfda13a28b5f6a8db3"
     },
     {
       "file": "app.js",
-      "line": 1339,
+      "line": 1352,
       "sink": "batch.set(",
       "group": "exam-save",
       "lineSha256": "4298660c7b3af551ec5057446d523da81f3545a01fb9d2cfda13a28b5f6a8db3"
     },
     {
       "file": "app.js",
-      "line": 1339,
+      "line": 1352,
       "sink": "batch.commit(",
       "group": "exam-save",
       "lineSha256": "4298660c7b3af551ec5057446d523da81f3545a01fb9d2cfda13a28b5f6a8db3"
     },
     {
       "file": "app.js",
-      "line": 1349,
+      "line": 1362,
       "sink": "writeBatch(",
       "group": "exam-delete",
       "lineSha256": "b3ab1197f9bedc301e2ef76a219e9d4f2ecbfc07d4208f0745e50c05accded4a"
     },
     {
       "file": "app.js",
-      "line": 1349,
+      "line": 1362,
       "sink": "batch.delete(",
       "group": "exam-delete",
       "lineSha256": "b3ab1197f9bedc301e2ef76a219e9d4f2ecbfc07d4208f0745e50c05accded4a"
     },
     {
       "file": "app.js",
-      "line": 1349,
+      "line": 1362,
       "sink": "batch.commit(",
       "group": "exam-delete",
       "lineSha256": "b3ab1197f9bedc301e2ef76a219e9d4f2ecbfc07d4208f0745e50c05accded4a"
     },
     {
       "file": "app.js",
-      "line": 1366,
+      "line": 1380,
       "sink": "writeBatch(",
       "group": "course-archive",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 1367,
+      "line": 1381,
       "sink": "batch.update(",
       "group": "course-archive",
       "lineSha256": "18900a679e91359a523e5ae12323ea8af092a3d9ce91a5af2597bc7cbb978f94"
     },
     {
       "file": "app.js",
-      "line": 1369,
+      "line": 1383,
       "sink": "batch.commit(",
       "group": "course-archive",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1467,
+      "line": 1481,
       "sink": "writeBatch(",
       "group": "course-deadline",
-      "lineSha256": "4a6415c4710e5dbc6af9ba74f4a4682df503ebb625f693dd02bf01e36a0ac2e8"
+      "lineSha256": "13e0482f57981bf8b19525e19bf7da22314d7292da64f233dd1b86311b2dd596"
     },
     {
       "file": "app.js",
-      "line": 1467,
+      "line": 1481,
       "sink": "batch.update(",
       "group": "course-deadline",
-      "lineSha256": "4a6415c4710e5dbc6af9ba74f4a4682df503ebb625f693dd02bf01e36a0ac2e8"
+      "lineSha256": "13e0482f57981bf8b19525e19bf7da22314d7292da64f233dd1b86311b2dd596"
     },
     {
       "file": "app.js",
-      "line": 1467,
+      "line": 1481,
       "sink": "batch.commit(",
       "group": "course-deadline",
-      "lineSha256": "4a6415c4710e5dbc6af9ba74f4a4682df503ebb625f693dd02bf01e36a0ac2e8"
+      "lineSha256": "13e0482f57981bf8b19525e19bf7da22314d7292da64f233dd1b86311b2dd596"
     },
     {
       "file": "app.js",
-      "line": 1499,
+      "line": 1512,
       "sink": "writeBatch(",
       "group": "course-save",
-      "lineSha256": "1c37c6f7b81bbcc2b4cc31b1f14c43d5ec78de25f1b1eb8806079f8eb8b2dc36"
+      "lineSha256": "9e763bdc4fee89ad4c22fd3e6253b88519593b4cf0384e10293d63f51ce5738a"
     },
     {
       "file": "app.js",
-      "line": 1499,
+      "line": 1512,
       "sink": "batch.set(",
       "group": "course-save",
-      "lineSha256": "1c37c6f7b81bbcc2b4cc31b1f14c43d5ec78de25f1b1eb8806079f8eb8b2dc36"
+      "lineSha256": "9e763bdc4fee89ad4c22fd3e6253b88519593b4cf0384e10293d63f51ce5738a"
     },
     {
       "file": "app.js",
-      "line": 1499,
+      "line": 1512,
       "sink": "batch.commit(",
       "group": "course-save",
-      "lineSha256": "1c37c6f7b81bbcc2b4cc31b1f14c43d5ec78de25f1b1eb8806079f8eb8b2dc36"
+      "lineSha256": "9e763bdc4fee89ad4c22fd3e6253b88519593b4cf0384e10293d63f51ce5738a"
     },
     {
       "file": "app.js",
-      "line": 1515,
+      "line": 1528,
       "sink": "writeBatch(",
       "group": "course-delete",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 1517,
+      "line": 1530,
       "sink": "batch.delete(",
       "group": "course-delete",
       "lineSha256": "b6dd23190a1deeed2eb9a0517db4b17668e78bcd5caeaa495f90e9f1bc407442"
     },
     {
       "file": "app.js",
-      "line": 1519,
+      "line": 1532,
       "sink": "batch.delete(",
       "group": "course-delete",
       "lineSha256": "2979fb33560769486d715920fb9ccb7d54243b02c754b505dda428781f28cf1c"
     },
     {
       "file": "app.js",
-      "line": 1520,
+      "line": 1533,
       "sink": "batch.delete(",
       "group": "course-delete",
       "lineSha256": "61a904828f1108c369f86ed86a8f99f234e415eacbb8d8c1f2ee1a234a905049"
     },
     {
       "file": "app.js",
-      "line": 1521,
+      "line": 1534,
       "sink": "batch.commit(",
       "group": "course-delete",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1598,
+      "line": 1611,
       "sink": "deleteDoc(",
       "group": "announcement-delete",
       "lineSha256": "1498ad687a1ee023de9a0c4a6f629a362b76131ebd85a6f6dfa2dafc8033bf79"
     },
     {
       "file": "app.js",
-      "line": 1609,
+      "line": 1622,
       "sink": "setDoc(",
       "group": "announcement-read",
       "lineSha256": "fb1fc82d98bbc5a3ee2e9adbf748323c605119ee399e41e3fb4304202d299bb4"
     },
     {
       "file": "app.js",
-      "line": 1638,
+      "line": 1651,
       "sink": "writeBatch(",
       "group": "notice-prune",
       "lineSha256": "02372a11e41e5a0903034a684941e312e14a847a236a8d5ff8abd9c4e4540a52"
     },
     {
       "file": "app.js",
-      "line": 1639,
+      "line": 1652,
       "sink": "batch.delete(",
       "group": "notice-prune",
       "lineSha256": "38850b195086f94365aaf88c5879af9bb46f11f7227be3e43a901c24528dfdaf"
     },
     {
       "file": "app.js",
-      "line": 1640,
+      "line": 1653,
       "sink": "batch.commit(",
       "group": "notice-prune",
       "lineSha256": "e4237fd88a96d1140828e7d2d6a49ac639ccfe067b969eedf0be391ad4448846"
     },
     {
       "file": "app.js",
-      "line": 1673,
+      "line": 1686,
       "sink": "deleteDoc(",
       "group": "notice-delete",
       "lineSha256": "17489dcdbae45526f9dafb79e16116de1973818dbc83ec353f6559ea11926f66"
     },
     {
       "file": "app.js",
-      "line": 1687,
+      "line": 1700,
       "sink": "writeBatch(",
       "group": "notice-read",
       "lineSha256": "aaeb5b2413e8306a6af60d404cd6b97042313ed6cdd1751c4debf9d7a94713eb"
     },
     {
       "file": "app.js",
-      "line": 1688,
+      "line": 1701,
       "sink": "batch.update(",
       "group": "notice-read",
       "lineSha256": "e9dd67dbd625ac17f8c82d344ba66b767e947d1533a6a1428b55c7a5beaf229e"
     },
     {
       "file": "app.js",
-      "line": 1689,
+      "line": 1702,
       "sink": "batch.commit(",
       "group": "notice-read",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1703,
+      "line": 1716,
       "sink": "writeBatch(",
       "group": "notice-clear",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 1704,
+      "line": 1717,
       "sink": "batch.delete(",
       "group": "notice-clear",
       "lineSha256": "335ba8e9655b2adbde59ebf716b800318af7e473eacfab2cdc6f2a0b3230ce75"
     },
     {
       "file": "app.js",
-      "line": 1705,
+      "line": 1718,
       "sink": "batch.commit(",
       "group": "notice-clear",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1720,
+      "line": 1733,
       "sink": "setDoc(",
       "group": "announcement-create",
       "lineSha256": "cebf9c8d62376ac59e1b57d767ce0223bd66886e68f27d120eb9fc302d672c41"
     },
     {
       "file": "app.js",
-      "line": 1788,
+      "line": 1801,
       "sink": "writeBatch(",
       "group": "student-labels",
       "lineSha256": "1124978ae13511315a40629968817dc7d05e58f612da82b0bbbb938decddf574"
     },
     {
       "file": "app.js",
-      "line": 1793,
+      "line": 1806,
       "sink": "batch.update(",
       "group": "student-labels",
       "lineSha256": "ea30609e400a3ca2cf1f20b669212d1a6ddbd5e4d65f2ce2f8aea1227d02a2dd"
     },
     {
       "file": "app.js",
-      "line": 1794,
+      "line": 1807,
       "sink": "batch.commit(",
       "group": "student-labels",
       "lineSha256": "db600baa210922a4318e492593899c1f8507e5fd66a09e46a840c8f7c5299273"
     },
     {
       "file": "app.js",
-      "line": 1794,
+      "line": 1807,
       "sink": "writeBatch(",
       "group": "student-labels",
       "lineSha256": "db600baa210922a4318e492593899c1f8507e5fd66a09e46a840c8f7c5299273"
     },
     {
       "file": "app.js",
-      "line": 1796,
+      "line": 1809,
       "sink": "batch.commit(",
       "group": "student-labels",
       "lineSha256": "3e64d508ace005dd667d35f0e987e1a02a7dcf97cc37a6ae72d1fabca02d3559"
     },
     {
       "file": "app.js",
-      "line": 1820,
+      "line": 1833,
       "sink": "runTransaction(",
       "group": "student-save",
       "lineSha256": "d6c4d58f17a4b227b4dd07f9134904b4611e753434ba0244a492d32c9c8e9cff"
     },
     {
       "file": "app.js",
-      "line": 1825,
+      "line": 1838,
       "sink": "tx.set(",
       "group": "student-save",
       "lineSha256": "e12a8152227610e03b51210ec1bccc47dbf26b8113a4a64f6fb67d9ccbaa043f"
     },
     {
       "file": "app.js",
-      "line": 1897,
+      "line": 1915,
       "sink": "writeBatch(",
       "group": "student-delete",
       "lineSha256": "02372a11e41e5a0903034a684941e312e14a847a236a8d5ff8abd9c4e4540a52"
     },
     {
       "file": "app.js",
-      "line": 1898,
+      "line": 1916,
       "sink": "batch.delete(",
       "group": "student-delete",
       "lineSha256": "3c16cdd8adb1836b3a5da4c67544e07f3a14b54f9fe52932481dc4eb04c51a6d"
     },
     {
       "file": "app.js",
-      "line": 1899,
+      "line": 1917,
       "sink": "batch.commit(",
       "group": "student-delete",
       "lineSha256": "e4237fd88a96d1140828e7d2d6a49ac639ccfe067b969eedf0be391ad4448846"
     },
     {
       "file": "app.js",
-      "line": 1902,
+      "line": 1920,
       "sink": "writeBatch(",
       "group": "student-delete",
       "lineSha256": "65cfa58cca6e4a12bce2bf7d2672da3c04695f849ef96502bcfd87cb23161d9f"
     },
     {
       "file": "app.js",
-      "line": 1902,
+      "line": 1920,
       "sink": "batch.delete(",
       "group": "student-delete",
       "lineSha256": "65cfa58cca6e4a12bce2bf7d2672da3c04695f849ef96502bcfd87cb23161d9f"
     },
     {
       "file": "app.js",
-      "line": 1903,
+      "line": 1921,
       "sink": "batch.commit(",
       "group": "student-delete",
       "lineSha256": "384ea873f678ace7c052320f041c4e17295c979e5dcfeb9e7d07621d53e15d0a"
     },
     {
       "file": "app.js",
-      "line": 1987,
+      "line": 2005,
       "sink": "writeBatch(",
       "group": "lesson-notice",
       "lineSha256": "3006b2c82097b786ff281c4ada32fd199e598e2da25bf5f5b1ce7b5dfd5f7080"
     },
     {
       "file": "app.js",
-      "line": 1988,
+      "line": 2006,
       "sink": "writer.set(",
       "group": "lesson-notice",
       "lineSha256": "f0f4438a82d4b6cff2cce85b92275dd8dcd7ef44aae53b43fa4e18b644ff65e9"
     },
     {
       "file": "app.js",
-      "line": 1989,
+      "line": 2007,
       "sink": "writer.commit(",
       "group": "lesson-notice",
       "lineSha256": "adc19d63c9badba857fc7ff14ca44f95413412ffd657a51ec3b5011dfeb0392d"
     },
     {
       "file": "app.js",
-      "line": 2025,
+      "line": 2043,
       "sink": "writeBatch(",
       "group": "student-notice",
       "lineSha256": "00418aabe6f646e86edd7aea7530195b50f349a2607fdc555b28d38b4e0503ba"
     },
     {
       "file": "app.js",
-      "line": 2027,
+      "line": 2045,
       "sink": "writer.set(",
       "group": "student-notice",
       "lineSha256": "501e397583bef98b0eb1116ebe08bbc141a43d27fb38955a0713ccf40fa4a244"
     },
     {
       "file": "app.js",
-      "line": 2029,
+      "line": 2047,
       "sink": "writer.commit(",
       "group": "student-notice",
       "lineSha256": "46b12b1bddffd8dbbaa10926f047faff65210cfe788d5796c691718ca1d23a13"
     },
     {
       "file": "app.js",
-      "line": 2034,
+      "line": 2052,
       "sink": "writeBatch(",
       "group": "generic-notice",
       "lineSha256": "ba51483520517b496e16b18ba3653161e49165c817dd5fa09750057418ad7c53"
     },
     {
       "file": "app.js",
-      "line": 2035,
+      "line": 2053,
       "sink": "targetBatch.set(",
       "group": "generic-notice",
       "lineSha256": "956af1e619f745c5a0d914e3f05e242e3255d47c83f57c81f7c0d8135aee59ce"
     },
     {
       "file": "app.js",
-      "line": 2036,
+      "line": 2054,
       "sink": "targetBatch.commit(",
       "group": "generic-notice",
       "lineSha256": "d884cd2e8d830fb8b1f6b2cb10609961d164390bc635f03884df268d6b481274"
     },
     {
       "file": "app.js",
-      "line": 2097,
+      "line": 2116,
       "sink": "runTransaction(",
       "group": "lesson-save",
       "lineSha256": "18d8db0e65de95c10d5655d2b996484bfeaa8d43ff6136c367e84d9590d7330f"
     },
     {
       "file": "app.js",
-      "line": 2101,
+      "line": 2120,
       "sink": "tx.set(",
       "group": "lesson-save",
       "lineSha256": "b79e182a759a34e7bc3abff7e75d54d7fc334f24a283805fd4b60cdd9f552b1e"
     },
     {
       "file": "app.js",
-      "line": 2103,
+      "line": 2122,
       "sink": "tx.set(",
       "group": "lesson-save",
       "lineSha256": "c911a566b61ccb2e60ea4b25813e93f0a95b19ad55e904da41953bf7bec8572d"
     },
     {
       "file": "app.js",
-      "line": 2121,
+      "line": 2141,
       "sink": "writeBatch(",
       "group": "lesson-delete",
       "lineSha256": "3ecef3ef1842c890a49fcd50cfcc48ad87960b64acf476cb2da7bfabd01e4069"
     },
     {
       "file": "app.js",
-      "line": 2121,
+      "line": 2141,
       "sink": "batch.delete(",
       "group": "lesson-delete",
       "lineSha256": "3ecef3ef1842c890a49fcd50cfcc48ad87960b64acf476cb2da7bfabd01e4069"
     },
     {
       "file": "app.js",
-      "line": 2123,
+      "line": 2143,
       "sink": "batch.set(",
       "group": "lesson-delete",
       "lineSha256": "ebfa40f752f9f688458d359c2f6f7450e1660824af33ce7e2422f8634c1b49fc"
     },
     {
       "file": "app.js",
-      "line": 2125,
+      "line": 2145,
       "sink": "batch.commit(",
       "group": "lesson-delete",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 2189,
+      "line": 2210,
       "sink": "runTransaction(",
       "group": "lesson-memo",
       "lineSha256": "18d8db0e65de95c10d5655d2b996484bfeaa8d43ff6136c367e84d9590d7330f"
     },
     {
       "file": "app.js",
-      "line": 2193,
+      "line": 2214,
       "sink": "tx.set(",
       "group": "lesson-memo",
       "lineSha256": "b79e182a759a34e7bc3abff7e75d54d7fc334f24a283805fd4b60cdd9f552b1e"
     },
     {
       "file": "app.js",
-      "line": 2489,
+      "line": 2511,
       "sink": "runTransaction(",
       "group": "course-availability",
       "lineSha256": "d6c4d58f17a4b227b4dd07f9134904b4611e753434ba0244a492d32c9c8e9cff"
     },
     {
       "file": "app.js",
-      "line": 2494,
+      "line": 2516,
       "sink": "tx.set(",
       "group": "course-availability",
       "lineSha256": "c0bbdf81e8f8e1c6e9694fd09c24b3e2e0644bc6126a09e7dd3b94bb74d1e593"
     },
     {
       "file": "app.js",
-      "line": 2495,
+      "line": 2517,
       "sink": "tx.set(",
       "group": "course-availability",
       "lineSha256": "6dc8e289d98c3aa58a63adc4edb1eb0e74847394257f399c13688a13fb1efc0b"
     },
     {
       "file": "app.js",
-      "line": 2497,
+      "line": 2519,
       "sink": "tx.set(",
       "group": "course-availability",
       "lineSha256": "75c6193f859d1f77b3f51479a8bad6c4fd139d5457c654b853ff88c3b9baae1c"
     },
     {
       "file": "app.js",
-      "line": 2908,
+      "line": 2932,
       "sink": "runTransaction(",
       "group": "course-publish",
       "lineSha256": "d6c4d58f17a4b227b4dd07f9134904b4611e753434ba0244a492d32c9c8e9cff"
     },
     {
       "file": "app.js",
-      "line": 2957,
+      "line": 2981,
       "sink": "tx.delete(",
       "group": "course-publish",
       "lineSha256": "303da544df813ed39e27e11fb1ab74b13844be25ba29f10c1ed7cca068866aef"
     },
     {
       "file": "app.js",
-      "line": 2958,
+      "line": 2982,
       "sink": "tx.set(",
       "group": "course-publish",
       "lineSha256": "32d7e51020d40b6c5e81a4028dbdbf97ba0d7cbbd10b78dae03e61a51cb8bc6a"
     },
     {
       "file": "app.js",
-      "line": 2961,
+      "line": 2985,
       "sink": "tx.set(",
       "group": "course-publish",
       "lineSha256": "85f5ac5006836f45f6b7e766faa9e0f469cf0622f4e2becd378b3127e753ba32"
     },
     {
       "file": "app.js",
-      "line": 2962,
+      "line": 2986,
       "sink": "tx.update(",
       "group": "course-publish",
       "lineSha256": "f0877f81005a3e72645a63500c062442bedb1591ee4ddffae759938324687df0"
     },
     {
       "file": "app.js",
-      "line": 2963,
+      "line": 2987,
       "sink": "tx.set(",
       "group": "course-publish",
       "lineSha256": "6f5cd109aa41c82de1d792a7f841c1a8b47c44e3e722db665915ba716be8c89a"
     },
     {
       "file": "app.js",
-      "line": 2965,
+      "line": 2989,
       "sink": "tx.set(",
       "group": "course-publish",
       "lineSha256": "3a051e76c5825397b72e6bd3353993b404459d17bc129a7b696da489a17b6a46"
     },
     {
       "file": "app.js",
-      "line": 2971,
+      "line": 2995,
       "sink": "tx.set(",
       "group": "course-publish",
       "lineSha256": "4f6e406a5601083d3604397d1378c34e135585846f18902e7b015c20593b35b9"
@@ -1377,5 +1378,6 @@
       "group": "teacher-work",
       "lineSha256": "3634ad130af9bbf5b8f8646a61e2f8e444982d049930155a190b4744267e288e"
     }
-  ]
+  ],
+  "sourceState": "Reviewed stage4 tree based on sourceCommit; exact current bytes are fixed by sourceHashes, not the base commit."
 }

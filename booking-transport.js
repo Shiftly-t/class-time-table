@@ -1,6 +1,6 @@
 // Shared booking RPC safety. Never persist QR credentials or blindly resend an
 // uncertain mutation: legacy endpoints may ignore requestId entirely.
-const READS=new Set(['view','courses','getSettings','slots','slotDemand','roster','teachers','detail','getQr','capabilities','requestStatus','planStudentDelete','planSnapshotRestore']);
+const READS=new Set(['view','courses','getSettings','slots','slotDemand','roster','teachers','detail','getQr','capabilities','requestStatus','planStudentDelete','planSnapshotRestore','inspectCourse','inspectAvailability','inspectControl','listSnapshots','verifyIntegrity']);
 const definite=new Set(['invalid-argument','permission-denied','unauthenticated','failed-precondition','not-found','already-exists','aborted','resource-exhausted']);
 const blocked=message=>Object.assign(Error(message),{code:'booking/result-unconfirmed'});
 export const bookingMutation=action=>!READS.has(action);

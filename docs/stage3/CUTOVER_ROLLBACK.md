@@ -1,5 +1,7 @@
 # ルール・API・Webの切替と安全な復旧（手順案・未実行）
 
+第4段階で独立ロックの候補を追加：`server-candidates/seasonal-authority/build-rules.cjs`。`enabled`を停止しても`enforceDirectWriteDeny`は維持する。ルールcompile/実許可拒否は未検証で、値だけで旧Admin SDK停止を証明したとは扱わない。
+
 対象は承認後の**分離テストprojectのみ**。本番適用の手順実行を許可する文書ではない。全writer移行が未完了のため、現時点では最終切替不可。
 
 ## 必要なルールの単位

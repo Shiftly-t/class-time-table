@@ -1,4 +1,6 @@
-# 第3段階：実Firebase結合テストの準備
+# 第3段階の準備記録と第4段階の更新
+
+**最新実装は[第4段階報告](../../SEASONAL_API_MIGRATION_REVIEW_20261113.md)を参照。** テストproject作成は保留中。講習APIと制限付きライフサイクルを追加し、[11ケース対応表](IMPLEMENTATION_PROGRESS_STAGE4.md)を更新した。以下の未実装一覧と件数は第3段階当時の記録。
 
 基準：Draft PR #4、82ef57e。準備段階であり、Firebaseプロジェクト作成/課金/サービス設定/配備/実データ操作は行っていない。本番とmainは変更せず、両公開フラグはfalse。
 

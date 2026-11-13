@@ -39,7 +39,10 @@
       "expected": "許可したsnapshot制御以外は停止。旧APIも別freeze手段で停止",
       "implementationBlocked": true,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "partial",
+      "implementationNotes": "提供された候補の全APIはmaintenanceへ従いowner業務も停止。旧版のin-flight/外部writer停止の実証は未完了。"
     },
     {
       "id": "APP-01",
@@ -64,9 +67,12 @@
       "area": "ルール",
       "scenario": "未認証/employee/admin/ownerで全API専用パスへSDK直接write",
       "expected": "ownerを含め最終版で拒否。Admin SDK認可は別に検査",
-      "implementationBlocked": true,
+      "implementationBlocked": false,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "candidate_ready_unverified",
+      "implementationNotes": "独立した直接write拒否フラグで旧allowを狭める生成候補とlocalhost限定12テストを追加。compile/実評価は未検証。"
     },
     {
       "id": "RULE-02",
@@ -75,7 +81,10 @@
       "expected": "無書込で拒否。旧API直呼びも停止。部分更新やルール緩和なし",
       "implementationBlocked": true,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "partial",
+      "implementationNotes": "旧Webの直接write拒否候補あり。ルールを迂回する旧Admin SDK/旧版の排出確認が残る。"
     },
     {
       "id": "RULE-03",
@@ -145,9 +154,12 @@
       "area": "講習勤務希望",
       "scenario": "本人/代理で締切前後・非表示・不正コマ・版競合を提出",
       "expected": "本人/代理権限を区別。最新定員と既存確保を守る。通常勤務曜日は参照しない",
-      "implementationBlocked": true,
+      "implementationBlocked": false,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "implemented_unverified",
+      "implementationNotes": "本人/代理/締切/非表示/正規コマ/source token/確保済み容量を同じ境界で検証。私有モデルとUI接続を検査。"
     },
     {
       "id": "COURSE-02",
@@ -163,27 +175,36 @@
       "area": "講習配置",
       "scenario": "手動配置/振替と親予約/管理確定/上限変更を同時実行",
       "expected": "受付停止中も共通lock。全枠と各講師2人上限を守り台帳と一致",
-      "implementationBlocked": true,
+      "implementationBlocked": false,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "implemented_unverified",
+      "implementationNotes": "手動講習を共通lockへ接続。親予約との最後の1枠競合、講師2人、版競合、予約所有ID保護を隔離検査。"
     },
     {
       "id": "COURSE-04",
       "area": "講習設定",
       "scenario": "期間/コマ/非表示/復元/締切を予約・配置と競合させる",
       "expected": "既存通常授業と確保を勝手に削除しない。未対応変更は無書込停止",
-      "implementationBlocked": true,
+      "implementationBlocked": false,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "implemented_with_limits",
+      "implementationNotes": "空の講習登録・締切・状態・空削除を接続。依存データのある期間/コマ変換は未実装として無書込拒否。"
     },
     {
       "id": "COURSE-05",
       "area": "営業カレンダー",
       "scenario": "講習中に休校/特別開校/模試を変更し同時に予約/移動",
       "expected": "commit時の最新開閉を使用。閉校後の新配置なし。既存希望は勝手に消さない",
-      "implementationBlocked": true,
+      "implementationBlocked": false,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "implemented_unverified",
+      "implementationNotes": "通常/講習カレンダーと枠を原子的更新。既存確保を保持し、閉校で新規予約を拒否。"
     },
     {
       "id": "BOOK-01",
@@ -336,7 +357,10 @@
       "expected": "全writer停止を実証。1つでも旧writerが通れば切替不可",
       "implementationBlocked": true,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "partial",
+      "implementationNotes": "提供候補の停止と小規模完全復元/計画投影は実装。旧版/外部writerの全停止を実環境で確認できていない。"
     },
     {
       "id": "RESTORE-05",
@@ -363,7 +387,10 @@
       "expected": "停止/基準hash一致後だけ復旧。旧破壊トリガーなし。再試験後に再開",
       "implementationBlocked": true,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "partial",
+      "implementationNotes": "停止・読取整合性API・復旧手順あり。配備版の互換性/旧版排出と実切替のリハーサルが残る。"
     },
     {
       "id": "OPS-03",
@@ -372,16 +399,22 @@
       "expected": "旧schema/APIを安易に再有効化しない。epoch/receipt/鍵を巻戻さず突合後に再開",
       "implementationBlocked": true,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "partial",
+      "implementationNotes": "新形式小規模復元とQR失効維持を実装。大規模世代復旧・外部writer停止・実復旧は未完了。"
     },
     {
       "id": "UI-01",
       "area": "実端末",
       "scenario": "iPad Safariのタップ/ドラッグ/スクロール/モーダル/回転/再読込を実行",
       "expected": "重要操作で横はみ出し・誤二重送信なし。スマホ/PCも実環境で確認",
-      "implementationBlocked": true,
+      "implementationBlocked": false,
       "status": "NOT_RUN",
-      "evidence": null
+      "evidence": null,
+      "originallyImplementationBlocked": true,
+      "implementationState": "ui_implemented_device_unverified",
+      "implementationNotes": "新APIフォーム/配置/メモ/削除/復元/停止/整合性を隔離UIで検査。実iPad Safariは未検証。"
     },
     {
       "id": "COST-01",
@@ -392,5 +425,6 @@
       "status": "NOT_RUN",
       "evidence": null
     }
-  ]
+  ],
+  "implementationUpdate": "stage4; six of the originally blocked eleven have limited/candidate code ready, five remain partial. No real tests executed."
 }
