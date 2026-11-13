@@ -83,7 +83,18 @@ export function installTeacherWorkPage(ctx){
     if(!list.some(x=>x.id===selected)){
       selected=list[0]?.id||'';refreshDrafts();
     }
-    const last=teacherSelect.value;
+    // Refresh clean drafts after Firestore listeners deliver updated schedules.
+    // Preserve unsaved changes; the transaction will reject concurrent edits.
+    if(!weekDirty && weekKey(storedWeek(selected))!==weekBaseline){
+      const value=storedWeek(selected);
+      weekDraft=value?sorted(value.weekdays||[]):sorted(allWeekdays);
+      weekBaseline=weekKey(value);
+    }
+    if(!dayDirty){
+      const value=storedDay(specialDate,selected);
+      dateDraft=value?sorted(value.availablePeriods||[]):dateDefaults();
+      dayBaseline=dateKey(value);
+    }
     teacherSelect.replaceChildren();
     for(const p of list){
       const o=document.createElement('option');o.value=p.id;o.textContent=p.name||p.id;teacherSelect.append(o);
@@ -162,7 +173,7 @@ export function installTeacherWorkPage(ctx){
           (state.people.find(p=>p.id===uid)?.name||'講師')+'の'+(type==='weekly'?'通常勤務曜日':prettyDate(day)+'臨時出勤'));
       });
       if(type==='weekly'){weekDirty=false;weekBaseline=JSON.stringify(week);}
-      else {dayDirty=false;dayBaseline=clear?'missing':JSON.stringify(periods);}
+      else {dayDirty=false;dayBaseline=clear?'missing':JSON.stringify(periods);if(clear)dateDraft=dateDefaults();}
       showMessage(type==='weekly'?'通常勤務曜日を保存しました。':'この日の例外設定を保存しました。');
     }catch(error){trapError(error,'勤務曜日の保存に失敗しました。Firestoreルールと他の端末の変更を確認してください。');}
     finally{busy=false;render();}
