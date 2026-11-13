@@ -4,11 +4,18 @@
 
 **この候補の追加だけで講師管理を有効化しないでください。** フロントの全更新経路と復元経路の移行、実Firestoreテストが未完了です。現行の機能フラグはfalseのままです。
 
-## 最新の画面接続
+## 最新の追加移行
 
-`NORMAL_API_MIGRATION_REVIEW_20261113.md`が最新の移行状況です。Web側の`normal-authority-client.js`は`normalAuthorityApi` callableを呼び、`inspect`の保存文書トークン/共有revisionと開始時の画面内容を照合します。通常エディター・個別編集・メモ・勤務管理・通常期間のカレンダーは接続済みですが、生徒・複数日移動・復元等が未移行です。新しい`normalAuthorityApiEnabled`も既定falseです。
+`STUDENT_MULTI_DATE_MIGRATION_REVIEW_20261113.md`が最新です。生徒・通常設定・表示情報の原子的更新、別日移動、講習期間の備考編集、読取専用の削除/復元計画を追加しました。登録/表示情報変更は非公開の予約fenceが未注入なら停止し、予約データがある場合の同期・削除/復元適用は未実装です。
+
+## 前回の画面接続
+
+`NORMAL_API_MIGRATION_REVIEW_20261113.md`は前回の接続記録です。Web側の`normal-authority-client.js`は`normalAuthorityApi` callableを呼び、`inspect`の保存文書トークン/共有revisionと開始時の画面内容を照合します。通常エディター・個別編集・メモ・勤務管理・通常期間のカレンダーは接続済みですが、予約側の連携・復元適用等が未移行です。新しい`normalAuthorityApiEnabled`も既定falseです。
 
 ## ファイル
+
+- `extended-operations.cjs` / `student-policy.cjs`：生徒・無期限の繰返し検証・2日間移動・読取専用計画。
+
 
 - `calendar.cjs`：公開Webアプリの祝日計算をUTCで動かす通常授業用カレンダー。
 - `policy.cjs`：勤務可否・通常授業生成・人数制約の純粋ロジック。
@@ -54,7 +61,7 @@ Firebase callableの検証済み`request.auth`・`request.app`だけを渡しま
 
 日別コマンドは追加の`absences:[{teacherUid,periods:[1,2],expected:null}]`も受け取り、担当振替と欠席を同一トランザクションで保存できます。既存欠席の変更時は`expected`にその文書のトークンを指定します。欠席設定の保存だけでは既存授業は消えません。
 
-上限は1回20変更（授業と欠席の合計）、同日保存文書400、生徒1000、講習200。超えた場合は不完全な計数をせず拒否します。全生徒の毎週設定を読むため通信量は未最適化です。上限の増加は負荷検証後に行うか、共通の生成索引へ移行してください。複数日間の移動は単一コマンドで対応しません。取消＋新配置をクライアントが別々に実行するのではなく、複数日の原子的APIを追加する必要があります。
+上限は1回20変更（授業と欠席の合計）、同日保存文書400、生徒1000、講習200。超えた場合は不完全な計数をせず拒否します。全生徒の毎週設定を読むため通信量は未最適化です。上限の増加は負荷検証後に行うか、共通の生成索引へ移行してください。別日移動は1授業・2日間を原子的に処理するmoveコマンドへ接続済み。多数日/多数授業、講習期間をまたぐ移動、実施済み等は未対応です。
 
 ### 勤務設定変更
 
@@ -76,7 +83,7 @@ authority無効時の既存コレクション権限は維持。有効時は通�
 ## 有効化前の必須作業
 
 1. 非公開デプロイリポジトリに候補を取り込み、Admin初期化・JST時計・App Check対応のcallableを接続する。既存本番のエクスポートを上書きしない。
-2. 通常エディター、個別編集、メモ、削除、勤務管理、欠席のcallable接続を隔離環境で検証。生徒通常設定の作成/更新/削除、講習期間内のカレンダー変更と履歴復元の信頼できるAPIも追加する。現時点では候補ルールがこれらの未移行操作を安全に拒否する。
+2. 通常エディター、個別編集、メモ、削除、勤務管理、欠席のcallable接続を隔離環境で検証。生徒更新の予約fenceを非公開で実装・実結合検証し、削除/復元適用と講習期間の開閉変更の信頼できるAPIも追加する。現時点では候補ルールがこれらの未移行操作を安全に拒否する。
 3. バックアップを読み取る機能はそのまま。復元は旧クライアント一括書き込みでは拒否される。owner・メンテナンス下で、容量/勤務を全体検証する専用復元APIと予約データの一貫した復元方針が必要。単純にルールを緩めない。
 4. 別のdemoプロジェクトのEmulatorで完全ルール候補をコンパイルし、実Admin SDKトランザクションとルール許可/拒否を実行する。本環境では未検証。
 5. 隔離stagingで既存データの不正スロット・人数超過・予約との混在を事前集計する。生徒/授業数の限界、App Check、トークン読取の実環境動作、JST日付境界、トランザクション再試行、同時操作と障害時の履歴/通知を実測する。
@@ -86,8 +93,18 @@ authority無効時の既存コレクション権限は維持。有効時は通�
 
 ## 読取とカレンダー契約
 
-`{kind:'inspect',requestId,date}`は`protocolVersion:1,version,entries,absences,calendar`を返します。各recordは`{value,token}`で、timestampは既存バックアップと同じ`__shiftlyType:'timestamp'`形式。仮想授業は保存文書ではないのでentriesに含めず、そのexpectedはnullです。`work:{type,teacherUid,date?}`を指定すると対象勤務設定とversionを返します。読取は文書を変更しません。
+`{kind:'inspect',requestId,date}`は`protocolVersion:1,version,entries,virtuals,absences,calendar`を返します。各recordは`{value,token}`で、timestampは既存バックアップと同じ`__shiftlyType:'timestamp'`形式。仮想授業は保存文書ではないのでentriesに含めず、そのexpectedはnullです。ただし生成元照合のexpectedOccurrenceはvirtualsから取得して必ず送ります。`work:{type,teacherUid,date?}`を指定すると対象勤務設定とversionを返します。読取は文書を変更しません。
 
-`{kind:'calendar',requestId,date,collection,expected,value}`は通常授業期間のみ対応。collectionはschoolClosures/schoolOpenDays/schoolEvents、valueはnote（模試はtitle,start,endも）。削除は`remove:true`。actorと時刻はサーバーが設定します。授業を削除せず、再開校時の人数を検証してrevision/監査/講師通知を同時保存します。講習期間内は未対応として拒否します。
+`{kind:'calendar',requestId,date,collection,expected,value}`は通常授業期間のみ対応。collectionはschoolClosures/schoolOpenDays/schoolEvents、valueはnote（模試はtitle,start,endも）。削除は`remove:true`。actorと時刻はサーバーが設定します。授業を削除せず、再開校時の人数を検証してrevision/監査/講師通知を同時保存します。講習期間内は既存文書の備考/模試名だけを許可し、開閉/時間変更は未対応として拒否します。
 
 `callable.cjs`の生成結果は非公開の配備リポジトリで`normalAuthorityApi`という名前にエクスポートする想定です。この公開リポジトリには配備設定を加えていません。両フラグは本PRで有効化しません。
+
+## 追加コマンドと非公開依存
+
+- inspectにstudentIdを指定すると生徒全体とtokenを返す。日付読取のvirtualsは未保存授業の割当token。仮想授業のday変更/moveにはexpectedOccurrenceが必須。rootの文書idとネストした通常枠idを混同しない。
+- studentはstudentId,value,expectedを受け、生徒＋表示情報を最大120件まで一括更新。新規/表示変更にはbookingFence.assertCanChangeStudent({transaction,db,studentId})が必須で、その私有実装は未提供。予約7コレクションのいずれかにデータがあれば新規/表示変更を拒否する。条件を緩めるcallbackを配備しない。
+- moveはid,targetId,fromDate,value,expectedSource,expectedTargetと、仮想元のexpectedOccurrenceを受ける。通常授業2日間だけを扱い、講習をまたぐ場合は拒否。
+- 講習期間のcalendarは既存文書の備考/模試名だけ。開閉/時間変更は未対応。
+- planStudentDeleteは参照件数と全体の予約データ有無、planRestoreはowner＋メンテナンス下で既存archiveIdの構造を読取検査する。どちらも常にcanApply:falseで、適用APIは存在しない。
+
+詳細な設計と配備前提はBOOKING_LIFECYCLE_AND_RESTORE_DESIGN_20261113.mdを参照。個人情報や秘密を公開するためのファイルではない。両フラグは引き続きfalse。

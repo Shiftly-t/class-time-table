@@ -10,6 +10,7 @@ export function authorityValue(value){
 }
 const key=value=>JSON.stringify(authorityValue(value));
 const stored=value=>value?.virtual?null:value==null?null:authorityValue(Object.fromEntries(Object.entries(value).filter(([k])=>!displayKeys.has(k))));
+const occurrenceValue=e=>Object.fromEntries(['studentId','regularId','date','start','end','teacherUid','subject','status'].map(k=>[k,e[k]??'']));
 const error=message=>Object.assign(Error(message),{code:'normal-authority/blocked'});
 const dto=value=>{
   const fields=['studentId','studentName','grade','school','teacherUid','teacherName','date','start','end','subject','status','memo','nextDates','regularId'];
@@ -19,7 +20,7 @@ export function createNormalAuthorityClient({enabled=false,call,getSession,newRe
   let generation=0,pending=null,active=false;
   const session=()=>`${generation}:${getSession()||''}`;
   function check(who){if(who!==session()||!getSession())throw error('ログイン状態が変わりました。再読み込みしてください。');}
-  async function inspect(fields,who){check(who);const response=await call({kind:'inspect',requestId:newRequestId(),...fields});check(who);const data=response?.data;if(!data||data.protocolVersion!==1||!Number.isSafeInteger(data.version)||data.version<0)throw error('通常授業APIの応答を確認できません。');if(fields.date&&(!data.entries||!data.absences||!data.calendar)||fields.work&&!data.work)throw error('通常授業APIの読取結果が不正です。');return data;}
+  async function inspect(fields,who){check(who);const response=await call({kind:'inspect',requestId:newRequestId(),...fields});check(who);const data=response?.data;if(!data||data.protocolVersion!==1||!Number.isSafeInteger(data.version)||data.version<0)throw error('通常授業APIの応答を確認できません。');if(fields.date&&(!data.entries||!data.absences||!data.calendar)||fields.work&&!data.work||fields.studentId&&!data.student)throw error('通常授業APIの読取結果が不正です。');return data;}
   async function perform(intent,prepare){
     if(!enabled)throw error('通常授業API移行モードは無効です。');
     if(active)throw error('通常授業の保存中です。完了を待ってください。');
@@ -35,10 +36,21 @@ export function createNormalAuthorityClient({enabled=false,call,getSession,newRe
       // Preserve an uncertain request and its id. Explicit policy rejection is safe to clear.
       const code=String(e?.code||'').replace(/^functions\//,'');
       if(['invalid-argument','permission-denied','unauthenticated','failed-precondition','not-found','already-exists','aborted','resource-exhausted'].includes(code))pending=null;
+      const explanations=[
+        ['Verified private booking-writer fence is not installed','予約側の排他連携が未設定のため、生徒登録・氏名等の変更は未対応です。業務データは変更していません。'],
+        ['Booking writers are not quiescent/coordinated','予約側の排他連携を確認できません。業務データは変更していません。'],
+        ['Booking/QR label coordination is not implemented','予約・QRを含む表示情報の同期が未実装のため、この生徒登録・表示情報変更は実行できません。'],
+        ['Booking-owned labels require booking coordination','予約由来の授業表示情報の同期が未実装のため、保存を停止しました。'],
+        ['Course opening changes require','講習期間の開校状態を変える操作は、予約枠との同期が未実装のため実行できません。既存の備考・模試名だけ変更できます。'],
+        ['Move would reveal a weekly lesson','移動元に通常授業が再出現するため、この移動は未対応です。元の授業も移動先も変更していません。'],
+        ['Moving across course periods is unsupported','講習期間をまたぐ通常授業の移動は未対応です。授業は変更していません。']
+      ];
+      if(code==='failed-precondition'){const match=explanations.find(([part])=>String(e?.message||'').includes(part));if(match)e.userMessage=match[1];}
       throw e;
     }finally{active=false;}
   }
   function equalBefore(before,current){if(key(stored(before))!==key(current?.value??null))throw error('他の端末で内容が変更されました。画面を閉じて再読み込みしてください。');}
+  function virtualBefore(before,snapshot,id){if(!before?.virtual)return {};const occurrence=snapshot.virtuals?.[id];if(!occurrence||key(occurrenceValue(before))!==key(occurrence.value))throw error('毎週設定が他の端末で変更されました。画面を閉じて再読み込みしてください。');return {expectedOccurrence:occurrence.token};}
   return {
     enabled:()=>enabled,
     reset(){generation++;pending=null;},
@@ -49,11 +61,27 @@ export function createNormalAuthorityClient({enabled=false,call,getSession,newRe
       return perform({date,changes,absences},async who=>{
         if(changes.length+absences.length>20)throw error('一度に保存できる授業・欠席変更は合計20件です。分けて保存してください。');
         const snapshot=await inspect({date},who);
-        const mapped=changes.map(c=>{if(c.before&&c.before.date!==date)throw error('日付をまたぐ授業移動はAPI未対応です。');if(c.value?.courseId||c.before?.courseId||c.id.startsWith('b_'))throw error('講習・予約授業は通常授業APIで変更できません。');const row=snapshot.entries?.[c.id];equalBefore(c.before,row);return {id:c.id,expected:row?.token??null,...(c.remove?{remove:true}:{value:dto(c.value)})};});
+        const mapped=changes.map(c=>{if(c.before&&c.before.date!==date)throw error('日付をまたぐ授業移動はAPI未対応です。');if(c.value?.courseId||c.before?.courseId||c.id.startsWith('b_'))throw error('講習・予約授業は通常授業APIで変更できません。');const row=snapshot.entries?.[c.id];equalBefore(c.before,row);return {id:c.id,expected:row?.token??null,...virtualBefore(c.before,snapshot,c.id),...(c.remove?{remove:true}:{value:dto(c.value)})};});
         const absent=absences.map(c=>{const row=snapshot.absences?.[c.teacherUid];equalBefore(c.before,row);return {teacherUid:c.teacherUid,periods:c.periods,expected:row?.token??null};});
         return {kind:'day',date,changes:mapped,absences:absent};
       });
     },
+    saveStudent({studentId,before,value}){
+      return perform({studentId,before,value},async who=>{const snapshot=await inspect({studentId},who);equalBefore(before,snapshot.student);return {kind:'student',studentId,value,expected:snapshot.student.token};});
+    },
+    moveLesson({id,before,value}){
+      return perform({id,before,value},async who=>{
+        if(!before||before.courseId||value.courseId||id.startsWith('b_'))throw error('講習・予約授業は通常授業の移動APIで変更できません。');
+        const from=await inspect({date:before.date},who),to=await inspect({date:value.date},who);
+        const original=from.entries[id];equalBefore(before,original);
+        const targetId=before.regularId?'m_'+newRequestId():id;
+        const target=to.entries[targetId];if(target)throw error('移動先の授業IDが既に使用されています。');
+        const moved=dto(value);delete moved.regularId;
+        return {kind:'move',id,targetId,...virtualBefore(before,from,id),fromDate:before.date,value:moved,expectedSource:original?.token??null,expectedTarget:null};
+      });
+    },
+    async planStudentDelete(studentId){if(!enabled)throw error('通常授業API移行モードは無効です。');const who=session();check(who);const response=await call({kind:'planStudentDelete',studentId,requestId:newRequestId()});check(who);if(response?.data?.canApply!==false)throw error('削除計画を確認できません。');return response.data;},
+    async planRestore(archiveId){if(!enabled)throw error('通常授業API移行モードは無効です。');const who=session();check(who);const response=await call({kind:'planRestore',archiveId,requestId:newRequestId()});check(who);if(response?.data?.canApply!==false)throw error('復元計画を確認できません。');return response.data;},
     saveWork({type,teacherUid,date,values,clear=false,before}){
       return perform({type,teacherUid,date,values,clear,before},async who=>{const snapshot=await inspect({work:{type,teacherUid,...(date?{date}:{})}},who);const field={weekly:'weekdays',date:'availablePeriods',absence:'absentPeriods'}[type];const project=v=>v==null?null:{[field]:v[field]};if(key(project(before))!==key(project(snapshot.work.value)))throw error('他の端末で勤務設定が変更されました。再読み込みしてください。');return {kind:'work',type,teacherUid,...(date?{date}:{}),values,clear,expectedVersion:snapshot.version};});
     },

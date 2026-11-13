@@ -2,14 +2,16 @@
 // Public, dependency-injected Admin Firestore transaction candidate; NOT deployed.
 const {createHash}=require('node:crypto');
 const P=require('./policy.cjs');
+const X=require('./extended-operations.cjs');
+const {gradeAt}=require('./student-policy.cjs');
 const {automaticClosure}=require('./calendar.cjs');
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
-function archive(value,sentinels=new WeakSet()){
+function archive(value,sentinels=new WeakSet(),stripId=true){
   if(value==null)return null;
   if(typeof value?.toDate==='function')return {__shiftlyType:'timestamp',value:value.toDate().toISOString()};
   if(typeof value==='object'&&sentinels.has(value))return {__shiftlyType:'serverNow'};
-  if(Array.isArray(value))return value.map(v=>archive(v,sentinels));
-  if(typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([k,v])=>k!=='id'&&v!==undefined).map(([k,v])=>[k,archive(v,sentinels)]));
+  if(Array.isArray(value))return value.map(v=>archive(v,sentinels,false));
+  if(typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([k,v])=>(!stripId||k!=='id')&&v!==undefined).map(([k,v])=>[k,archive(v,sentinels,false)]));
   return value;
 }
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;
@@ -27,12 +29,12 @@ function cleanEntry(value){
   if(value.memoUpdatedAt!=null)P.fail('invalid-argument','memoUpdatedAt must be omitted/null');
   return {...value,memoUpdatedAt:null};
 }
-function createNormalAuthority({db,serverTimestamp,todayKey}){
+function createNormalAuthority({db,serverTimestamp,todayKey,bookingFence=null}){
   if(!db||typeof serverTimestamp!=='function'||typeof todayKey!=='function')throw Error('Admin Firestore and a JST date clock are required');
   return async function execute(context,command){
     const uid=context?.auth?.uid;if(!P.id(uid))P.fail('unauthenticated','Staff authentication required');
     if(context.app?.appId==null)P.fail('failed-precondition','Verified App Check required');
-    if(!command||!['day','work','inspect','calendar'].includes(command.kind)||(!P.id(command.requestId)||command.requestId.length>80))P.fail('invalid-argument','Invalid command');
+    if(!command||!['day','work','inspect','calendar','student','move','planStudentDelete','planRestore'].includes(command.kind)||(!P.id(command.requestId)||command.requestId.length>80))P.fail('invalid-argument','Invalid command');
     const input=JSON.parse(JSON.stringify(command));const hash=digest(canonical(input));
     const sentinels=new WeakSet();const stamp=()=>{const value=serverTimestamp();if(value&&typeof value==='object')sentinels.add(value);return value;};
     const auditJson=value=>{const json=JSON.stringify(archive(value,sentinels));if(json.length>300000)P.fail('resource-exhausted','History exceeds supported size');return json;};
@@ -45,14 +47,26 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
       // Do not replace with a client-side preflight or a counter outside this transaction.
       const lock=await read('normalAuthorityState/global');
       if(lock&&(!Number.isSafeInteger(lock.version)||lock.version<0))P.fail('failed-precondition','Invalid revision');
-      const query=async(col,filter,max)=>{let q=db.collection(col);if(filter)q=q.where(...filter);const snap=await tx.get(q.limit(max+1));if(snap.docs.length>max)P.fail('resource-exhausted','Dataset exceeds validated transaction bound');return snap.docs.map(s=>({id:s.id,...s.data()}));};
+      const query=async(col,filter,max)=>{let q=db.collection(col);if(filter)q=q.where(...filter);const snap=await tx.get(q.limit(max+1));if(snap.docs.length>max)P.fail('resource-exhausted','Dataset exceeds validated transaction bound');return snap.docs.map(s=>({...s.data(),id:s.id}));};
+      const any=async col=>(await tx.get(db.collection(col).limit(1))).docs.length>0;
+      const assertStudentIdentityBoundary=async studentId=>{
+        if(typeof bookingFence?.assertCanChangeStudent!=='function')P.fail('failed-precondition','Verified private booking-writer fence is not installed');
+        if(await bookingFence.assertCanChangeStudent({transaction:tx,db,studentId})!==true)P.fail('failed-precondition','Booking writers are not quiescent/coordinated');
+      };
+      const common={input,read,query,any,entryToken,cleanEntry,actor,maintenance,assertStudentIdentityBoundary,version:lock?.version||0,today:todayKey(),automaticClosure};
+      if(input.kind==='planStudentDelete')return X.planDeletion(common);
+      if(input.kind==='planRestore')return X.planRestore(common);
       if(input.kind==='inspect'){
-        const result={protocolVersion:1,version:lock?.version||0,entries:Object.create(null),absences:Object.create(null),calendar:{}};
+        const result={protocolVersion:1,version:lock?.version||0,entries:Object.create(null),absences:Object.create(null),calendar:{},virtuals:Object.create(null)};
         if(input.date){P.date(input.date);
-          for(const e of await query('timetableEntries',['date','==',input.date],400))if(!e.courseId&&!e.id.startsWith('b_'))result.entries[e.id]={value:archive(e),token:entryToken(e)};
+          const dayEntries=await query('timetableEntries',['date','==',input.date],400);
+          for(const e of dayEntries)if(!e.courseId&&!e.id.startsWith('b_'))result.entries[e.id]={value:archive(e),token:entryToken(e)};
+          const students=await query('schoolStudents',null,1000);
+          for(const e of P.effectiveDay(input.date,dayEntries,students,todayKey()))if(!dayEntries.some(s=>s.id===e.id))result.virtuals[e.id]={value:P.occurrenceValue(e),token:entryToken(P.occurrenceValue(e))};
           for(const a of await query('teacherDayAbsences',['date','==',input.date],100))result.absences[a.teacherUid]={value:archive(a),token:entryToken(a)};
           for(const col of ['schoolClosures','schoolOpenDays','schoolEvents']){const value=await read(col+'/'+input.date);result.calendar[col]={value:archive(value),token:value?entryToken(value):null};}
         }
+        if(input.studentId){if(!P.id(input.studentId))P.fail('invalid-argument','Invalid student id');const value=await read('schoolStudents/'+input.studentId);result.student={value:archive(value),token:value?entryToken(value):null};}
         if(input.work){const {type,teacherUid,date}=input.work;if(!['weekly','date','absence'].includes(type)||!P.id(teacherUid))P.fail('invalid-argument','Invalid inspect target');if(type!=='weekly')P.date(date);const col={weekly:'teacherWeeklyWork',date:'teacherDateWork',absence:'teacherDayAbsences'}[type];const value=await read(col+'/'+(type==='weekly'?teacherUid:date+'_'+teacherUid));result.work={value:archive(value),token:value?entryToken(value):null};}
         return result;
       }
@@ -60,11 +74,14 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
       const receiptPath=`normalAuthorityRequests/${operationKey}`,receipt=await read(receiptPath);
       if(receipt){if(receipt.hash!==hash)P.fail('already-exists','Request id reused with different content');return receipt.result;}
       const writes=[],notices=new Map();
-      if(input.kind==='calendar'){
+      if(input.kind==='student')await X.prepareStudent({...common,writes,notices});
+      else if(input.kind==='move')await X.prepareMove({...common,writes,notices});
+      else if(input.kind==='calendar'){
         P.date(input.date);
         if(!['schoolClosures','schoolOpenDays','schoolEvents'].includes(input.collection))P.fail('invalid-argument','Invalid calendar collection');
         const courses=await query('specialCourses',null,200);
-        if(courses.some(c=>c.startDate<=input.date&&input.date<=c.endDate))P.fail('failed-precondition','Course calendar migration is not supported');
+        const courseMatches=courses.filter(c=>c.startDate<=input.date&&input.date<=c.endDate);
+        if(courseMatches.length>1)P.fail('failed-precondition','Overlapping course calendars are unsupported');
         const path=input.collection+'/'+input.date,before=await read(path);
         if(!own(input,'expected')||input.expected!==(before?entryToken(before):null))P.fail('aborted','Calendar changed; reload');
         if(own(input,'remove')&&typeof input.remove!=='boolean')P.fail('invalid-argument','Invalid remove flag');
@@ -75,6 +92,12 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
           if(input.collection==='schoolEvents'){if(typeof values.title!=='string'||!values.title.trim()||values.title.length>80||P.time(values.start)>=P.time(values.end))P.fail('invalid-argument','Invalid exam data');}
           after={...values,date:input.date,...(input.collection==='schoolEvents'?{type:'exam'}:{}),updatedBy:uid,updatedAt:stamp()};
         }
+        if(courseMatches.length){
+          if(!before||!after||(input.collection==='schoolEvents'&&(before.type!=='exam'||before.start!==after.start||before.end!==after.end)))P.fail('failed-precondition','Course opening changes require the private booking/calendar transaction bridge');
+          // Existing calendar notes/titles only: no open-state or reservation-capacity change.
+          const dayEntries=await query('timetableEntries',['date','==',input.date],400);
+          for(const e of dayEntries)if(e.courseId)notices.set(e.teacherUid,{message:'担当授業の予定が更新されました',date:input.date});
+        }else{
         const calendar={};
         for(const col of ['schoolClosures','schoolOpenDays','schoolEvents'])calendar[col]=col===input.collection?after:await read(col+'/'+input.date);
         const students=await query('schoolStudents',null,1000),stored=await query('timetableEntries',['date','==',input.date],400);
@@ -82,6 +105,7 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
         const opens=calendar.schoolOpenDays||calendar.schoolEvents?.type==='exam'||(!calendar.schoolClosures&&!automaticClosure(input.date));
         if(opens)for(const e of rows.filter(e=>e.status!=='cancelled'))P.validatePlacement(e,rows.filter(r=>r.teacherUid===e.teacherUid),{});
         for(const teacherUid of new Set(rows.map(e=>e.teacherUid))){if(!P.id(teacherUid))P.fail('failed-precondition','Invalid calendar teacher');notices.set(teacherUid,{message:'担当授業の予定が更新されました',date:input.date});}
+        }
         // Calendar edits do not delete or regenerate stored lessons. They share the same lock.
         writes.push({path,before,after});
       }else if(input.kind==='work'){
@@ -134,6 +158,7 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
             // Removing a daily override reveals its weekly occurrence; validate that result below.
             final=final.filter(e=>e.id!==change.id);writes.push({path:'timetableEntries/'+change.id,before,after:null});
           }else{
+            if(!before&&visible?.regularId&&change.expectedOccurrence!==entryToken(P.occurrenceValue(visible)))P.fail('aborted','Weekly source changed; reload');
             const value=cleanEntry(change.value);
             if(value.date!==input.date)P.fail('invalid-argument','One date per command; use cancel and a new placement for another date');
             const student=students.find(s=>s.id===value.studentId);if(!student)P.fail('not-found','Student no longer exists');
@@ -145,8 +170,10 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
             if(!teachers.has(value.teacherUid))teachers.set(value.teacherUid,await read('users/'+value.teacherUid));
             const teacher=teachers.get(value.teacherUid);if(!['admin','employee'].includes(teacher?.role))P.fail('invalid-argument','Invalid teacher');
             if(!work.has(value.teacherUid)){const key=input.date+'_'+value.teacherUid;const [weekly,daily,absence]=await Promise.all([read('teacherWeeklyWork/'+value.teacherUid),read('teacherDateWork/'+key),read('teacherDayAbsences/'+key)]);work.set(value.teacherUid,{weekly,daily,absence:absenceOverrides.has(value.teacherUid)?absenceOverrides.get(value.teacherUid):absence});}
+            const canonicalGrade=typeof student.grade==='string'?gradeAt(student,input.date):value.grade;
+            if(canonicalGrade.length>30)P.fail('failed-precondition','Invalid student grade');
             for(const [text,max]of [[student.name||'',80],[student.school||'',80],[teacher.name||'',100]])if(typeof text!=='string'||text.length>max)P.fail('failed-precondition','Invalid legacy student or teacher label');
-            const after={...value,studentName:student.name||'',school:student.school||'',teacherName:teacher.name||'',memoUpdatedAt:before?.memo===value.memo?(before.memoUpdatedAt||null):stamp()};
+            const after={...value,studentName:student.name||'',school:student.school||'',teacherName:teacher.name||'',grade:canonicalGrade,memoUpdatedAt:before?.memo===value.memo?(before.memoUpdatedAt||null):stamp()};
             final=final.filter(e=>e.id!==change.id);final.push({id:change.id,...after});
             writes.push({path:'timetableEntries/'+change.id,before,after,placement:!P.sameAssignment(visible,after)});
           }
@@ -171,6 +198,8 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
           P.validatePlacement(entry,[entry,...peers],{});
         }
       }
+      if(writes.length>180)P.fail('resource-exhausted','Too many records for an atomic update');
+      if(writes.reduce((n,w)=>n+Buffer.byteLength(auditJson(w.before))+Buffer.byteLength(auditJson(w.after)),0)>2000000)P.fail('resource-exhausted','Atomic history payload exceeds validated bound');
       if(notices.size>100)P.fail('resource-exhausted','Too many teachers for one atomic calendar update');
       const version=(lock?.version||0)+1;if(!Number.isSafeInteger(version))P.fail('resource-exhausted','Revision exhausted');
       const result={protocolVersion:1,version,changed:writes.length};
@@ -179,7 +208,7 @@ function createNormalAuthority({db,serverTimestamp,todayKey}){
         const w=writes[i],ref=db.doc(w.path);if(w.after)tx.set(ref,w.after);else tx.delete(ref);
         tx.set(db.doc(`auditLogs/normal_${operationKey}_${i}`),{path:w.path,action:w.after?(w.before?'変更':'追加'):'削除',summary:'通常授業・勤務設定のサーバー更新',actorUid:uid,actorName:String(actor.name||'').slice(0,90),beforeJson:auditJson(w.before),afterJson:auditJson(w.after),groupId:input.requestId,courseId:'',createdAt:stamp()});
       }
-      for(const [teacherUid,n]of notices)tx.set(db.doc(`notifications/${teacherUid}/items/normal_${operationKey}`),{...n,read:false,createdAt:stamp()});
+      for(const [noticeKey,n]of notices){const {recipient,...payload}=n,teacherUid=recipient||noticeKey;if(!P.id(teacherUid))P.fail('failed-precondition','Invalid notice target');tx.set(db.doc(`notifications/${teacherUid}/items/normal_${operationKey}_${digest(noticeKey).slice(0,12)}`),{...payload,read:false,createdAt:stamp()});}
       tx.set(db.doc('normalAuthorityState/global'),{version,updatedBy:uid,updatedAt:stamp()});
       tx.set(db.doc(receiptPath),{hash,result,createdAt:stamp()});
       return result;

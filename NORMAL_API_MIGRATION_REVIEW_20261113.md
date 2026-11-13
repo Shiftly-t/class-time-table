@@ -1,5 +1,7 @@
 # 通常授業の画面→サーバーAPI移行検査（2026-11-13）
 
+> 後続の生徒/別日移動/削除・復元計画は `STUDENT_MULTI_DATE_MIGRATION_REVIEW_20261113.md` が最新です。本書の未実装一覧と件数は前回追加時点の記録です。
+
 ## 結論と実行範囲
 
 PR #4の`7d52c9307dfe879b1e8a8bb25174801237ee0dc9`を基準に、通常授業の書込経路を調べ、接続可能な画面を新規サーバー候補へ接続した。**全機能の移行完了・正式導入可能とは判定しない。** `teacherWorkFeatureEnabled`と新しい`normalAuthorityApiEnabled`は両方false。実際のFirebase・Cloud Functions・Firestoreルール・mainは変更していない。

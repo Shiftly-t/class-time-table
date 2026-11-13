@@ -44,4 +44,5 @@ function validatePlacement(entry,rows,work){
   for(const p of periods(entry)){const [start,end]=PERIODS[p-1];if(rows.filter(e=>e.status!=='cancelled'&&e.teacherUid===entry.teacherUid&&overlap(e,{start,end})).length>2)fail('resource-exhausted','Teacher capacity exceeded');}
   const events=[entry,...teacherPeers].flatMap(e=>[[e.start,1],[e.end,-1]]).sort((a,b)=>a[0].localeCompare(b[0])||a[1]-b[1]);let count=0;for(const [,delta]of events){count+=delta;if(count>2)fail('resource-exhausted','Teacher capacity exceeded');}
 }
-module.exports={PERIODS,PolicyError,fail,id,date,time,numbers,periods,canAssign,effectiveDay,sameAssignment,validatePlacement};
+const occurrenceValue=e=>Object.fromEntries(['studentId','regularId','date','start','end','teacherUid','subject','status'].map(k=>[k,e[k]??'']));
+module.exports={occurrenceValue,PERIODS,PolicyError,fail,id,date,time,numbers,periods,canAssign,effectiveDay,sameAssignment,validatePlacement};

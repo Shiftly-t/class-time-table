@@ -2,13 +2,14 @@
   "name": "shiftly-t-quality-checks",
   "private": true,
   "scripts": {
-    "test": "npm run test:normal:server && npm run test:normal:client && node tests/config-guard.cjs && node tests/teacher-weekly-work.cjs && node tests/pr1-review.cjs && node tests/audit.cjs",
+    "test": "npm run test:normal:server && npm run test:normal:client && npm run test:normal:extended && node tests/config-guard.cjs && node tests/teacher-weekly-work.cjs && node tests/pr1-review.cjs && node tests/audit.cjs",
     "test:rules:static": "node tests/rules-compatibility.cjs",
     "test:rules": "npm --prefix tests/rules test",
     "test:work:rules": "npm --prefix tests/rules run test:work",
     "test:normal:server": "node --test tests/server/normal-authority.test.cjs",
     "test:normal:rules": "npm --prefix tests/rules run test:normal-authority",
-    "test:normal:client": "node --test tests/server/normal-client.test.cjs"
+    "test:normal:client": "node --test tests/server/normal-client.test.cjs",
+    "test:normal:extended": "node --test tests/server/extended-operations.test.cjs tests/server/extended-client.test.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"
