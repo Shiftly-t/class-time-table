@@ -41,5 +41,5 @@ const path=require('node:path');
   const guide=file('TEACHER_WEEKLY_WORK_GUIDE.md');
   assert.ok(guide.includes('allow read: if isMember()'));
   assert.ok(guide.includes('正式導入')||guide.includes('未導入'));
-  console.log('teacher workday contracts: 17 checks passed');
+  console.log('teacher workday behavior and integration contracts: passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});
