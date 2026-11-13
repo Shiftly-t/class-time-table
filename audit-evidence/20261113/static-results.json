@@ -1,0 +1,27 @@
+{
+  "kind": "static-source-contract",
+  "rulesEvaluation": "UNVERIFIED",
+  "passed": 20,
+  "checks": [
+    "registered role and maintenance gates are present",
+    "client role escalation is denied",
+    "all seven booking collections deny client read/write",
+    "reserved b_ IDs are denied in create/update/delete",
+    "booking active protection covers create/update/delete, including memo-only writes",
+    "memo form writes the protected timetable document directly",
+    "lesson form and course editor also write timetable directly",
+    "booking management UI uses protected callable API actions",
+    "student label propagation directly updates all linked entries in batches",
+    "linked student deletion is a direct batch path too",
+    "normal assignment uses post-commit teacher absence document",
+    "normal teacher absence and course assignment checks are separate",
+    "course periods have only list/count validation in supplied rules",
+    "availability slots have only list/count validation, not element/calendar validation",
+    "owner is not exempted from archived availability write rejection",
+    "student write policy has no schema validation function",
+    "revision counter accepts any positive int, not exact previous+1",
+    "entry allow conditions require neither audit nor capacity/revision shared state",
+    "app-sized batches must be tested against rules read-call limits separately",
+    "backup includes archived availability and directly restores it"
+  ]
+}

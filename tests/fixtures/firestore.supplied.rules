@@ -1,0 +1,344 @@
+// User-supplied rules, 2026-11-13. Whitespace/comments normalized only.
+// This fixture is for the local Emulator; it is NOT a deployment rules file.
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signedIn() { return request.auth != null; }
+  function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+  function studentPath(id) { return /databases/$(database)/documents/schoolStudents/$(id); }
+  function maintenanceConfigPath() { return /databases/$(database)/documents/systemConfig/maintenance; }
+  function maintenanceEventPath(id) { return /databases/$(database)/documents/maintenanceEvents/$(id); }
+  function registeredStaff() {
+   return signedIn() && exists(userPath(request.auth.uid))
+    && get(userPath(request.auth.uid)).data.role in ['owner','admin','employee'];
+  }
+  function isMaintenanceEnabled() {
+   return exists(maintenanceConfigPath()) && get(maintenanceConfigPath()).data.get('enabled',false) == true;
+  }
+  function isMember() {
+   return registeredStaff() && (get(userPath(request.auth.uid)).data.role == 'owner' || !isMaintenanceEnabled());
+  }
+  function isAdmin() { return isMember() && get(userPath(request.auth.uid)).data.role in ['owner','admin']; }
+  function isOwner() { return isMember() && get(userPath(request.auth.uid)).data.role == 'owner'; }
+  function coursePath(id) { return /databases/$(database)/documents/specialCourses/$(id); }
+  function availabilityPath(courseId,uid) { return /databases/$(database)/documents/specialCourses/$(courseId)/teacherAvailability/$(uid); }
+  function teacherAbsencePath(date,uid) {
+   let absenceId = date + '_' + uid;
+   return /databases/$(database)/documents/teacherDayAbsences/$(absenceId);
+  }
+  function regularAssignmentAllowed(d) {
+   let path = teacherAbsencePath(d.date,d.teacherUid);
+   return d.get('courseId','') != '' || d.status == 'cancelled' || !existsAfter(path) || !(
+    (d.start < '18:25' && d.end > '17:30' && getAfter(path).data.absentPeriods.hasAny([1]))
+    || (d.start < '19:25' && d.end > '18:30' && getAfter(path).data.absentPeriods.hasAny([2]))
+    || (d.start < '20:25' && d.end > '19:30' && getAfter(path).data.absentPeriods.hasAny([3]))
+    || (d.start < '21:25' && d.end > '20:30' && getAfter(path).data.absentPeriods.hasAny([4]))
+   );
+  }
+  function courseAssignmentAvailable(d) {
+   let periods = get(coursePath(d.courseId)).data.periods;
+   let slots = get(availabilityPath(d.courseId,d.teacherUid)).data.slots;
+   return (
+    (periods.size() > 0 && periods[0].start == d.start && periods[0].end == d.end && slots.hasAny([d.date + '_0']))
+    ||
+    (periods.size() > 1 && periods[1].start == d.start && periods[1].end == d.end && slots.hasAny([d.date + '_1']))
+    ||
+    (periods.size() > 2 && periods[2].start == d.start && periods[2].end == d.end && slots.hasAny([d.date + '_2']))
+    ||
+    (periods.size() > 3 && periods[3].start == d.start && periods[3].end == d.end && slots.hasAny([d.date + '_3']))
+    ||
+    (periods.size() > 4 && periods[4].start == d.start && periods[4].end == d.end && slots.hasAny([d.date + '_4']))
+    ||
+    (periods.size() > 5 && periods[5].start == d.start && periods[5].end == d.end && slots.hasAny([d.date + '_5']))
+    ||
+    (periods.size() > 6 && periods[6].start == d.start && periods[6].end == d.end && slots.hasAny([d.date + '_6']))
+    ||
+    (periods.size() > 7 && periods[7].start == d.start && periods[7].end == d.end && slots.hasAny([d.date + '_7']))
+    ||
+    (periods.size() > 8 && periods[8].start == d.start && periods[8].end == d.end && slots.hasAny([d.date + '_8']))
+    ||
+    (periods.size() > 9 && periods[9].start == d.start && periods[9].end == d.end && slots.hasAny([d.date + '_9']))
+    ||
+    (periods.size() > 10 && periods[10].start == d.start && periods[10].end == d.end && slots.hasAny([d.date + '_10']))
+    ||
+    (periods.size() > 11 && periods[11].start == d.start && periods[11].end == d.end && slots.hasAny([d.date + '_11']))
+   );
+  }
+  function assignedAvailable(d) {
+   return !('courseId' in d) || (
+    exists(coursePath(d.courseId)) && exists(availabilityPath(d.courseId,d.teacherUid))
+    && (exists(/databases/$(database)/documents/schoolOpenDays/$(d.date))
+     || !exists(/databases/$(database)/documents/schoolClosures/$(d.date))
+     || (exists(/databases/$(database)/documents/schoolEvents/$(d.date))
+      && get(/databases/$(database)/documents/schoolEvents/$(d.date)).data.type == 'exam'))
+    && courseAssignmentAvailable(d)
+   );
+  }
+  function sameAssignment(a,b) {
+   return a.date == b.date && a.start == b.start && a.end == b.end && a.teacherUid == b.teacherUid
+    && a.get('courseId','') == b.get('courseId','') && (b.status != 'scheduled' || a.status == 'scheduled');
+  }
+  function validEntry(d) {
+   return d.keys().hasOnly(['studentId','studentName','grade','school','teacherUid','teacherName','date','start','end','subject','status','memo','memoUpdatedAt','nextDates','regularId','courseId'])
+    && d.keys().hasAll(['studentId','studentName','grade','school','teacherUid','teacherName','date','start','end','subject','status','memo','nextDates'])
+    && d.studentId is string && exists(studentPath(d.studentId))
+    && d.studentName is string && d.studentName.size() <= 80
+    && d.grade is string && d.grade.size() <= 30 && d.school is string && d.school.size() <= 80
+    && d.teacherUid is string && exists(userPath(d.teacherUid))
+    && get(userPath(d.teacherUid)).data.role in ['employee','admin']
+    && d.teacherName is string && d.teacherName.size() <= 100
+    && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    && d.start is string && d.start.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    && d.end is string && d.end.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$') && d.start < d.end
+    && d.subject is string && d.subject.size() <= 80 && d.status in ['scheduled','done','cancelled']
+    && d.memo is string && d.memo.size() <= 2000
+    && (!('memoUpdatedAt' in d) || d.memoUpdatedAt == null || d.memoUpdatedAt is timestamp)
+    && d.nextDates is list && d.nextDates.size() <= 2
+    && (!('regularId' in d) || (d.regularId is string && d.regularId.size() <= 50))
+    && (!('courseId' in d) || (d.courseId is string && d.courseId.size() > 0 && d.courseId.size() <= 100
+     && !('regularId' in d) && exists(coursePath(d.courseId))
+     && d.date >= get(coursePath(d.courseId)).data.startDate && d.date <= get(coursePath(d.courseId)).data.endDate));
+  }
+  match /users/{uid} {
+   allow get: if registeredStaff() && (uid == request.auth.uid || isMember());
+   allow list: if isMember();
+   allow create, update, delete: if false;
+  }
+  function validMaintenanceConfig(d) {
+   return d.keys().hasOnly(['enabled','message','version','updatedBy','updatedAt','lastEventId','startedAt'])
+    && d.keys().hasAll(['enabled','message','version','updatedBy','updatedAt','lastEventId','startedAt'])
+    && d.enabled is bool && d.message is string && d.message.size() <= 300
+    && d.version is string && d.version.size() <= 50 && d.updatedBy == request.auth.uid && d.updatedAt == request.time
+    && d.lastEventId is string && d.lastEventId.size() > 0 && d.lastEventId.size() <= 100
+    && (d.startedAt == null || d.startedAt is timestamp)
+    && getAfter(maintenanceEventPath(d.lastEventId)).data.createdAt == request.time
+    && getAfter(maintenanceEventPath(d.lastEventId)).data.actorUid == request.auth.uid
+    && getAfter(maintenanceEventPath(d.lastEventId)).data.toEnabled == d.enabled;
+  }
+  match /systemConfig/{configId} {
+   allow get: if configId == 'maintenance' && registeredStaff();
+   allow list: if false;
+   allow create, update: if configId == 'maintenance' && isOwner() && validMaintenanceConfig(request.resource.data);
+   allow delete: if false;
+  }
+  function validMaintenanceEvent(d) {
+   return d.keys().hasOnly(['type','toEnabled','message','version','actorUid','actorName','backupId','createdAt'])
+    && d.keys().hasAll(['type','toEnabled','message','version','actorUid','actorName','backupId','createdAt'])
+    && d.type in ['start','end','update'] && d.toEnabled is bool && d.message is string && d.message.size() <= 300
+    && d.version is string && d.version.size() <= 50 && d.actorUid == request.auth.uid
+    && d.actorName is string && d.actorName.size() <= 90 && d.backupId is string && d.backupId.size() <= 100
+    && d.createdAt == request.time;
+  }
+  match /maintenanceEvents/{eventId} {
+   allow read: if isOwner();
+   allow create: if isOwner() && validMaintenanceEvent(request.resource.data);
+   allow update, delete: if false;
+  }
+  match /teacherDayAbsences/{absenceId} {
+   allow read: if isMember();
+   allow create, update: if isAdmin()
+    && request.resource.data.keys().hasOnly(['date','teacherUid','absentPeriods','updatedBy','updatedAt'])
+    && request.resource.data.keys().hasAll(['date','teacherUid','absentPeriods','updatedBy','updatedAt'])
+    && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    && request.resource.data.teacherUid is string && exists(userPath(request.resource.data.teacherUid))
+    && get(userPath(request.resource.data.teacherUid)).data.role in ['employee','admin']
+    && absenceId == request.resource.data.date + '_' + request.resource.data.teacherUid
+    && request.resource.data.absentPeriods is list && request.resource.data.absentPeriods.size() <= 4
+    && request.resource.data.absentPeriods.hasOnly([1,2,3,4])
+    && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+   allow delete: if isAdmin();
+  }
+  match /schoolStudents/{id} {
+   allow read: if isMember();
+   allow create, update, delete: if isAdmin();
+  }
+  match /monthlyTargets/{id} { allow read, create, update, delete: if isAdmin(); }
+  function bookingActiveForEntry(e) {
+   let courseId = e.get('courseId','');
+   return courseId is string && courseId.size() > 0
+    && exists(/databases/$(database)/documents/bookingSettings/$(courseId))
+    && get(/databases/$(database)/documents/bookingSettings/$(courseId)).data.get('enabled',false) == true;
+  }
+  match /timetableEntries/{id} {
+   allow read: if isMember();
+   allow create: if isAdmin() && !id.matches('^b_.*') && validEntry(request.resource.data)
+    && !bookingActiveForEntry(request.resource.data) && assignedAvailable(request.resource.data)
+    && regularAssignmentAllowed(request.resource.data);
+   allow update: if isAdmin() && !id.matches('^b_.*') && validEntry(request.resource.data)
+    && !bookingActiveForEntry(resource.data) && !bookingActiveForEntry(request.resource.data)
+    && (sameAssignment(resource.data,request.resource.data) || assignedAvailable(request.resource.data))
+    && ((resource.data.date == request.resource.data.date && resource.data.start == request.resource.data.start
+      && resource.data.end == request.resource.data.end && resource.data.teacherUid == request.resource.data.teacherUid
+      && resource.data.status == request.resource.data.status
+      && resource.data.get('courseId','') == request.resource.data.get('courseId',''))
+     || regularAssignmentAllowed(request.resource.data));
+   allow delete: if isAdmin() && !id.matches('^b_.*') && !bookingActiveForEntry(resource.data);
+  }
+  function validAdminNotice(d) {
+   return ((d.keys().hasAll(['message','date','read','createdAt']) && d.keys().hasOnly(['message','date','read','createdAt'])
+     && d.message is string && d.message in ['担当生徒の情報が更新されました','担当生徒の通常授業（曜日・時間など）が更新されました','担当授業の予定が更新されました','新しい担当授業が登録されました','担当授業が削除されました','担当授業の伝達事項が更新されました','講習の担当授業が変更されました。時間割を確認してください。']
+     && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') && d.read == false && d.createdAt == request.time)
+    || (d.keys().hasAll(['kind','lessonId','message','date','read','createdAt']) && d.keys().hasOnly(['kind','lessonId','message','date','read','createdAt'])
+     && d.kind == 'lesson' && d.lessonId is string && d.lessonId.size() > 0 && d.lessonId.size() <= 240
+     && d.message is string && d.message.size() > 0 && d.message.size() <= 400
+     && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') && d.read == false && d.createdAt == request.time)
+    || (d.keys().hasAll(['kind','studentId','message','date','read','createdAt']) && d.keys().hasOnly(['kind','studentId','message','date','read','createdAt'])
+     && d.kind == 'student' && d.studentId is string && d.studentId.size() > 0 && d.studentId.size() <= 240
+     && d.message is string && d.message.size() > 0 && d.message.size() <= 400
+     && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') && d.read == false && d.createdAt == request.time));
+  }
+  function validTeacherAvailabilityNotice(uid,d) {
+   return isMember() && get(userPath(request.auth.uid)).data.role == 'employee'
+    && exists(userPath(uid)) && get(userPath(uid)).data.role in ['admin','owner']
+    && d.keys().hasAll(['kind','senderUid','courseId','read','createdAt']) && d.keys().hasOnly(['kind','senderUid','courseId','read','createdAt'])
+    && d.kind == 'availability' && d.senderUid == request.auth.uid
+    && d.courseId is string && d.courseId.size() > 0 && d.courseId.size() <= 100 && exists(coursePath(d.courseId))
+    && d.read == false && d.createdAt == request.time
+    && getAfter(availabilityPath(d.courseId,request.auth.uid)).data.updatedBy == request.auth.uid
+    && getAfter(availabilityPath(d.courseId,request.auth.uid)).data.updatedAt == request.time;
+  }
+  match /notifications/{uid}/items/{id} {
+   allow read: if isMember() && uid == request.auth.uid;
+   allow create: if (isAdmin() && validAdminNotice(request.resource.data)) || validTeacherAvailabilityNotice(uid,request.resource.data);
+   allow update: if isMember() && uid == request.auth.uid
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']) && request.resource.data.read == true;
+   allow delete: if isMember() && uid == request.auth.uid;
+  }
+  match /officialAnnouncements/{id} {
+   allow read: if isMember();
+   allow create: if isOwner()
+    && request.resource.data.keys().hasOnly(['message','startAt','endAt','createdBy','createdAt'])
+    && request.resource.data.keys().hasAll(['message','startAt','endAt','createdBy','createdAt'])
+    && request.resource.data.message is string && request.resource.data.message.size() >= 1 && request.resource.data.message.size() <= 450
+    && request.resource.data.startAt is timestamp && request.resource.data.endAt is timestamp
+    && request.resource.data.endAt > request.resource.data.startAt && request.resource.data.endAt > request.time
+    && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+   allow update: if false;
+   allow delete: if isOwner();
+  }
+  function validOfficialReadState(d) {
+   return d.keys().hasOnly(['seenIds','updatedAt']) && d.keys().hasAll(['seenIds','updatedAt'])
+    && d.seenIds is list && d.seenIds.size() <= 1000 && d.updatedAt == request.time;
+  }
+  match /announcementReadStates/{uid} {
+   allow read: if isMember() && request.auth.uid == uid;
+   allow create: if isMember() && request.auth.uid == uid && validOfficialReadState(request.resource.data);
+   allow update: if isMember() && request.auth.uid == uid && validOfficialReadState(request.resource.data)
+    && request.resource.data.seenIds.hasAll(resource.data.seenIds);
+   allow delete: if false;
+  }
+  match /specialCourses/{id} {
+   allow read: if isMember();
+   allow create, update: if isAdmin()
+    && request.resource.data.keys().hasOnly(['name','type','startDate','endDate','periods','availabilityDeadline','updatedBy','updatedAt','archived'])
+    && request.resource.data.keys().hasAll(['name','type','startDate','endDate','periods','updatedBy','updatedAt'])
+    && request.resource.data.type in ['spring','summer','winter'] && request.resource.data.name is string && request.resource.data.name.size() <= 30
+    && request.resource.data.startDate is string && request.resource.data.startDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    && request.resource.data.endDate is string && request.resource.data.endDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    && request.resource.data.startDate <= request.resource.data.endDate
+    && request.resource.data.periods is list && request.resource.data.periods.size() >= 1 && request.resource.data.periods.size() <= 12
+    && (!('availabilityDeadline' in request.resource.data) || request.resource.data.availabilityDeadline == null || request.resource.data.availabilityDeadline is timestamp)
+    && request.resource.data.get('archived',false) is bool && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time
+    && (!exists(/databases/$(database)/documents/bookingSettings/$(id))
+     || (request.resource.data.startDate == resource.data.startDate && request.resource.data.endDate == resource.data.endDate && request.resource.data.periods == resource.data.periods));
+   allow delete: if isAdmin() && !exists(/databases/$(database)/documents/bookingSettings/$(id));
+  }
+  match /specialCourses/{courseId}/teacherAvailability/{uid} {
+   allow read: if isAdmin() || (isMember() && request.auth.uid == uid);
+   allow create, update: if isMember() && exists(coursePath(courseId)) && get(coursePath(courseId)).data.get('archived',false) != true
+    && (isAdmin() || (request.auth.uid == uid && get(coursePath(courseId)).data.get('availabilityDeadline',null) is timestamp && request.time <= get(coursePath(courseId)).data.availabilityDeadline))
+    && exists(userPath(uid)) && get(userPath(uid)).data.role in ['employee','admin']
+    && request.resource.data.keys().hasOnly(['slots','updatedBy','updatedAt']) && request.resource.data.keys().hasAll(['slots','updatedBy','updatedAt'])
+    && request.resource.data.slots is list && request.resource.data.slots.size() <= 1200
+    && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+   allow delete: if isAdmin();
+  }
+  match /specialCourses/{courseId}/scheduleMeta/{metaId} {
+   allow read: if isAdmin();
+   allow create, update: if isAdmin() && metaId == 'state'
+    && request.resource.data.keys().hasOnly(['version','updatedBy','updatedAt']) && request.resource.data.keys().hasAll(['version','updatedBy','updatedAt'])
+    && request.resource.data.version is int && request.resource.data.version >= 1
+    && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+   allow delete: if isAdmin();
+  }
+  match /schoolEvents/{dateId} {
+   allow read: if isMember();
+   allow create, update: if isAdmin() && dateId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    && request.resource.data.keys().hasOnly(['date','type','title','start','end','note','updatedBy','updatedAt'])
+    && request.resource.data.keys().hasAll(['date','type','title','start','end','note','updatedBy','updatedAt'])
+    && request.resource.data.date == dateId && request.resource.data.type == 'exam'
+    && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80
+    && request.resource.data.start is string && request.resource.data.start.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    && request.resource.data.end is string && request.resource.data.end.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    && request.resource.data.start < request.resource.data.end
+    && request.resource.data.note is string && request.resource.data.note.size() <= 500
+    && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+   allow delete: if isAdmin();
+  }
+  match /schoolOpenDays/{dateId} {
+   allow read: if isMember();
+   allow create, update: if isAdmin() && dateId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    && request.resource.data.keys().hasOnly(['date','note','updatedBy','updatedAt'])
+    && request.resource.data.keys().hasAll(['date','note','updatedBy','updatedAt'])
+    && request.resource.data.date == dateId && request.resource.data.note is string && request.resource.data.note.size() <= 500
+    && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+   allow delete: if isAdmin();
+  }
+  match /schoolClosures/{dateId} {
+   allow read: if isMember();
+   allow create, update: if isAdmin() && dateId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    && request.resource.data.keys().hasOnly(['date','note','updatedBy','updatedAt'])
+    && request.resource.data.keys().hasAll(['date','note','updatedBy','updatedAt'])
+    && request.resource.data.date == dateId && request.resource.data.note is string && request.resource.data.note.size() <= 500
+    && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+   allow delete: if isAdmin();
+  }
+  function validAudit(d) {
+   return d.keys().hasOnly(['path','action','summary','actorUid','actorName','beforeJson','afterJson','groupId','courseId','createdAt'])
+    && d.keys().hasAll(['path','action','summary','actorUid','actorName','beforeJson','afterJson','groupId','courseId','createdAt'])
+    && d.path is string && d.path.size() > 0 && d.path.size() <= 240
+    && d.action is string && d.action.size() > 0 && d.action.size() <= 30
+    && d.summary is string && d.summary.size() <= 150 && d.actorUid == request.auth.uid
+    && d.actorName is string && d.actorName.size() <= 90
+    && d.beforeJson is string && d.beforeJson.size() <= 300000 && d.afterJson is string && d.afterJson.size() <= 300000
+    && d.groupId is string && d.groupId.size() <= 100 && d.courseId is string && d.courseId.size() <= 100
+    && d.createdAt == request.time;
+  }
+  match /auditLogs/{logId} {
+   allow read: if isOwner();
+   allow create: if isMember() && validAudit(request.resource.data)
+    && (isAdmin() || (get(userPath(request.auth.uid)).data.role == 'employee'
+     && request.resource.data.action == '勤務希望' && request.resource.data.courseId.size() > 0
+     && request.resource.data.path == 'specialCourses/' + request.resource.data.courseId + '/teacherAvailability/' + request.auth.uid
+     && getAfter(availabilityPath(request.resource.data.courseId,request.auth.uid)).data.updatedAt == request.time
+     && getAfter(availabilityPath(request.resource.data.courseId,request.auth.uid)).data.updatedBy == request.auth.uid));
+   allow update, delete: if false;
+  }
+  match /backupArchives/{backupId} {
+   allow read: if isOwner();
+   allow create: if isOwner()
+    && request.resource.data.keys().hasOnly(['label','createdBy','createdAt','partCount','recordCount','formatVersion'])
+    && request.resource.data.keys().hasAll(['label','createdBy','createdAt','partCount','recordCount','formatVersion'])
+    && request.resource.data.label is string && request.resource.data.label.size() <= 100
+    && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time
+    && request.resource.data.partCount is int && request.resource.data.partCount >= 0 && request.resource.data.partCount <= 500
+    && request.resource.data.recordCount is int && request.resource.data.recordCount >= 0 && request.resource.data.recordCount <= 10000
+    && request.resource.data.formatVersion == 1;
+   allow update, delete: if false;
+   match /parts/{partId} {
+    allow read: if isOwner();
+    allow create: if isOwner() && partId.matches('^[0-9]{5}$')
+     && request.resource.data.keys().hasOnly(['json']) && request.resource.data.keys().hasAll(['json'])
+     && request.resource.data.json is string && request.resource.data.json.size() <= 300000;
+    allow update, delete: if false;
+   }
+  }
+  match /bookingSettings/{id} { allow read, write: if false; }
+  match /bookingSlots/{id} { allow read, write: if false; }
+  match /bookingEntries/{id} { allow read, write: if false; }
+  match /bookingAccess/{id} { allow read, write: if false; }
+  match /bookingTeacherLoad/{id} { allow read, write: if false; }
+  match /bookingTeacherLimits/{id} { allow read, write: if false; }
+  match /bookingAudit/{id} { allow read, write: if false; }
+ }
+}
