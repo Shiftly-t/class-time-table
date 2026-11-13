@@ -1691,6 +1691,15 @@ function collectRegularSlots(){
     for(const field of row.querySelectorAll('[data-field]'))info[field.dataset.field]=field.value.trim();
     info.weekday=Number(info.weekday);
     if(!info.teacherUid||!info.activeFrom||!info.start||!info.end||info.start>=info.end||!state.people.some(p=>p.id===info.teacherUid&&isAssignableTeacher(p.role))){throw Error('通常授業の曜日・時間・担当講師・適用開始日を確認してください。');}
+    // Do not assign a new weekly lesson on a teacher's regular day off.
+    // Historical mismatches may be kept while other student fields are edited.
+    const previousStudent=state.students.find(x=>x.id===$('studentId').value);
+    const previous=previousStudent?.regularSlots?.[info.id];
+    const assignmentChanged=!previous || Number(previous.weekday)!==info.weekday || previous.teacherUid!==info.teacherUid;
+    const weekly=state.teacherWeeklyWorkStatus==='ready'?state.teacherWeeklyWork?.[info.teacherUid]:null;
+    if(assignmentChanged && weekly && !weekly.weekdays?.includes(info.weekday)){
+      throw Error('担当講師の通常勤務曜日ではありません。講師管理で曜日を確認するか、別の担当講師を選んでください。');
+    }
     slots[info.id]=info;
   }
   return slots;
