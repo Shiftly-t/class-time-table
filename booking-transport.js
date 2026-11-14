@@ -3,6 +3,13 @@
 const READS=new Set(['view','courses','getSettings','slots','slotDemand','roster','teachers','detail','getQr','capabilities','requestStatus','planStudentDelete','planSnapshotRestore','inspectCourse','inspectAvailability','inspectControl','listSnapshots','verifyIntegrity','planWithdrawal']);
 const definite=new Set(['invalid-argument','permission-denied','unauthenticated','failed-precondition','not-found','already-exists','aborted','resource-exhausted']);
 const blocked=message=>Object.assign(Error(message),{code:'booking/result-unconfirmed'});
+// A resolved callable alone does not prove that its expected mutation completed.
+// Keep both the deployed booking contract and the migrated seasonal contract.
+const confirmedMutation=response=>{
+ const d=response?.data;
+ if(d?.protocolVersion===3)return d.ok!==false && Number.isSafeInteger(d.version) && d.version>=1 && Number.isSafeInteger(d.changed) && d.changed>=0;
+ return d?.ok===true;
+};
 export const bookingMutation=action=>!READS.has(action);
 export function createBookingTransport({call,getSession,newRequestId=()=>crypto.randomUUID()}){
  let session=null,generation=0,pending=null,inFlight=null,committed=0;
@@ -19,7 +26,7 @@ export function createBookingTransport({call,getSession,newRequestId=()=>crypto.
    if(mutation&&(pending||inFlight))throw blocked('前の送信結果が未確認です。「送信結果を確認」を使い、同じ処理を繰り返さないでください。');
    const operation=mutation?{epoch,body:{...fields,requestId:newRequestId()}}:null;
    if(operation){pending=operation;inFlight=operation;}
-   try{const response=await call(operation?.body||fields);check(epoch);if(operation){if(pending===operation)pending=null;committed++;}return response;}
+   try{const response=await call(operation?.body||fields);check(epoch);if(operation){if(!confirmedMutation(response))throw blocked('保存結果を確認できません。「送信結果を確認」を使い、同じ処理を繰り返さないでください。');if(pending===operation)pending=null;committed++;}return response;}
    catch(e){if(operation&&pending===operation&&definite.has(String(e?.code||'').replace(/^functions\//,'')))pending=null;throw e;}
    finally{if(inFlight===operation)inFlight=null;}
   },
