@@ -366,6 +366,8 @@ function enableOneTapSave(formId) {
 // ────────────────────────────────────────────────────────────────────────────
 const OWNER_ROOT_COLLECTIONS=['schoolStudents','timetableEntries','monthlyTargets','specialCourses','schoolClosures','schoolOpenDays','schoolEvents','teacherDayAbsences','teacherWeeklyWork','teacherDateWork'];
 const auditState={logs:[],archives:[],busy:false,loaded:false};
+let authGeneration=0,businessGeneration=0,availabilityGeneration=0;
+const sessionGuard=()=>{const epoch=authGeneration,uid=state.user?.uid;return ()=>Boolean(uid&&epoch===authGeneration&&state.user?.uid===uid);};
 function archivedValue(value){
   if(value===null||value===undefined)return null;
   if(value instanceof Date)return {__shiftlyType:'timestamp',value:value.toISOString()};
@@ -491,26 +493,29 @@ function downloadOwnerJson(name,object){
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 async function reloadOwnerTools(){
-  if(!isOwner())return;const actorUid=state.user?.uid;
+  if(!isOwner())return;const current=sessionGuard();
   const [logs,archives]=await Promise.all([
     getDocs(query(collection(db,'auditLogs'),orderBy('createdAt','desc'),limit(150))),
     getDocs(query(collection(db,'backupArchives'),orderBy('createdAt','desc'),limit(80)))
   ]);
-  if(state.user?.uid!==actorUid||!isOwner())return;
-  auditState.logs=logs.docs.map(d=>({...d.data(),id:d.id}));
-  auditState.archives=archives.docs.map(d=>({...d.data(),id:d.id}));
-  if(seasonalAuthority.enabled()){try{const v2=await seasonalAuthority.listSnapshots();auditState.archives=[...v2.archives.map(a=>({...a,label:a.label||'予約台帳を含む完全バックアップ（QR再発行必須）'})),...auditState.archives];}catch(e){showMessage('新形式バックアップは未対応または取得できません。旧形式の復元適用は停止しています。');}}
+  if(!current()||!isOwner())return;
+  const nextLogs=logs.docs.map(d=>({...d.data(),id:d.id}));
+  let nextArchives=archives.docs.map(d=>({...d.data(),id:d.id}));
+  if(seasonalAuthority.enabled()){try{const v2=await seasonalAuthority.listSnapshots();if(!current()||!isOwner())return;nextArchives=[...v2.archives.map(a=>({...a,label:a.label||'予約台帳を含む完全バックアップ（QR再発行必須）'})),...nextArchives];}catch(e){if(!current()||!isOwner())return;showMessage('新形式バックアップは未対応または取得できません。旧形式の復元適用は停止しています。');}}
+  if(!current()||!isOwner())return;
+  auditState.logs=nextLogs;auditState.archives=nextArchives;
   auditState.loaded=true;renderOwnerTools();
 }
 async function loadOwnerTools(){
-  if(!isOwner())return;
+  if(!isOwner())return;const current=sessionGuard();
   $('ownerAuditMessage').textContent='変更履歴とバックアップを確認しています…';
-  try{await reloadOwnerTools();$('ownerAuditMessage').textContent='最近の変更履歴を最大150件表示しています。';}
-  catch(error){trapError(error,'変更履歴を取得できませんでした');$('ownerAuditMessage').textContent='読み込みに失敗しました。Firebaseルールを確認してください。';}
+  try{await reloadOwnerTools();if(!current()||!isOwner())return;$('ownerAuditMessage').textContent='最近の変更履歴を最大150件表示しています。';}
+  catch(error){if(!current()||!isOwner())return;trapError(error,'変更履歴を取得できませんでした');$('ownerAuditMessage').textContent='読み込みに失敗しました。Firebaseルールを確認してください。';}
 }
 function renderOwnerTools(){
   const logHost=$('ownerAuditList'),archiveHost=$('ownerArchiveList');
   logHost.replaceChildren();archiveHost.replaceChildren();
+  if(!isOwner())return;
   if(seasonalAuthority.enabled()){const check=make('button','ghost','台帳・授業の整合性を確認');check.id='ownerVerifyIntegrity';check.type='button';check.disabled=auditState.busy;check.addEventListener('click',async()=>{if(!isOwner()||auditState.busy)return;const actorUid=state.user?.uid;ownerOperationBusy(true);try{const r=await seasonalAuthority.verifyIntegrity();if(state.user?.uid===actorUid)showMessage(`台帳・参照・人数を確認しました。生徒${r.counts.students}、授業${r.counts.lessons}、予約${r.counts.reservations}件。勤務設定の「要振替」表示は別途確認してください。`);}catch(e){trapError(e,'整合性を確認できません。業務を再開せず内容を確認してください');}finally{ownerOperationBusy(false);if(isOwner())renderOwnerTools();}});archiveHost.append(check);}
   if(!auditState.logs.length)logHost.append(make('p','empty','まだ記録された変更履歴がありません。新版の適用後の操作から記録されます。'));
   for(const log of auditState.logs){
@@ -633,7 +638,7 @@ $('ownerCreateBackup').addEventListener('click',async()=>{
 });
 $('ownerRefresh').addEventListener('click',loadOwnerTools);
 
-function resetSubscriptions(){state.unsub.forEach(fn=>fn());state.unsub=[];maintenanceState.dataStarted=false;}
+function resetSubscriptions(){businessGeneration++;state.unsub.forEach(fn=>fn());state.unsub=[];maintenanceState.dataStarted=false;}
 
 // Readable by registered users even when ordinary data access is blocked.
 const MAINTENANCE_REF = doc(db,'systemConfig','maintenance');
@@ -670,12 +675,13 @@ function renderMaintenanceOwner(){
   }
 }
 async function loadMaintenanceHistory(){
-  if(!isOwner())return;
+  if(!isOwner())return;const current=sessionGuard();
   try{
     const rows=await getDocs(query(collection(db,'maintenanceEvents'),orderBy('createdAt','desc'),limit(50)));
+    if(!current()||!isOwner())return;
     maintenanceState.history=rows.docs.map(row=>({id:row.id,...row.data()}));
     renderMaintenanceOwner();
-  }catch(error){trapError(error,'メンテナンス履歴を取得できませんでした');}
+  }catch(error){if(!current()||!isOwner())return;trapError(error,'メンテナンス履歴を取得できませんでした');}
 }
 async function changeMaintenance(type){
   if(!isOwner()||maintenanceState.busy||!maintenanceState.loaded)return;
@@ -2296,18 +2302,21 @@ function localDateTimeInput(date){
 }
 
 function clearAvailabilitySubscriptions(){
+  availabilityGeneration++;
   for(const unsub of state.availabilityUnsub||[])try{unsub();}catch(error){console.warn(error);}
   state.availabilityUnsub=[];
 }
 function subscribeAvailabilityCourses(){
   clearAvailabilitySubscriptions();
+  const current=sessionGuard(),epoch=availabilityGeneration;
+  const subscribe=(ref,next,error)=>onSnapshot(ref,snap=>{if(current()&&epoch===availabilityGeneration)next(snap);},err=>{if(current()&&epoch===availabilityGeneration)error(err);});
   state.availability=new Map();state.availabilityStatus={};
   for(const course of state.courses.filter(c=>c.archived!==true)){
     const courseId=course.id;
     state.availabilityStatus[courseId]='loading';
     if(isAdmin()){
       const ref=collection(db,'specialCourses',courseId,'teacherAvailability');
-      const unsub=onSnapshot(ref,snapshot=>{
+      const unsub=subscribe(ref,snapshot=>{
         for(const key of [...state.availability.keys()])if(key.startsWith(courseId+'/'))state.availability.delete(key);
         for(const d of snapshot.docs)state.availability.set(availabilityDocKey(courseId,d.id),{...d.data(),uid:d.id});
         state.availabilityStatus[courseId]='ready';renderAll();
@@ -2315,7 +2324,7 @@ function subscribeAvailabilityCourses(){
       state.availabilityUnsub.push(unsub);
     }else{
       const ref=doc(db,'specialCourses',courseId,'teacherAvailability',state.user.uid);
-      const unsub=onSnapshot(ref,snapshot=>{
+      const unsub=subscribe(ref,snapshot=>{
         const key=availabilityDocKey(courseId,state.user.uid);
         if(snapshot.exists())state.availability.set(key,{...snapshot.data(),uid:snapshot.id});
         else state.availability.delete(key);
@@ -3045,6 +3054,7 @@ function syncBookingManagementShortcut(){
   $('navCourses').after(link);
 }
 function loggedOut(){
+  authGeneration++;
   seasonalAuthority.reset();bookingEditorTransport.reset();document.getElementById('bookingResultCheck')?.remove();normalAuthority.reset();document.getElementById('normalAuthorityRetry')?.remove();
   pendingStudentDeletion=null;studentEditBaseline=null;
   if(maintenanceState.unsub){maintenanceState.unsub();maintenanceState.unsub=null;}
@@ -3058,13 +3068,20 @@ function loggedOut(){
   for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();
 }
 async function loggedIn(user){
+  const epoch=++authGeneration;
+  const current=()=>epoch===authGeneration&&auth.currentUser?.uid===user.uid&&state.user?.uid===user.uid;
+  state.profile=null;state.students=[];state.people=[];
+  $('appPanel').hidden=true;$('notificationButton').hidden=true;$('identity').textContent='';
+  for(const dialog of document.querySelectorAll('dialog'))if(dialog.open)dialog.close();
+  auditState.logs=[];auditState.archives=[];auditState.loaded=false;auditState.busy=false;
+  $('ownerAuditList').replaceChildren();$('ownerArchiveList').replaceChildren();$('ownerAuditMessage').textContent='';
   seasonalAuthority.reset();bookingEditorTransport.reset();document.getElementById('bookingResultCheck')?.remove();normalAuthority.reset();document.getElementById('normalAuthorityRetry')?.remove();
   if(maintenanceState.unsub){maintenanceState.unsub();maintenanceState.unsub=null;}
   resetSubscriptions();clearAvailabilitySubscriptions();state.availability=new Map();state.availabilityStatus={};state.user=user;state.notices=[];state.officialAnnouncements=[];state.officialSeenIds=new Set();state.officialSeenReady=false;state.entries=[];state.entriesStatus='loading';state.closures={};state.closuresStatus='loading';state.openDays={};state.openDaysStatus='loading';state.examEvents={};state.examStatus='loading';state.courses=[];state.coursesStatus='loading';state.teacherAbsences={};state.teacherAbsencesStatus='loading';state.teacherWeeklyWork={};state.teacherWeeklyWorkStatus=teacherWorkFeatureEnabled?'loading':'disabled';state.teacherDateWork={};state.teacherDateWorkStatus=teacherWorkFeatureEnabled?'loading':'disabled';regularEditor?.reset();teacherWorkPage?.reset();
   const profileSnap=await getDoc(doc(db,'users',user.uid));
-  if(auth.currentUser?.uid!==user.uid)return;
+  if(!current())return;
   if(!profileSnap.exists()||!['owner','admin','employee'].includes(profileSnap.data().role)){showMessage('利用者登録がありません。管理者に連絡してください。');await signOut(auth);return;}
-  if(auth.currentUser?.uid!==user.uid)return;
+  if(!current())return;
   state.profile=profileSnap.data();
   const name=state.profile.name?.trim()||user.email||'ユーザー';
   $('welcomeName').textContent=`ようこそ、${name}さん`;
@@ -3089,7 +3106,7 @@ async function loggedIn(user){
   maintenanceState.dataStarted=false;
   if(maintenanceState.unsub){maintenanceState.unsub();maintenanceState.unsub=null;}
   maintenanceState.unsub=onSnapshot(MAINTENANCE_REF,snapshot=>{
-    if(state.user?.uid!==user.uid)return;
+    if(!current())return;
     const data=snapshot.exists()?snapshot.data():{};
     maintenanceState.loaded=true;
     maintenanceState.enabled=data.enabled===true;
@@ -3111,6 +3128,7 @@ async function loggedIn(user){
       if(!maintenanceState.dataStarted)startBusinessSubscriptions(user);
     }
   },error=>{
+    if(!current())return;
     console.error('メンテナンス状態を確認できません',error);
     maintenanceState.loaded=false;$('appPanel').hidden=true;
     $('maintenancePanel').hidden=false;
@@ -3124,10 +3142,12 @@ async function loggedIn(user){
 function startBusinessSubscriptions(user){
   if(maintenanceState.dataStarted||!state.user||state.user.uid!==user.uid)return;
   maintenanceState.dataStarted=true;
-  state.unsub.push(onSnapshot(collection(db,'schoolStudents'),snap=>{state.students=snap.docs.map(d=>({...d.data(),id:d.id}));renderAll();persistAnnualGradePromotion();},err=>trapError(err,'生徒情報を取得できません')));
-  state.unsub.push(onSnapshot(collection(db,'users'),snap=>{state.people=snap.docs.map(d=>({...d.data(),id:d.id}));renderAll();},err=>trapError(err,'教師情報を取得できません')));
+  const current=sessionGuard(),epoch=businessGeneration;
+  const subscribe=(ref,next,error)=>onSnapshot(ref,snap=>{if(current()&&epoch===businessGeneration)next(snap);},err=>{if(current()&&epoch===businessGeneration)error(err);});
+  state.unsub.push(subscribe(collection(db,'schoolStudents'),snap=>{state.students=snap.docs.map(d=>({...d.data(),id:d.id}));renderAll();persistAnnualGradePromotion();},err=>trapError(err,'生徒情報を取得できません')));
+  state.unsub.push(subscribe(collection(db,'users'),snap=>{state.people=snap.docs.map(d=>({...d.data(),id:d.id}));renderAll();},err=>trapError(err,'教師情報を取得できません')));
   if(teacherWorkFeatureEnabled){
-  state.unsub.push(onSnapshot(collection(db,'teacherWeeklyWork'),snap=>{
+  state.unsub.push(subscribe(collection(db,'teacherWeeklyWork'),snap=>{
     if(state.user?.uid!==user.uid)return;
     state.teacherWeeklyWork=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));
     state.teacherWeeklyWorkStatus='ready';renderAll();
@@ -3136,7 +3156,7 @@ function startBusinessSubscriptions(user){
     state.teacherWeeklyWork={};console.warn('通常勤務曜日を確認できません。新規配置を停止します',err);
     renderAll();
   }));
-  state.unsub.push(onSnapshot(collection(db,'teacherDateWork'),snap=>{
+  state.unsub.push(subscribe(collection(db,'teacherDateWork'),snap=>{
     if(state.user?.uid!==user.uid)return;
     state.teacherDateWork=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));
     state.teacherDateWorkStatus='ready';renderAll();
@@ -3146,8 +3166,8 @@ function startBusinessSubscriptions(user){
     renderAll();
   }));
   }
-  state.unsub.push(onSnapshot(collection(db,'timetableEntries'),snap=>{state.entries=snap.docs.map(d=>({...d.data(),id:d.id}));state.entriesStatus='ready';renderAll();},err=>{state.entriesStatus='error';trapError(err,'時間割を取得できません');}));
-  state.unsub.push(onSnapshot(collection(db,'teacherDayAbsences'),snap=>{
+  state.unsub.push(subscribe(collection(db,'timetableEntries'),snap=>{state.entries=snap.docs.map(d=>({...d.data(),id:d.id}));state.entriesStatus='ready';renderAll();},err=>{state.entriesStatus='error';trapError(err,'時間割を取得できません');}));
+  state.unsub.push(subscribe(collection(db,'teacherDayAbsences'),snap=>{
     state.teacherAbsences=Object.fromEntries(snap.docs.map(d=>[d.id,{id:d.id,...d.data()}]));
     state.teacherAbsencesStatus='ready';
     renderAll();
@@ -3157,13 +3177,13 @@ function startBusinessSubscriptions(user){
     if(isAdmin())showMessage('コマ別欠席の読込権限がありません。Firestoreルールを設定してください。');
     renderAll();
   }));
-  state.unsub.push(onSnapshot(collection(db,'specialCourses'),snap=>{
+  state.unsub.push(subscribe(collection(db,'specialCourses'),snap=>{
     state.courses=snap.docs.map(d=>({...d.data(),id:d.id})).filter(c=>Array.isArray(c.periods) && c.startDate && c.endDate).sort((a,b)=>a.startDate.localeCompare(b.startDate));
     state.coursesStatus='ready';subscribeAvailabilityCourses();renderAll();
     if($('lessonFormDialog').open)syncLessonCoursePeriod(lessonById($('lessonId').value));
     if($('detailDialog').open && state.activeLesson){const lesson=lessonById(state.activeLesson);if(lesson)renderUpcomingForLesson(lesson);}
   },err=>{state.coursesStatus='error';trapError(err,'講習情報を取得できません');renderAll();}));
-  state.unsub.push(onSnapshot(collection(db,'schoolClosures'),snap=>{
+  state.unsub.push(subscribe(collection(db,'schoolClosures'),snap=>{
     state.closures=Object.fromEntries(snap.docs.map(d=>[d.id,{...d.data(),date:d.id}]));
     state.closuresStatus='ready';renderAll();
     if($('detailDialog').open && state.activeLesson){
@@ -3171,19 +3191,19 @@ function startBusinessSubscriptions(user){
       if(active)renderUpcomingForLesson(active);
     }
   },err=>{state.closuresStatus='error';trapError(err,'休校日情報を取得できません');renderAll();}));
-  state.unsub.push(onSnapshot(collection(db,'schoolOpenDays'),snap=>{
+  state.unsub.push(subscribe(collection(db,'schoolOpenDays'),snap=>{
     if(state.user?.uid!==user.uid)return;
     state.openDays=Object.fromEntries(snap.docs.map(d=>[d.id,{...d.data(),date:d.id}]));
     state.openDaysStatus='ready';renderAll();
     if($('detailDialog').open&&state.activeLesson){const active=lessonById(state.activeLesson);if(active)renderUpcomingForLesson(active);}
   },err=>{state.openDaysStatus='error';trapError(err,'特別開校日情報を取得できません');renderAll();}));
-  state.unsub.push(onSnapshot(collection(db,'schoolEvents'),snap=>{
+  state.unsub.push(subscribe(collection(db,'schoolEvents'),snap=>{
     if(state.user?.uid!==user.uid)return;
     state.examEvents=Object.fromEntries(snap.docs.map(d=>[d.id,{...d.data(),date:d.id}]));
     state.examStatus='ready';renderAll();
   },err=>{state.examStatus='error';trapError(err,'模試・テスト予定を取得できません');renderAll();}));
   // Admins and teachers both have their own private notification inbox.
-  state.unsub.push(onSnapshot(collection(db,'notifications',user.uid,'items'),snap=>{
+  state.unsub.push(subscribe(collection(db,'notifications',user.uid,'items'),snap=>{
     if(state.user?.uid!==user.uid)return;
     state.notices=snap.docs.map(d=>({...d.data(),id:d.id}));
     renderNoticeButton();if($('notificationDialog').open)renderNotifications();
@@ -3191,13 +3211,13 @@ function startBusinessSubscriptions(user){
   },err=>trapError(err,'通知を取得できません')));
   // Official announcements are global. Users may view them, but only the owner
   // may publish or withdraw them. Read markers are private per account.
-  state.unsub.push(onSnapshot(collection(db,'officialAnnouncements'),snap=>{
+  state.unsub.push(subscribe(collection(db,'officialAnnouncements'),snap=>{
     if(state.user?.uid!==user.uid)return;
     state.officialAnnouncements=snap.docs.map(d=>({...d.data(),id:d.id}));
     renderNoticeButton();
     if($('notificationDialog').open){renderNotifications();markVisibleOfficialRead();}
   },err=>trapError(err,'運営のお知らせを取得できません')));
-  state.unsub.push(onSnapshot(doc(db,'announcementReadStates',user.uid),snap=>{
+  state.unsub.push(subscribe(doc(db,'announcementReadStates',user.uid),snap=>{
     if(state.user?.uid!==user.uid)return;
     const seen=snap.exists()?snap.data().seenIds:[];
     state.officialSeenIds=new Set(Array.isArray(seen)?seen:[]);

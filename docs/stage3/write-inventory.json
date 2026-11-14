@@ -2,7 +2,7 @@
   "scope": "All root Web JavaScript files; Firebase SDK sink constructors/mutations/commits, including helper callbacks. Not a general JS taint analysis; private server inventory separate.",
   "sourceCommit": "9baa0c69aaf4197f2967db9afcb9fc62bd74c297",
   "sourceHashes": {
-    "app.js": "9b82afe7e50314e21e082626ce1f867666b803780e1687400a92582e53d32ae7",
+    "app.js": "6bb258bff4b279ddcd164049dc3188e0dbe2e9d55c10953ef38ec5a40d67bda3",
     "booking-config.js": "9a2d493cbf36bf2f2fbf34d6bdcd72f82e922517267219ea18679aec153be901",
     "booking-transport.js": "f4a68f7b64f02b86ba77b8e35464caae80ed872a3c65a5c329ed7362606da93f",
     "config.js": "771ca98683512b7c03684a69534e98aa9ebc8cab0536cd8bb2eced0c1a2339e9",
@@ -17,8 +17,8 @@
     {
       "id": "audit-helper",
       "file": "app.js",
-      "from": 402,
-      "to": 409,
+      "from": 404,
+      "to": 411,
       "operation": "監査履歴の共通ヘルパー",
       "collections": [
         "auditLogs"
@@ -30,8 +30,8 @@
     {
       "id": "archive-create",
       "file": "app.js",
-      "from": 453,
-      "to": 474,
+      "from": 455,
+      "to": 476,
       "operation": "旧形式バックアップ作成",
       "collections": [
         "backupArchives/*/parts",
@@ -44,8 +44,8 @@
     {
       "id": "audit-restore",
       "file": "app.js",
-      "from": 537,
-      "to": 572,
+      "from": 542,
+      "to": 577,
       "operation": "変更履歴から単一文書復元",
       "collections": [
         "dynamic: OWNER_ROOT_COLLECTIONS and course subcollections",
@@ -58,8 +58,8 @@
     {
       "id": "archive-restore",
       "file": "app.js",
-      "from": 572,
-      "to": 627,
+      "from": 577,
+      "to": 632,
       "operation": "全体復元",
       "collections": [
         "dynamic: OWNER_ROOT_COLLECTIONS and course subcollections",
@@ -72,8 +72,8 @@
     {
       "id": "maintenance",
       "file": "app.js",
-      "from": 678,
-      "to": 712,
+      "from": 684,
+      "to": 718,
       "operation": "メンテナンス変更・イベント記録",
       "collections": [
         "systemConfig/maintenance",
@@ -86,8 +86,8 @@
     {
       "id": "grade-promotion",
       "file": "app.js",
-      "from": 819,
-      "to": 852,
+      "from": 825,
+      "to": 858,
       "operation": "ログイン/年度境界の学年自動保存",
       "collections": [
         "schoolStudents",
@@ -100,8 +100,8 @@
     {
       "id": "open-delete",
       "file": "app.js",
-      "from": 1148,
-      "to": 1169,
+      "from": 1154,
+      "to": 1175,
       "operation": "特別開校日解除",
       "collections": [
         "schoolOpenDays",
@@ -114,8 +114,8 @@
     {
       "id": "open-save",
       "file": "app.js",
-      "from": 1170,
-      "to": 1190,
+      "from": 1176,
+      "to": 1196,
       "operation": "特別開校日登録",
       "collections": [
         "schoolOpenDays",
@@ -128,8 +128,8 @@
     {
       "id": "closure-save",
       "file": "app.js",
-      "from": 1291,
-      "to": 1321,
+      "from": 1297,
+      "to": 1327,
       "operation": "休校登録・編集",
       "collections": [
         "schoolClosures",
@@ -142,8 +142,8 @@
     {
       "id": "closure-delete",
       "file": "app.js",
-      "from": 1322,
-      "to": 1335,
+      "from": 1328,
+      "to": 1341,
       "operation": "休校解除",
       "collections": [
         "schoolClosures",
@@ -156,8 +156,8 @@
     {
       "id": "exam-save",
       "file": "app.js",
-      "from": 1336,
-      "to": 1357,
+      "from": 1342,
+      "to": 1363,
       "operation": "模試登録・編集",
       "collections": [
         "schoolEvents",
@@ -170,8 +170,8 @@
     {
       "id": "exam-delete",
       "file": "app.js",
-      "from": 1358,
-      "to": 1365,
+      "from": 1364,
+      "to": 1371,
       "operation": "模試削除",
       "collections": [
         "schoolEvents",
@@ -184,8 +184,8 @@
     {
       "id": "course-archive",
       "file": "app.js",
-      "from": 1371,
-      "to": 1388,
+      "from": 1377,
+      "to": 1394,
       "operation": "講習非表示・復元",
       "collections": [
         "specialCourses",
@@ -198,8 +198,8 @@
     {
       "id": "course-deadline",
       "file": "app.js",
-      "from": 1469,
-      "to": 1486,
+      "from": 1475,
+      "to": 1492,
       "operation": "講習勤務希望締切変更",
       "collections": [
         "specialCourses",
@@ -212,8 +212,8 @@
     {
       "id": "course-save",
       "file": "app.js",
-      "from": 1487,
-      "to": 1517,
+      "from": 1493,
+      "to": 1523,
       "operation": "講習登録・期間/コマ変更",
       "collections": [
         "specialCourses",
@@ -226,8 +226,8 @@
     {
       "id": "course-delete",
       "file": "app.js",
-      "from": 1518,
-      "to": 1539,
+      "from": 1524,
+      "to": 1545,
       "operation": "講習削除と子文書削除",
       "collections": [
         "specialCourses",
@@ -242,8 +242,8 @@
     {
       "id": "announcement-delete",
       "file": "app.js",
-      "from": 1601,
-      "to": 1616,
+      "from": 1607,
+      "to": 1622,
       "operation": "公式お知らせ取消",
       "collections": [
         "officialAnnouncements"
@@ -255,8 +255,8 @@
     {
       "id": "announcement-read",
       "file": "app.js",
-      "from": 1617,
-      "to": 1632,
+      "from": 1623,
+      "to": 1638,
       "operation": "公式お知らせ既読",
       "collections": [
         "announcementReadStates"
@@ -268,8 +268,8 @@
     {
       "id": "notice-prune",
       "file": "app.js",
-      "from": 1638,
-      "to": 1660,
+      "from": 1644,
+      "to": 1666,
       "operation": "通知件数整理",
       "collections": [
         "notifications/*/items"
@@ -281,8 +281,8 @@
     {
       "id": "notice-delete",
       "file": "app.js",
-      "from": 1675,
-      "to": 1693,
+      "from": 1681,
+      "to": 1699,
       "operation": "通知個別削除",
       "collections": [
         "notifications/*/items"
@@ -294,8 +294,8 @@
     {
       "id": "notice-read",
       "file": "app.js",
-      "from": 1694,
-      "to": 1707,
+      "from": 1700,
+      "to": 1713,
       "operation": "通知既読一括",
       "collections": [
         "notifications/*/items"
@@ -307,8 +307,8 @@
     {
       "id": "notice-clear",
       "file": "app.js",
-      "from": 1708,
-      "to": 1723,
+      "from": 1714,
+      "to": 1729,
       "operation": "通知全削除",
       "collections": [
         "notifications/*/items"
@@ -320,8 +320,8 @@
     {
       "id": "announcement-create",
       "file": "app.js",
-      "from": 1724,
-      "to": 1738,
+      "from": 1730,
+      "to": 1744,
       "operation": "公式お知らせ掲載",
       "collections": [
         "officialAnnouncements"
@@ -333,8 +333,8 @@
     {
       "id": "student-labels",
       "file": "app.js",
-      "from": 1793,
-      "to": 1815,
+      "from": 1799,
+      "to": 1821,
       "operation": "生徒表示情報の授業伝播",
       "collections": [
         "timetableEntries",
@@ -347,8 +347,8 @@
     {
       "id": "student-save",
       "file": "app.js",
-      "from": 1816,
-      "to": 1857,
+      "from": 1822,
+      "to": 1863,
       "operation": "生徒登録・編集・毎週設定",
       "collections": [
         "schoolStudents",
@@ -361,8 +361,8 @@
     {
       "id": "student-delete",
       "file": "app.js",
-      "from": 1885,
-      "to": 1929,
+      "from": 1891,
+      "to": 1935,
       "operation": "生徒削除と関連文書削除",
       "collections": [
         "schoolStudents",
@@ -377,8 +377,8 @@
     {
       "id": "lesson-notice",
       "file": "app.js",
-      "from": 2003,
-      "to": 2009,
+      "from": 2009,
+      "to": 2015,
       "operation": "授業通知生成",
       "collections": [
         "notifications/*/items"
@@ -390,8 +390,8 @@
     {
       "id": "student-notice",
       "file": "app.js",
-      "from": 2041,
-      "to": 2049,
+      "from": 2047,
+      "to": 2055,
       "operation": "生徒変更通知生成",
       "collections": [
         "notifications/*/items"
@@ -403,8 +403,8 @@
     {
       "id": "generic-notice",
       "file": "app.js",
-      "from": 2050,
-      "to": 2056,
+      "from": 2056,
+      "to": 2062,
       "operation": "旧定型通知生成",
       "collections": [
         "notifications/*/items"
@@ -416,8 +416,8 @@
     {
       "id": "lesson-save",
       "file": "app.js",
-      "from": 2058,
-      "to": 2133,
+      "from": 2064,
+      "to": 2139,
       "operation": "個別授業登録・編集・担当/別日移動",
       "collections": [
         "timetableEntries",
@@ -432,8 +432,8 @@
     {
       "id": "lesson-delete",
       "file": "app.js",
-      "from": 2134,
-      "to": 2154,
+      "from": 2140,
+      "to": 2160,
       "operation": "個別授業削除",
       "collections": [
         "timetableEntries",
@@ -448,8 +448,8 @@
     {
       "id": "lesson-memo",
       "file": "app.js",
-      "from": 2190,
-      "to": 2227,
+      "from": 2196,
+      "to": 2233,
       "operation": "伝達事項保存",
       "collections": [
         "timetableEntries",
@@ -463,8 +463,8 @@
     {
       "id": "course-availability",
       "file": "app.js",
-      "from": 2486,
-      "to": 2529,
+      "from": 2495,
+      "to": 2538,
       "operation": "講習勤務希望提出・管理者代理保存",
       "collections": [
         "specialCourses/*/teacherAvailability",
@@ -478,8 +478,8 @@
     {
       "id": "course-publish",
       "file": "app.js",
-      "from": 2904,
-      "to": 3001,
+      "from": 2913,
+      "to": 3010,
       "operation": "講習配置エディター公開",
       "collections": [
         "timetableEntries",
@@ -526,784 +526,784 @@
   "sites": [
     {
       "file": "app.js",
-      "line": 406,
+      "line": 408,
       "sink": "writer.set(",
       "group": "audit-helper",
       "lineSha256": "e99235efe432ce7aa6acfda687d0e849a4bc695e151b7e168638b8c0d18fd8db"
     },
     {
       "file": "app.js",
-      "line": 468,
+      "line": 470,
       "sink": "writeBatch(",
       "group": "archive-create",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 469,
+      "line": 471,
       "sink": "batch.set(",
       "group": "archive-create",
       "lineSha256": "158ccaf6b1a4a4ec16f9a61a715bafdc3a50ff4f786e06f6e54b8312a4e80ae0"
     },
     {
       "file": "app.js",
-      "line": 470,
+      "line": 472,
       "sink": "batch.commit(",
       "group": "archive-create",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 472,
+      "line": 474,
       "sink": "setDoc(",
       "group": "archive-create",
       "lineSha256": "e44cde4f69fac85d49d186481178b03f51f81dcde59898e8bfd3ba5f67114a37"
     },
     {
       "file": "app.js",
-      "line": 556,
+      "line": 561,
       "sink": "runTransaction(",
       "group": "audit-restore",
       "lineSha256": "d6c4d58f17a4b227b4dd07f9134904b4611e753434ba0244a492d32c9c8e9cff"
     },
     {
       "file": "app.js",
-      "line": 560,
+      "line": 565,
       "sink": "tx.delete(",
       "group": "audit-restore",
       "lineSha256": "7432b4365ae5f1d60686ee4c7284fe30f7c6cf88df9e267afedd8afcebd01a32"
     },
     {
       "file": "app.js",
-      "line": 560,
+      "line": 565,
       "sink": "tx.set(",
       "group": "audit-restore",
       "lineSha256": "7432b4365ae5f1d60686ee4c7284fe30f7c6cf88df9e267afedd8afcebd01a32"
     },
     {
       "file": "app.js",
-      "line": 561,
+      "line": 566,
       "sink": "tx.set(",
       "group": "audit-restore",
       "lineSha256": "bdebac479c6e03a097a1aa454ea5d68055567f4c5bb3f699421c70ccfe18d128"
     },
     {
       "file": "app.js",
-      "line": 605,
+      "line": 610,
       "sink": "writeBatch(",
       "group": "archive-restore",
       "lineSha256": "adf860cae18e8c15d6558538346ee7b7f5d93aa3e18222f4ee5ac889f2767bee"
     },
     {
       "file": "app.js",
-      "line": 606,
+      "line": 611,
       "sink": "batch.set(",
       "group": "archive-restore",
       "lineSha256": "c80969edc9983bcf72748269981fc1749a46773570440ec88471ff64416c4241"
     },
     {
       "file": "app.js",
-      "line": 607,
+      "line": 612,
       "sink": "batch.commit(",
       "group": "archive-restore",
       "lineSha256": "dc3853614d8f0081bae8202ff75cf5943fbb20da9ce3a16de3e100fd640cf7cf"
     },
     {
       "file": "app.js",
-      "line": 616,
+      "line": 621,
       "sink": "writeBatch(",
       "group": "archive-restore",
       "lineSha256": "981c94c7426634f84de5beef89cf6284d9ab0e123662a4b4bf191e8d15edec7a"
     },
     {
       "file": "app.js",
-      "line": 616,
+      "line": 621,
       "sink": "batch.delete(",
       "group": "archive-restore",
       "lineSha256": "981c94c7426634f84de5beef89cf6284d9ab0e123662a4b4bf191e8d15edec7a"
     },
     {
       "file": "app.js",
-      "line": 616,
+      "line": 621,
       "sink": "batch.commit(",
       "group": "archive-restore",
       "lineSha256": "981c94c7426634f84de5beef89cf6284d9ab0e123662a4b4bf191e8d15edec7a"
     },
     {
       "file": "app.js",
-      "line": 618,
+      "line": 623,
       "sink": "writeBatch(",
       "group": "archive-restore",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 620,
+      "line": 625,
       "sink": "batch.commit(",
       "group": "archive-restore",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 703,
+      "line": 709,
       "sink": "writeBatch(",
       "group": "maintenance",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 704,
+      "line": 710,
       "sink": "batch.set(",
       "group": "maintenance",
       "lineSha256": "8dd31f9de232e6dfd62a35dd89d77ce794892e46cf0a20695066d46fd532f9be"
     },
     {
       "file": "app.js",
-      "line": 705,
+      "line": 711,
       "sink": "batch.set(",
       "group": "maintenance",
       "lineSha256": "cfab44de9813b78f1be1ded2a0a4fb3afd38ace5d0cb340c64532c143e36347e"
     },
     {
       "file": "app.js",
-      "line": 706,
+      "line": 712,
       "sink": "batch.commit(",
       "group": "maintenance",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 835,
+      "line": 841,
       "sink": "runTransaction(",
       "group": "grade-promotion",
       "lineSha256": "3ea89126f702859f863854c8e64beaabacf27657b9980ad3845d8bf8130923f9"
     },
     {
       "file": "app.js",
-      "line": 843,
+      "line": 849,
       "sink": "tx.update(",
       "group": "grade-promotion",
       "lineSha256": "db01ac2e5704ee8d737b24b66975d675b21a099dbf807857f1981ffae45958d4"
     },
     {
       "file": "app.js",
-      "line": 844,
+      "line": 850,
       "sink": "tx.set(",
       "group": "grade-promotion",
       "lineSha256": "072870312cccaaa38a24a959eb8dd03914f4b7e0602f82296def51d12d12e2a2"
     },
     {
       "file": "app.js",
-      "line": 1160,
+      "line": 1166,
       "sink": "writeBatch(",
       "group": "open-delete",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 1161,
+      "line": 1167,
       "sink": "batch.delete(",
       "group": "open-delete",
       "lineSha256": "c6850af7b2ac4bcfaf1a9b1e7b2e7bfcda49a566041e8db44e0a7137cce3a846"
     },
     {
       "file": "app.js",
-      "line": 1163,
+      "line": 1169,
       "sink": "batch.commit(",
       "group": "open-delete",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1180,
+      "line": 1186,
       "sink": "writeBatch(",
       "group": "open-save",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 1181,
+      "line": 1187,
       "sink": "batch.set(",
       "group": "open-save",
       "lineSha256": "79d9925b9de5cfd93fd0619270943a2f760afbaf0495a1d4455c84d39031a98c"
     },
     {
       "file": "app.js",
-      "line": 1183,
+      "line": 1189,
       "sink": "batch.commit(",
       "group": "open-save",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1314,
+      "line": 1320,
       "sink": "writeBatch(",
       "group": "closure-save",
       "lineSha256": "59cdfc8f6661e1161323e540e42073e765be7277d5adf466388bf1fbfceb7e7c"
     },
     {
       "file": "app.js",
-      "line": 1314,
+      "line": 1320,
       "sink": "batch.set(",
       "group": "closure-save",
       "lineSha256": "59cdfc8f6661e1161323e540e42073e765be7277d5adf466388bf1fbfceb7e7c"
     },
     {
       "file": "app.js",
-      "line": 1314,
+      "line": 1320,
       "sink": "batch.commit(",
       "group": "closure-save",
       "lineSha256": "59cdfc8f6661e1161323e540e42073e765be7277d5adf466388bf1fbfceb7e7c"
     },
     {
       "file": "app.js",
-      "line": 1328,
+      "line": 1334,
       "sink": "writeBatch(",
       "group": "closure-delete",
       "lineSha256": "19aa0ba2a23df38bd21341ac830adbb2d3ec7b80be88952d5257b9001f900cd2"
     },
     {
       "file": "app.js",
-      "line": 1328,
+      "line": 1334,
       "sink": "batch.delete(",
       "group": "closure-delete",
       "lineSha256": "19aa0ba2a23df38bd21341ac830adbb2d3ec7b80be88952d5257b9001f900cd2"
     },
     {
       "file": "app.js",
-      "line": 1328,
+      "line": 1334,
       "sink": "batch.commit(",
       "group": "closure-delete",
       "lineSha256": "19aa0ba2a23df38bd21341ac830adbb2d3ec7b80be88952d5257b9001f900cd2"
     },
     {
       "file": "app.js",
-      "line": 1352,
+      "line": 1358,
       "sink": "writeBatch(",
       "group": "exam-save",
       "lineSha256": "4298660c7b3af551ec5057446d523da81f3545a01fb9d2cfda13a28b5f6a8db3"
     },
     {
       "file": "app.js",
-      "line": 1352,
+      "line": 1358,
       "sink": "batch.set(",
       "group": "exam-save",
       "lineSha256": "4298660c7b3af551ec5057446d523da81f3545a01fb9d2cfda13a28b5f6a8db3"
     },
     {
       "file": "app.js",
-      "line": 1352,
+      "line": 1358,
       "sink": "batch.commit(",
       "group": "exam-save",
       "lineSha256": "4298660c7b3af551ec5057446d523da81f3545a01fb9d2cfda13a28b5f6a8db3"
     },
     {
       "file": "app.js",
-      "line": 1362,
+      "line": 1368,
       "sink": "writeBatch(",
       "group": "exam-delete",
       "lineSha256": "b3ab1197f9bedc301e2ef76a219e9d4f2ecbfc07d4208f0745e50c05accded4a"
     },
     {
       "file": "app.js",
-      "line": 1362,
+      "line": 1368,
       "sink": "batch.delete(",
       "group": "exam-delete",
       "lineSha256": "b3ab1197f9bedc301e2ef76a219e9d4f2ecbfc07d4208f0745e50c05accded4a"
     },
     {
       "file": "app.js",
-      "line": 1362,
+      "line": 1368,
       "sink": "batch.commit(",
       "group": "exam-delete",
       "lineSha256": "b3ab1197f9bedc301e2ef76a219e9d4f2ecbfc07d4208f0745e50c05accded4a"
     },
     {
       "file": "app.js",
-      "line": 1380,
+      "line": 1386,
       "sink": "writeBatch(",
       "group": "course-archive",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 1381,
+      "line": 1387,
       "sink": "batch.update(",
       "group": "course-archive",
       "lineSha256": "18900a679e91359a523e5ae12323ea8af092a3d9ce91a5af2597bc7cbb978f94"
     },
     {
       "file": "app.js",
-      "line": 1383,
+      "line": 1389,
       "sink": "batch.commit(",
       "group": "course-archive",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1481,
+      "line": 1487,
       "sink": "writeBatch(",
       "group": "course-deadline",
       "lineSha256": "13e0482f57981bf8b19525e19bf7da22314d7292da64f233dd1b86311b2dd596"
     },
     {
       "file": "app.js",
-      "line": 1481,
+      "line": 1487,
       "sink": "batch.update(",
       "group": "course-deadline",
       "lineSha256": "13e0482f57981bf8b19525e19bf7da22314d7292da64f233dd1b86311b2dd596"
     },
     {
       "file": "app.js",
-      "line": 1481,
+      "line": 1487,
       "sink": "batch.commit(",
       "group": "course-deadline",
       "lineSha256": "13e0482f57981bf8b19525e19bf7da22314d7292da64f233dd1b86311b2dd596"
     },
     {
       "file": "app.js",
-      "line": 1512,
+      "line": 1518,
       "sink": "writeBatch(",
       "group": "course-save",
       "lineSha256": "9e763bdc4fee89ad4c22fd3e6253b88519593b4cf0384e10293d63f51ce5738a"
     },
     {
       "file": "app.js",
-      "line": 1512,
+      "line": 1518,
       "sink": "batch.set(",
       "group": "course-save",
       "lineSha256": "9e763bdc4fee89ad4c22fd3e6253b88519593b4cf0384e10293d63f51ce5738a"
     },
     {
       "file": "app.js",
-      "line": 1512,
+      "line": 1518,
       "sink": "batch.commit(",
       "group": "course-save",
       "lineSha256": "9e763bdc4fee89ad4c22fd3e6253b88519593b4cf0384e10293d63f51ce5738a"
     },
     {
       "file": "app.js",
-      "line": 1528,
+      "line": 1534,
       "sink": "writeBatch(",
       "group": "course-delete",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 1530,
+      "line": 1536,
       "sink": "batch.delete(",
       "group": "course-delete",
       "lineSha256": "b6dd23190a1deeed2eb9a0517db4b17668e78bcd5caeaa495f90e9f1bc407442"
     },
     {
       "file": "app.js",
-      "line": 1532,
+      "line": 1538,
       "sink": "batch.delete(",
       "group": "course-delete",
       "lineSha256": "2979fb33560769486d715920fb9ccb7d54243b02c754b505dda428781f28cf1c"
     },
     {
       "file": "app.js",
-      "line": 1533,
+      "line": 1539,
       "sink": "batch.delete(",
       "group": "course-delete",
       "lineSha256": "61a904828f1108c369f86ed86a8f99f234e415eacbb8d8c1f2ee1a234a905049"
     },
     {
       "file": "app.js",
-      "line": 1534,
+      "line": 1540,
       "sink": "batch.commit(",
       "group": "course-delete",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1611,
+      "line": 1617,
       "sink": "deleteDoc(",
       "group": "announcement-delete",
       "lineSha256": "1498ad687a1ee023de9a0c4a6f629a362b76131ebd85a6f6dfa2dafc8033bf79"
     },
     {
       "file": "app.js",
-      "line": 1622,
+      "line": 1628,
       "sink": "setDoc(",
       "group": "announcement-read",
       "lineSha256": "fb1fc82d98bbc5a3ee2e9adbf748323c605119ee399e41e3fb4304202d299bb4"
     },
     {
       "file": "app.js",
-      "line": 1651,
+      "line": 1657,
       "sink": "writeBatch(",
       "group": "notice-prune",
       "lineSha256": "02372a11e41e5a0903034a684941e312e14a847a236a8d5ff8abd9c4e4540a52"
     },
     {
       "file": "app.js",
-      "line": 1652,
+      "line": 1658,
       "sink": "batch.delete(",
       "group": "notice-prune",
       "lineSha256": "38850b195086f94365aaf88c5879af9bb46f11f7227be3e43a901c24528dfdaf"
     },
     {
       "file": "app.js",
-      "line": 1653,
+      "line": 1659,
       "sink": "batch.commit(",
       "group": "notice-prune",
       "lineSha256": "e4237fd88a96d1140828e7d2d6a49ac639ccfe067b969eedf0be391ad4448846"
     },
     {
       "file": "app.js",
-      "line": 1686,
+      "line": 1692,
       "sink": "deleteDoc(",
       "group": "notice-delete",
       "lineSha256": "17489dcdbae45526f9dafb79e16116de1973818dbc83ec353f6559ea11926f66"
     },
     {
       "file": "app.js",
-      "line": 1700,
+      "line": 1706,
       "sink": "writeBatch(",
       "group": "notice-read",
       "lineSha256": "aaeb5b2413e8306a6af60d404cd6b97042313ed6cdd1751c4debf9d7a94713eb"
     },
     {
       "file": "app.js",
-      "line": 1701,
+      "line": 1707,
       "sink": "batch.update(",
       "group": "notice-read",
       "lineSha256": "e9dd67dbd625ac17f8c82d344ba66b767e947d1533a6a1428b55c7a5beaf229e"
     },
     {
       "file": "app.js",
-      "line": 1702,
+      "line": 1708,
       "sink": "batch.commit(",
       "group": "notice-read",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1716,
+      "line": 1722,
       "sink": "writeBatch(",
       "group": "notice-clear",
       "lineSha256": "f42566c126099c0bceddc45a2cbeff634709327fd305d23f2de12645e22affda"
     },
     {
       "file": "app.js",
-      "line": 1717,
+      "line": 1723,
       "sink": "batch.delete(",
       "group": "notice-clear",
       "lineSha256": "335ba8e9655b2adbde59ebf716b800318af7e473eacfab2cdc6f2a0b3230ce75"
     },
     {
       "file": "app.js",
-      "line": 1718,
+      "line": 1724,
       "sink": "batch.commit(",
       "group": "notice-clear",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 1733,
+      "line": 1739,
       "sink": "setDoc(",
       "group": "announcement-create",
       "lineSha256": "cebf9c8d62376ac59e1b57d767ce0223bd66886e68f27d120eb9fc302d672c41"
     },
     {
       "file": "app.js",
-      "line": 1801,
+      "line": 1807,
       "sink": "writeBatch(",
       "group": "student-labels",
       "lineSha256": "1124978ae13511315a40629968817dc7d05e58f612da82b0bbbb938decddf574"
     },
     {
       "file": "app.js",
-      "line": 1806,
+      "line": 1812,
       "sink": "batch.update(",
       "group": "student-labels",
       "lineSha256": "ea30609e400a3ca2cf1f20b669212d1a6ddbd5e4d65f2ce2f8aea1227d02a2dd"
     },
     {
       "file": "app.js",
-      "line": 1807,
+      "line": 1813,
       "sink": "batch.commit(",
       "group": "student-labels",
       "lineSha256": "db600baa210922a4318e492593899c1f8507e5fd66a09e46a840c8f7c5299273"
     },
     {
       "file": "app.js",
-      "line": 1807,
+      "line": 1813,
       "sink": "writeBatch(",
       "group": "student-labels",
       "lineSha256": "db600baa210922a4318e492593899c1f8507e5fd66a09e46a840c8f7c5299273"
     },
     {
       "file": "app.js",
-      "line": 1809,
+      "line": 1815,
       "sink": "batch.commit(",
       "group": "student-labels",
       "lineSha256": "3e64d508ace005dd667d35f0e987e1a02a7dcf97cc37a6ae72d1fabca02d3559"
     },
     {
       "file": "app.js",
-      "line": 1833,
+      "line": 1839,
       "sink": "runTransaction(",
       "group": "student-save",
       "lineSha256": "d6c4d58f17a4b227b4dd07f9134904b4611e753434ba0244a492d32c9c8e9cff"
     },
     {
       "file": "app.js",
-      "line": 1838,
+      "line": 1844,
       "sink": "tx.set(",
       "group": "student-save",
       "lineSha256": "e12a8152227610e03b51210ec1bccc47dbf26b8113a4a64f6fb67d9ccbaa043f"
     },
     {
       "file": "app.js",
-      "line": 1915,
+      "line": 1921,
       "sink": "writeBatch(",
       "group": "student-delete",
       "lineSha256": "02372a11e41e5a0903034a684941e312e14a847a236a8d5ff8abd9c4e4540a52"
     },
     {
       "file": "app.js",
-      "line": 1916,
+      "line": 1922,
       "sink": "batch.delete(",
       "group": "student-delete",
       "lineSha256": "3c16cdd8adb1836b3a5da4c67544e07f3a14b54f9fe52932481dc4eb04c51a6d"
     },
     {
       "file": "app.js",
-      "line": 1917,
+      "line": 1923,
       "sink": "batch.commit(",
       "group": "student-delete",
       "lineSha256": "e4237fd88a96d1140828e7d2d6a49ac639ccfe067b969eedf0be391ad4448846"
     },
     {
       "file": "app.js",
-      "line": 1920,
+      "line": 1926,
       "sink": "writeBatch(",
       "group": "student-delete",
       "lineSha256": "65cfa58cca6e4a12bce2bf7d2672da3c04695f849ef96502bcfd87cb23161d9f"
     },
     {
       "file": "app.js",
-      "line": 1920,
+      "line": 1926,
       "sink": "batch.delete(",
       "group": "student-delete",
       "lineSha256": "65cfa58cca6e4a12bce2bf7d2672da3c04695f849ef96502bcfd87cb23161d9f"
     },
     {
       "file": "app.js",
-      "line": 1921,
+      "line": 1927,
       "sink": "batch.commit(",
       "group": "student-delete",
       "lineSha256": "384ea873f678ace7c052320f041c4e17295c979e5dcfeb9e7d07621d53e15d0a"
     },
     {
       "file": "app.js",
-      "line": 2005,
+      "line": 2011,
       "sink": "writeBatch(",
       "group": "lesson-notice",
       "lineSha256": "3006b2c82097b786ff281c4ada32fd199e598e2da25bf5f5b1ce7b5dfd5f7080"
     },
     {
       "file": "app.js",
-      "line": 2006,
+      "line": 2012,
       "sink": "writer.set(",
       "group": "lesson-notice",
       "lineSha256": "f0f4438a82d4b6cff2cce85b92275dd8dcd7ef44aae53b43fa4e18b644ff65e9"
     },
     {
       "file": "app.js",
-      "line": 2007,
+      "line": 2013,
       "sink": "writer.commit(",
       "group": "lesson-notice",
       "lineSha256": "adc19d63c9badba857fc7ff14ca44f95413412ffd657a51ec3b5011dfeb0392d"
     },
     {
       "file": "app.js",
-      "line": 2043,
+      "line": 2049,
       "sink": "writeBatch(",
       "group": "student-notice",
       "lineSha256": "00418aabe6f646e86edd7aea7530195b50f349a2607fdc555b28d38b4e0503ba"
     },
     {
       "file": "app.js",
-      "line": 2045,
+      "line": 2051,
       "sink": "writer.set(",
       "group": "student-notice",
       "lineSha256": "501e397583bef98b0eb1116ebe08bbc141a43d27fb38955a0713ccf40fa4a244"
     },
     {
       "file": "app.js",
-      "line": 2047,
+      "line": 2053,
       "sink": "writer.commit(",
       "group": "student-notice",
       "lineSha256": "46b12b1bddffd8dbbaa10926f047faff65210cfe788d5796c691718ca1d23a13"
     },
     {
       "file": "app.js",
-      "line": 2052,
+      "line": 2058,
       "sink": "writeBatch(",
       "group": "generic-notice",
       "lineSha256": "ba51483520517b496e16b18ba3653161e49165c817dd5fa09750057418ad7c53"
     },
     {
       "file": "app.js",
-      "line": 2053,
+      "line": 2059,
       "sink": "targetBatch.set(",
       "group": "generic-notice",
       "lineSha256": "956af1e619f745c5a0d914e3f05e242e3255d47c83f57c81f7c0d8135aee59ce"
     },
     {
       "file": "app.js",
-      "line": 2054,
+      "line": 2060,
       "sink": "targetBatch.commit(",
       "group": "generic-notice",
       "lineSha256": "d884cd2e8d830fb8b1f6b2cb10609961d164390bc635f03884df268d6b481274"
     },
     {
       "file": "app.js",
-      "line": 2116,
+      "line": 2122,
       "sink": "runTransaction(",
       "group": "lesson-save",
       "lineSha256": "18d8db0e65de95c10d5655d2b996484bfeaa8d43ff6136c367e84d9590d7330f"
     },
     {
       "file": "app.js",
-      "line": 2120,
+      "line": 2126,
       "sink": "tx.set(",
       "group": "lesson-save",
       "lineSha256": "b79e182a759a34e7bc3abff7e75d54d7fc334f24a283805fd4b60cdd9f552b1e"
     },
     {
       "file": "app.js",
-      "line": 2122,
+      "line": 2128,
       "sink": "tx.set(",
       "group": "lesson-save",
       "lineSha256": "c911a566b61ccb2e60ea4b25813e93f0a95b19ad55e904da41953bf7bec8572d"
     },
     {
       "file": "app.js",
-      "line": 2141,
+      "line": 2147,
       "sink": "writeBatch(",
       "group": "lesson-delete",
       "lineSha256": "3ecef3ef1842c890a49fcd50cfcc48ad87960b64acf476cb2da7bfabd01e4069"
     },
     {
       "file": "app.js",
-      "line": 2141,
+      "line": 2147,
       "sink": "batch.delete(",
       "group": "lesson-delete",
       "lineSha256": "3ecef3ef1842c890a49fcd50cfcc48ad87960b64acf476cb2da7bfabd01e4069"
     },
     {
       "file": "app.js",
-      "line": 2143,
+      "line": 2149,
       "sink": "batch.set(",
       "group": "lesson-delete",
       "lineSha256": "ebfa40f752f9f688458d359c2f6f7450e1660824af33ce7e2422f8634c1b49fc"
     },
     {
       "file": "app.js",
-      "line": 2145,
+      "line": 2151,
       "sink": "batch.commit(",
       "group": "lesson-delete",
       "lineSha256": "96776f0c66bdbae1cd60105d21fd2c6c921cf0802b796b16c121e7b3b4f9ddb5"
     },
     {
       "file": "app.js",
-      "line": 2210,
+      "line": 2216,
       "sink": "runTransaction(",
       "group": "lesson-memo",
       "lineSha256": "18d8db0e65de95c10d5655d2b996484bfeaa8d43ff6136c367e84d9590d7330f"
     },
     {
       "file": "app.js",
-      "line": 2214,
+      "line": 2220,
       "sink": "tx.set(",
       "group": "lesson-memo",
       "lineSha256": "b79e182a759a34e7bc3abff7e75d54d7fc334f24a283805fd4b60cdd9f552b1e"
     },
     {
       "file": "app.js",
-      "line": 2511,
+      "line": 2520,
       "sink": "runTransaction(",
       "group": "course-availability",
       "lineSha256": "d6c4d58f17a4b227b4dd07f9134904b4611e753434ba0244a492d32c9c8e9cff"
     },
     {
       "file": "app.js",
-      "line": 2516,
+      "line": 2525,
       "sink": "tx.set(",
       "group": "course-availability",
       "lineSha256": "c0bbdf81e8f8e1c6e9694fd09c24b3e2e0644bc6126a09e7dd3b94bb74d1e593"
     },
     {
       "file": "app.js",
-      "line": 2517,
+      "line": 2526,
       "sink": "tx.set(",
       "group": "course-availability",
       "lineSha256": "6dc8e289d98c3aa58a63adc4edb1eb0e74847394257f399c13688a13fb1efc0b"
     },
     {
       "file": "app.js",
-      "line": 2519,
+      "line": 2528,
       "sink": "tx.set(",
       "group": "course-availability",
       "lineSha256": "75c6193f859d1f77b3f51479a8bad6c4fd139d5457c654b853ff88c3b9baae1c"
     },
     {
       "file": "app.js",
-      "line": 2932,
+      "line": 2941,
       "sink": "runTransaction(",
       "group": "course-publish",
       "lineSha256": "d6c4d58f17a4b227b4dd07f9134904b4611e753434ba0244a492d32c9c8e9cff"
     },
     {
       "file": "app.js",
-      "line": 2981,
+      "line": 2990,
       "sink": "tx.delete(",
       "group": "course-publish",
       "lineSha256": "303da544df813ed39e27e11fb1ab74b13844be25ba29f10c1ed7cca068866aef"
     },
     {
       "file": "app.js",
-      "line": 2982,
+      "line": 2991,
       "sink": "tx.set(",
       "group": "course-publish",
       "lineSha256": "32d7e51020d40b6c5e81a4028dbdbf97ba0d7cbbd10b78dae03e61a51cb8bc6a"
     },
     {
       "file": "app.js",
-      "line": 2985,
+      "line": 2994,
       "sink": "tx.set(",
       "group": "course-publish",
       "lineSha256": "85f5ac5006836f45f6b7e766faa9e0f469cf0622f4e2becd378b3127e753ba32"
     },
     {
       "file": "app.js",
-      "line": 2986,
+      "line": 2995,
       "sink": "tx.update(",
       "group": "course-publish",
       "lineSha256": "f0877f81005a3e72645a63500c062442bedb1591ee4ddffae759938324687df0"
     },
     {
       "file": "app.js",
-      "line": 2987,
+      "line": 2996,
       "sink": "tx.set(",
       "group": "course-publish",
       "lineSha256": "6f5cd109aa41c82de1d792a7f841c1a8b47c44e3e722db665915ba716be8c89a"
     },
     {
       "file": "app.js",
-      "line": 2989,
+      "line": 2998,
       "sink": "tx.set(",
       "group": "course-publish",
       "lineSha256": "3a051e76c5825397b72e6bd3353993b404459d17bc129a7b696da489a17b6a46"
     },
     {
       "file": "app.js",
-      "line": 2995,
+      "line": 3004,
       "sink": "tx.set(",
       "group": "course-publish",
       "lineSha256": "4f6e406a5601083d3604397d1378c34e135585846f18902e7b015c20593b35b9"

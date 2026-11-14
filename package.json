@@ -2,7 +2,7 @@
   "name": "shiftly-t-quality-checks",
   "private": true,
   "scripts": {
-    "test": "npm run test:seasonal && npm run test:stage3 && node --test tests/booking-transport.cjs && npm run test:normal:server && npm run test:normal:client && npm run test:normal:extended && node tests/config-guard.cjs && node tests/teacher-weekly-work.cjs && node tests/pr1-review.cjs && node tests/audit.cjs",
+    "test": "npm run test:rules:static && npm run test:seasonal && npm run test:stage3 && node --test tests/booking-transport.cjs && npm run test:normal:server && npm run test:normal:client && npm run test:normal:extended && node tests/config-guard.cjs && node tests/teacher-weekly-work.cjs && node tests/pr1-review.cjs && node tests/audit.cjs",
     "test:rules:static": "node tests/rules-compatibility.cjs",
     "test:rules": "npm --prefix tests/rules test",
     "test:work:rules": "npm --prefix tests/rules run test:work",

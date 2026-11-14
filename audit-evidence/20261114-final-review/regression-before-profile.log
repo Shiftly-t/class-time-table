@@ -1,0 +1,16 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'owner'
+- 'employee'
+
+    at /workspace/class-time-table-integration/tests/audit.cjs:275:569
+    at async check (/workspace/class-time-table-integration/tests/audit.cjs:51:108)
+    at async /workspace/class-time-table-integration/tests/audit.cjs:275:1 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'owner',
+  expected: 'employee',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

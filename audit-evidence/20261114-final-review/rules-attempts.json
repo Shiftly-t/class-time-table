@@ -1,0 +1,22 @@
+[
+  {
+    "file": "firestore.test.cjs",
+    "exitCode": 1,
+    "status": "UNVERIFIED: local Emulator unavailable"
+  },
+  {
+    "file": "work-integration.test.cjs",
+    "exitCode": 1,
+    "status": "UNVERIFIED: local Emulator unavailable"
+  },
+  {
+    "file": "normal-authority.test.cjs",
+    "exitCode": 1,
+    "status": "UNVERIFIED: local Emulator unavailable"
+  },
+  {
+    "file": "seasonal-workflows.test.cjs",
+    "exitCode": 1,
+    "status": "UNVERIFIED: local Emulator unavailable"
+  }
+]

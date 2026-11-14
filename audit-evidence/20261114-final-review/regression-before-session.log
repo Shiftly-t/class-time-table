@@ -1,0 +1,22 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   {
++     grade: '中1',
++     id: 'private',
++     name: '前の利用者の生徒'
++   }
++ ]
+- []
+
+    at /workspace/class-time-table-integration/tests/audit.cjs:272:656
+    at async check (/workspace/class-time-table-integration/tests/audit.cjs:51:108)
+    at async /workspace/class-time-table-integration/tests/audit.cjs:272:1 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [Array],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}

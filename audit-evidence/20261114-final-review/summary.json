@@ -1,0 +1,30 @@
+{
+  "reviewBase": "b427848afd81186f30ec8afca3a95fba785f142e",
+  "publicPolicyAndClient": 29,
+  "stage3Preparation": 30,
+  "bookingTransport": 12,
+  "normalServer": 29,
+  "normalClient": 19,
+  "normalExtended": 41,
+  "chromium": 114,
+  "newSessionRegressions": 4,
+  "rulesStatic": 20,
+  "privateCandidatePrior": 31,
+  "privateCandidateNew": 42,
+  "privateHandlerUI": 12,
+  "originalCharacterization": {
+    "behavior": 16,
+    "reproducedFindings": 14,
+    "findingPassMeansSafe": false
+  },
+  "realFirebase": {
+    "cases": 43,
+    "status": "NOT_RUN"
+  },
+  "rulesEmulator": "UNVERIFIED: localhost8095 unavailable",
+  "productionChanged": false,
+  "mainChanged": false,
+  "flagsEnabled": false,
+  "projectCreated": false,
+  "privateSourcesPublished": false
+}
