@@ -1,3 +1,5 @@
+> 最新：採用された簡素化の第1段階は [SIMPLIFICATION_STAGE1_REVIEW_20261114.md](../../SIMPLIFICATION_STAGE1_REVIEW_20261114.md)。退塾サーバー/定員移行は未完、両フラグfalse。以下の旧段階記録と区別する。
+
 # 第3段階の準備記録と第4段階の更新
 
 **最新実装は[第4段階報告](../../SEASONAL_API_MIGRATION_REVIEW_20261113.md)を参照。** テストproject作成は保留中。講習APIと制限付きライフサイクルを追加し、[11ケース対応表](IMPLEMENTATION_PROGRESS_STAGE4.md)を更新した。以下の未実装一覧と件数は第3段階当時の記録。

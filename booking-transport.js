@@ -1,6 +1,6 @@
 // Shared booking RPC safety. Never persist QR credentials or blindly resend an
 // uncertain mutation: legacy endpoints may ignore requestId entirely.
-const READS=new Set(['view','courses','getSettings','slots','slotDemand','roster','teachers','detail','getQr','capabilities','requestStatus','planStudentDelete','planSnapshotRestore','inspectCourse','inspectAvailability','inspectControl','listSnapshots','verifyIntegrity']);
+const READS=new Set(['view','courses','getSettings','slots','slotDemand','roster','teachers','detail','getQr','capabilities','requestStatus','planStudentDelete','planSnapshotRestore','inspectCourse','inspectAvailability','inspectControl','listSnapshots','verifyIntegrity','planWithdrawal']);
 const definite=new Set(['invalid-argument','permission-denied','unauthenticated','failed-precondition','not-found','already-exists','aborted','resource-exhausted']);
 const blocked=message=>Object.assign(Error(message),{code:'booking/result-unconfirmed'});
 export const bookingMutation=action=>!READS.has(action);
@@ -15,6 +15,7 @@ export function createBookingTransport({call,getSession,newRequestId=()=>crypto.
   isMutation:bookingMutation,
   async call(fields){
    const epoch=sync(),mutation=bookingMutation(fields.action);
+   if(['setTeacherLimit','setCapacity'].includes(fields.action))throw Object.assign(Error('個別定員の変更は廃止しました。講習の勤務希望と予約停止設定で調整してください。'),{code:'booking/unsupported-operation'});
    if(mutation&&(pending||inFlight))throw blocked('前の送信結果が未確認です。「送信結果を確認」を使い、同じ処理を繰り返さないでください。');
    const operation=mutation?{epoch,body:{...fields,requestId:newRequestId()}}:null;
    if(operation){pending=operation;inFlight=operation;}

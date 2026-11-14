@@ -1,7 +1,7 @@
 // Local files only. No Firebase SDK, credentials, CLI, HTTP or deployment call.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..');
-const files=['index.html','course-booking.html','course-booking-admin.html','app.js','course-booking.js','course-booking-admin.js','booking-transport.js','normal-authority-client.js','seasonal-authority-client.js','normal-editor.js','teacher-work.js','style.css','booking.css','normal-editor.css','teacher-work.css'];
+const files=['index.html','course-booking.html','course-booking-admin.html','app.js','course-booking.js','course-booking-admin.js','booking-transport.js','normal-authority-client.js','seasonal-authority-client.js','student-grade.js','student-enrollment.js','authority-commands.js','course-structure.js','normal-editor.js','teacher-work.js','style.css','booking.css','normal-editor.css','teacher-work.css'];
 async function prepare(manifest,output){
  require('./check-write-inventory.cjs').verifyInventory();
  const {validateStage3Manifest}=await import('./stage3-safety.mjs');

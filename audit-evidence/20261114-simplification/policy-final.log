@@ -1,0 +1,25 @@
+
+> test:simplification
+> node --test tests/server/simplification.test.cjs
+
+✔ academic grades are calculated from the JST academic year without changing the source (7.831039ms)
+✔ manual grade anchor and legacy/other labels remain supported (0.508701ms)
+✔ withdrawal hides only future generated occurrences and never mutates the student (0.917815ms)
+✔ course structure is fixed by settings (1.974214ms)
+✔ course structure is fixed by hasLessons (0.408482ms)
+✔ course structure is fixed by hasAvailability (0.416796ms)
+✔ fixed seasonal capacity counts distinct submitted staff and excludes owner (0.769106ms)
+✔ migration never silently drops old zero/one/four or slot overrides (0.305851ms)
+✔ withdrawal planning refuses future lessons and unknown or future reservation holds (0.696338ms)
+✔ single write facade delegates normal and seasonal commands without a database fallback (1.133193ms)
+✔ deprecated capacity mutations are rejected before RPC without changing pending state (3.032757ms)
+✔ annual promotion has no remaining database writer; backup recovery remains preserved (2.313185ms)
+✔ capacity calculations reject invalid dates and unidentified staff (0.380131ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 111.186759
