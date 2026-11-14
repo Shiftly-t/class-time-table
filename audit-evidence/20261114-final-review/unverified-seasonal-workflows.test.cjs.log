@@ -1,0 +1,178 @@
+✖ locked business writes including owner: owner (5.17715ms)
+✖ locked business writes including owner: admin (0.61074ms)
+✖ locked business writes including owner: t (0.099977ms)
+✖ locked business writes including owner: null (0.070424ms)
+✖ API gate disabled never reopens old direct student writes (0.055973ms)
+✖ legacy lock absent preserves original admin student and course lesson permissions (0.043364ms)
+✖ locked teacher submission, proxy, course meta and backup creation are all denied (0.035642ms)
+✖ independent notification ownership and staff reads remain narrow (0.038587ms)
+✖ internal coordinationReceipts never exposed to browser owner (0.173656ms)
+✖ internal coordinatedBackups never exposed to browser owner (0.097244ms)
+✖ internal studentLifecycle never exposed to browser owner (0.04714ms)
+✖ internal normalAuthorityState never exposed to browser owner (0.036304ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 0
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 271.931401
+
+✖ failing tests:
+
+test at seasonal-workflows.test.cjs:11:45
+✖ locked business writes including owner: owner (5.17715ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:11:45
+✖ locked business writes including owner: admin (0.61074ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:11:45
+✖ locked business writes including owner: t (0.099977ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:11:45
+✖ locked business writes including owner: null (0.070424ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:12:1
+✖ API gate disabled never reopens old direct student writes (0.055973ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:13:1
+✖ legacy lock absent preserves original admin student and course lesson permissions (0.043364ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:14:1
+✖ locked teacher submission, proxy, course meta and backup creation are all denied (0.035642ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:15:1
+✖ independent notification ownership and staff reads remain narrow (0.038587ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:16:113
+✖ internal coordinationReceipts never exposed to browser owner (0.173656ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:16:113
+✖ internal coordinatedBackups never exposed to browser owner (0.097244ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:16:113
+✖ internal studentLifecycle never exposed to browser owner (0.04714ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at seasonal-workflows.test.cjs:16:113
+✖ internal normalAuthorityState never exposed to browser owner (0.036304ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }

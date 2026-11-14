@@ -1,0 +1,440 @@
+
+> test
+> npm run test:simplification && npm run test:rules:static && npm run test:seasonal && npm run test:stage3 && node --test tests/booking-transport.cjs && npm run test:normal:server && npm run test:normal:client && npm run test:normal:extended && node tests/config-guard.cjs && node tests/teacher-weekly-work.cjs && node tests/pr1-review.cjs && node tests/audit.cjs
+
+
+> test:simplification
+> node --test tests/server/simplification.test.cjs
+
+✔ academic grades are calculated from the JST academic year without changing the source (7.968469ms)
+✔ manual grade anchor and legacy/other labels remain supported (0.486959ms)
+✔ withdrawal hides only future generated occurrences and never mutates the student (1.017561ms)
+✔ course structure is fixed by settings (1.583797ms)
+✔ course structure is fixed by hasLessons (0.413099ms)
+✔ course structure is fixed by hasAvailability (0.325711ms)
+✔ fixed seasonal capacity counts distinct submitted staff and excludes owner (0.309287ms)
+✔ migration never silently drops old zero/one/four or slot overrides (0.360763ms)
+✔ withdrawal planning refuses future lessons and unknown or future reservation holds (0.500419ms)
+✔ single write facade delegates normal and seasonal commands without a database fallback (1.090599ms)
+✔ deprecated capacity mutations are rejected before RPC without changing pending state (3.04896ms)
+✔ annual promotion has no remaining database writer; backup recovery remains preserved (2.039529ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 108.693348
+
+> test:rules:static
+> node tests/rules-compatibility.cjs
+
+STATIC PASS registered role and maintenance gates are present
+STATIC PASS client role escalation is denied
+STATIC PASS all seven booking collections deny client read/write
+STATIC PASS reserved b_ IDs are denied in create/update/delete
+STATIC PASS booking active protection covers create/update/delete, including memo-only writes
+STATIC PASS memo form writes the protected timetable document directly
+STATIC PASS lesson form and course editor also write timetable directly
+STATIC PASS booking management UI uses protected callable API actions
+STATIC PASS student label propagation directly updates all linked entries in batches
+STATIC PASS in-app permanent deletion is disabled without a direct batch path
+STATIC PASS normal assignment uses post-commit teacher absence document
+STATIC PASS normal teacher absence and course assignment checks are separate
+STATIC PASS course periods have only list/count validation in supplied rules
+STATIC PASS availability slots have only list/count validation, not element/calendar validation
+STATIC PASS owner is not exempted from archived availability write rejection
+STATIC PASS student write policy has no schema validation function
+STATIC PASS revision counter accepts any positive int, not exact previous+1
+STATIC PASS entry allow conditions require neither audit nor capacity/revision shared state
+STATIC PASS app-sized batches must be tested against rules read-call limits separately
+STATIC PASS backup includes archived availability and directly restores it
+STATIC RESULT 20 source assertions passed; Firestore evaluation UNVERIFIED
+
+> test:seasonal
+> node --test tests/server/seasonal-policy.test.cjs tests/server/seasonal-client.test.cjs
+
+✔ disabled flag never sends even a capability request (1.751324ms)
+✔ old or unsupported API never receives mutations (0.461931ms)
+✔ availability requires source slots and both expected tokens (0.979065ms)
+✔ stale availability never sends save (0.422483ms)
+✔ course edit compares full source and preserves timestamp DTO (1.307279ms)
+✔ manual publication includes per-document, course and meta preconditions (0.595488ms)
+✔ manual oversized or stale changes cannot mutate (0.386821ms)
+✔ memo DTO cannot alter schedule or ledger (0.256719ms)
+✔ calendar owns date and type, and sends exact source value (0.462883ms)
+✔ maintenance never needs a legacy backup mutation (0.449232ms)
+✔ login changing between capabilities and inspection prevents every mutation (0.37262ms)
+✔ login changing after inspect prevents manual mutation (0.323848ms)
+✔ uncertain mutation is never replayed and read-only status clears it (0.633175ms)
+✔ malformed mutation success remains uncertain (0.253524ms)
+✔ lifecycle apply never accepts an unsupported plan or QR-reactivating restore (0.312441ms)
+✔ delete apply echoes the full revision-bound plan (0.378238ms)
+✔ a deletion plan without revision cannot enable apply (0.151543ms)
+✔ integrity verification is read-only and requires all reported checks (0.245893ms)
+✔ incomplete integrity response cannot report success (0.21674ms)
+✔ owner can start maintenance when the config document is initially absent (0.265913ms)
+✔ withdrawal refuses an unadvertised server and never falls back to student deletion (0.168549ms)
+✔ withdrawal plan requires explicit history preservation and QR revocation (0.152315ms)
+✔ withdrawal mutation binds the plan revision and validates positive lifecycle acknowledgements (0.166185ms)
+✔ an ambiguous withdrawal result retains request status and cannot be retried (0.147087ms)
+✔ public course DTO enforces dates, 120 day bound and ordered nonoverlapping periods (1.713348ms)
+✔ course DTO never accepts server metadata or arbitrary fields (0.252513ms)
+✔ availability is canonical, unique, within course and bounded (2.07349ms)
+✔ manual placement counts unpublished assigned reservations and enforces two (8.429459ms)
+✔ pending reservations prevent a second overlapping student lesson (0.222027ms)
+✔ adjacent intervals do not consume the same seat (0.254335ms)
+✔ cancelled lessons do not consume capacity; arbitrary lesson paths and dates are rejected (0.491746ms)
+✔ final rules candidate preserves QR ownership and old validation; does not use API enabled to reopen legacy writes (4.54705ms)
+✔ rules candidate locks course availability/meta, audit and backup creation but retains independent notification read/delete (3.260451ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 163.101689
+
+> test:stage3
+> node --test tests/stage3/*.test.cjs
+
+✔ generated index.html: correct blocks external access (1068.273192ms)
+✔ generated index.html: mixed-config blocks external access (550.64975ms)
+✔ generated index.html: wrong-origin blocks external access (553.266678ms)
+✔ generated course-booking.html: correct blocks external access (513.402527ms)
+✔ generated course-booking.html: mixed-config blocks external access (407.159807ms)
+✔ generated course-booking.html: wrong-origin blocks external access (492.435934ms)
+✔ generated course-booking-admin.html: correct blocks external access (424.029322ms)
+✔ generated course-booking-admin.html: mixed-config blocks external access (451.276757ms)
+✔ generated course-booking-admin.html: wrong-origin blocks external access (361.438456ms)
+✔ reviewed inventory covers every current Web file and 36 operation groups (45.412642ms)
+✔ unreviewed Web change stops preparation (4.0448ms)
+✔ fictional isolated manifest accepted offline (0.477235ms)
+✔ reject production id (0.197922ms)
+✔ reject mixed authDomain (0.20329ms)
+✔ reject mixed bucket (0.145505ms)
+✔ reject mixed sender (0.197312ms)
+✔ reject mixed app id (0.170852ms)
+✔ reject reused Web key (0.150622ms)
+✔ reject reused App Check site key (0.340012ms)
+✔ reject unapproved host (0.214596ms)
+✔ reject enabled work flag (0.186836ms)
+✔ reject enabled API flag (0.139967ms)
+✔ reject wrong region (0.106688ms)
+✔ reject secret-bearing configuration (0.145094ms)
+✔ template fails before any output directory is created (31.960134ms)
+✔ local preparation keeps production source intact and inserts guard before all SDK initialization (68.870616ms)
+✔ never output a test configuration inside any Git checkout (28.364397ms)
+✔ runtime rejects origin, marker, flags and configuration substitution before SDK use (0.498505ms)
+✔ CLI parse errors never echo configuration contents (33.078076ms)
+✔ Storage service is not required when Web config has no bucket (0.280895ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5775.525852
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice
+✔ mutation gets a fresh request ID; read does not (1.811905ms)
+✔ ambiguous response never replays mutation, even with same payload (0.543462ms)
+✔ confirmation sends only scoped readonly status and clears committed receipt (0.827212ms)
+✔ unsupported or uncommitted status remains blocked {} (0.359821ms)
+✔ unsupported or uncommitted status remains blocked {"protocolVersion":2,"committed":false} (0.246423ms)
+✔ unsupported or uncommitted status remains blocked {"protocolVersion":1,"committed":true} (0.191333ms)
+✔ definite rejected operation can be corrected (3.574726ms)
+✔ internal errors keep uncertain state (0.229069ms)
+✔ session change discards delayed response (0.356756ms)
+✔ old request finalizer cannot unlock a newer session mutation (0.541118ms)
+✔ read failure never blocks future operation (0.313113ms)
+✔ no request can be sent without a session (0.137673ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 66.940327
+
+> test:normal:server
+> node --test tests/server/normal-authority.test.cjs
+
+✔ unconfigured authority, unauthenticated, teacher, parent and absent App Check are rejected (3.992794ms)
+✔ maintenance denies admin but owner can operate (9.285767ms)
+✔ weekly off day blocks creation; daily attendance allows only selected periods; absence wins (2.487031ms)
+✔ multi-period placement requires all overlapping periods (0.577262ms)
+✔ last capacity place: two admins race, one retries and is refused (2.221369ms)
+✔ concurrent student duplicate across two teachers is rejected (1.046785ms)
+✔ idempotent retry emits one lesson, audit and notice; request reuse with different payload rejected (1.407839ms)
+✔ weekly virtual lessons count toward cap even without stored documents (0.654586ms)
+✔ canonical daily reassignment materializes one occurrence, preserves weekly data and next week (1.044562ms)
+✔ weekly off-day edit retains stored lessons and all weekly templates (0.659714ms)
+✔ work update and assignment share revision; racing work update cannot overwrite after lesson commit (1.030411ms)
+✔ stale lesson cannot overwrite a different administrator memo (0.51481ms)
+✔ memo-only edit of off-day legacy assignment permitted, reassignment to off-day blocked (1.523168ms)
+✔ cancelled weekly occurrence does not regenerate; explicit undo safely restores weekly occurrence (1.040136ms)
+✔ course dates, course documents and reserved booking ids refused without touching booking data (1.231237ms)
+✔ closed school refused; explicit open day restores permission (0.512687ms)
+✔ invalid calendar/time, missing students, malicious fields and duplicate periods fail closed (1.187022ms)
+✔ one-off deletion exposing a virtual weekly lesson is checked for capacity (0.83994ms)
+✔ bounded query refuses instead of calculating incomplete capacity (3.847018ms)
+✔ read/write discipline and atomic failure leave no lesson/history/receipt writes (0.662678ms)
+✔ generated rules match full supplied baseline, retain booking protection, and only narrow legacy writes (1.300851ms)
+✔ deletion revealing a weekly lesson on an off-day is refused (0.563502ms)
+✔ history uses existing UI timestamp envelope and excludes display-only id (0.499868ms)
+✔ frontend and server work priorities agree over a weekday/period/override/absence matrix (5.33877ms)
+✔ date exception clear returns to weekly rule, absence update preserves all lessons (0.990712ms)
+✔ overlap across adjacent intervals and malformed legacy labels fail closed (0.761494ms)
+✔ same-command absence and reassignment validate the final absence state atomically (1.118602ms)
+✔ reactivating cancelled off-day assignment is refused; marking existing lesson done preserves history (0.782285ms)
+✔ undo daily override validates the weekly teacher work and capacity and notifies both teachers (1.566312ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 115.390632
+
+> test:normal:client
+> node --test tests/server/normal-client.test.cjs
+
+✔ disabled adapter cannot call or write (1.343553ms)
+✔ inspect returns only normal raw records and tokens and makes no document writes (4.783491ms)
+✔ connected adapter inspects then commits a valid lesson without client timestamp (10.066879ms)
+✔ stale UI baseline is refused before a write command (0.834762ms)
+✔ server rejects a race after inspection and receipt is not created (1.020716ms)
+✔ uncertain response retries exact request id; a different target is blocked (1.301841ms)
+✔ logout during inspection cannot send a mutation (5.142561ms)
+✔ work inspection uses current revision and refuses stale work UI (1.011022ms)
+✔ virtual occurrence assignment and absence are sent in one command (1.897591ms)
+✔ normal calendar edits use tokens, preserve lessons, and course dates are refused (2.030197ms)
+✔ automatic Sunday and national holiday cannot be bypassed; open-day exception permits registration (1.559442ms)
+✔ cross-day moves, course/booking entries and oversized batches never issue mutation (1.105481ms)
+✔ calendar/work restore guards and malformed responses never fall back to Firestore (0.932176ms)
+✔ SDK timestamps normalize against transport envelopes without forging memoUpdatedAt (0.73873ms)
+✔ stale calendar snapshot cannot replace another administrator note (0.357558ms)
+✔ reopening an overcapacity normal day is refused without removing the closure (0.759381ms)
+✔ calendar edits and assignment serialize on the same transaction revision (0.880049ms)
+✔ public server holiday calculation matches public app calendar for 2020..2028 (30.39226ms)
+✔ pending own-work timestamp does not block a new semantic work edit (0.682086ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 128.2681
+
+> test:normal:extended
+> node --test tests/server/extended-operations.test.cjs tests/server/extended-client.test.cjs
+
+✔ student client inspects entire nested weekly baseline and saves one atomic command (13.315224ms)
+✔ stale student UI cannot replace a new remark or weekly slot (0.809244ms)
+✔ uncertain registration uses same request/id and never duplicates a student (1.261401ms)
+✔ uninstalled private fence and booking identity block expose safe Japanese guidance (0.985805ms)
+✔ client moves an existing one-off through two inspected endpoints, preserves its id (3.23159ms)
+✔ virtual weekly move is detached and an uncertain retry reuses the original target id (2.210663ms)
+✔ stale source and course move never mutate either endpoint (1.254983ms)
+✔ course metadata-only calendar route succeeds; opening changes give a not-implemented message (1.123889ms)
+✔ deletion and restore planning are read-only even when archive is valid (0.940949ms)
+✔ stale virtual UI assignment cannot use a new weekly source token to overwrite it (0.642779ms)
+✔ student creation keeps nested slot ids in inspection and audit and commits notifications atomically (11.907947ms)
+✔ student label and linked historical/future entry labels commit together preserving memo/status/assignment (1.169916ms)
+✔ invalid schema, duplicate weekly slots, bad date and role fail without partial writes (2.108181ms)
+✔ weekly teacher off-day and explicit future absence cannot be bypassed (1.752857ms)
+✔ unbounded weekly capacity catches a third student decades after initial boundary (0.940008ms)
+✔ future stored one-off colliding with a new weekly student is counted (1.651728ms)
+✔ finite weekly intervals that do not overlap remain valid (0.803897ms)
+✔ parallel student registrations competing for last weekly capacity yield one success (1.419575ms)
+✔ stale student token cannot overwrite other changes and duplicate request emits one history (0.693684ms)
+✔ bookingSettings fences creation/label updates but allows unrelated remarks/weekly settings (1.180182ms)
+✔ bookingSlots fences creation/label updates but allows unrelated remarks/weekly settings (1.016671ms)
+✔ bookingEntries fences creation/label updates but allows unrelated remarks/weekly settings (1.250736ms)
+✔ bookingAccess fences creation/label updates but allows unrelated remarks/weekly settings (0.723307ms)
+✔ bookingTeacherLoad fences creation/label updates but allows unrelated remarks/weekly settings (0.679753ms)
+✔ bookingTeacherLimits fences creation/label updates but allows unrelated remarks/weekly settings (0.585814ms)
+✔ bookingAudit fences creation/label updates but allows unrelated remarks/weekly settings (0.635148ms)
+✔ oversized label propagation refuses entire student edit rather than batching (1.575325ms)
+✔ single lesson moves atomically between dates preserving memo, status, stable id and two dates of notice (2.364089ms)
+✔ virtual recurring move creates a cancellation source and detached target, preserving weekly source (0.952606ms)
+✔ move destination cap, closed day, off-work day, course and stale source reject all endpoint writes (1.741611ms)
+✔ duplicate move request does not produce a second target or duplicate notes (0.685642ms)
+✔ course calendar metadata edit works without touching booking counts; opening changes remain fenced (0.547107ms)
+✔ student deletion plan is read only and never claims QR revocation (0.856434ms)
+✔ restore plan validates complete immutable parts but never applies incomplete booking recovery (0.696959ms)
+✔ missing, duplicate and malformed restore parts refuse without creating a safety copy or receipt (0.502572ms)
+✔ verification resource bound and canonical occurrence identity collisions stop saves (6.552181ms)
+✔ default server refuses student identity writes without a trusted booking-writer fence, even with empty booking data (0.490384ms)
+✔ virtual source tokens reject an unchanged document-null precondition after the weekly teacher changes (1.421698ms)
+✔ document identity is authoritative even when a legacy student carries an id field (0.463675ms)
+✔ two admins moving into the final destination capacity cannot overbook or partially move a loser (1.293179ms)
+✔ a newly materialized virtual lesson uses current student grade rather than a stale client label (0.630481ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 41
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 194.566189
+PASS production initialization blocked: app.js
+PASS production initialization blocked: course-booking.js
+PASS production initialization blocked: course-booking-admin.js
+PASS teacher management and API migration flags remain disabled
+teacher workday behavior and integration contracts: passed
+starting chromium
+launched chromium
+opening app
+browser: 通常授業エディター確定エラー Error: 保存中に時間割が変更されました。変更を破棄して再読み込みしてください。
+    at HTMLButtonElement.publish (http://127.0.0.1:41525/normal-editor.js:427:45)
+browser: Error: 保存中に時間割が変更されました。変更を破棄して再読み込みしてください。
+    at HTMLButtonElement.publish (http://127.0.0.1:41525/normal-editor.js:427:45)
+chromium: PASS absence staging, blocked destination, touch drag, next tap, undo, split warnings, save guard, daily override, weekly preservation, notifications, archive/restore
+starting webkit
+webkit unavailable: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/webkit-2336/pw_run.sh
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     npx playwright install                                 ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+PASS 通常授業の適用終了日を生徒編集後も保持・重複設定を拒否
+PASS 生徒編集の他端末更新を拒否し上書きしない
+PASS 生徒登録・更新の監査を維持し画面から完全削除しない
+PASS 日別変更・講習非表示が毎週設定を壊さず、次回予定・休校例外が一致
+PASS 通常の個別登録も同一生徒の重複・同時刻3人目を拒否
+PASS 日本時間の締切入力・年度境界をUTC端末でも一致
+PASS 全体バックアップ復元で特別開校日と講師欠席を復元
+PASS 模試未読込時は時間割を開校と誤表示しない
+PASS 画面幅320: 全ロール主要画面・生徒入力・スクロール領域
+PASS 画面幅390: 全ロール主要画面・生徒入力・スクロール領域
+PASS 画面幅768: 全ロール主要画面・生徒入力・スクロール領域
+PASS 画面幅1024: 全ロール主要画面・生徒入力・スクロール領域
+PASS 画面幅1440: 全ロール主要画面・生徒入力・スクロール領域
+PASS ログイン失敗・成功・未登録拒否・ログアウトの状態遷移
+PASS 予約管理の全タブ・QR印刷・確定要求・ログアウト時QR消去
+PASS 予約管理の取得中ログアウトで遅延応答から個人情報が復活しない
+PASS 予約管理の書込中は講習選択欄を固定
+PASS 予約画面320px: QR氏名確認・希望提出・公開確認・入力のエスケープ
+PASS 予約画面768px: QR氏名確認・希望提出・公開確認・入力のエスケープ
+PASS 予約画面1440px: QR氏名確認・希望提出・公開確認・入力のエスケープ
+PASS 不正QRはAPIを呼ばず拒否
+PASS 勤務希望: 保存・提出通知・他端末の更新拒否・締切後拒否
+PASS お知らせ・伝達事項は講師から編集できず、通知既読は本人宛のみ
+PASS 休校・特別開校・模試の登録削除は基の休校データを維持
+PASS 講習ドラッグ後の最初のタップ・担当上限・勤務希望を検証
+PASS 全体復元はメンテナンス外と不正なバックアップを拒否
+PASS スマホの通常・講習エディターはタップ再描画後も横スクロールを維持
+PASS 授業・伝達事項: 他端末の変更を拒否し、通常予定のメモ保存を翌週へ漏らさない
+PASS 予約授業の詳細は読取専用で、直接編集の導線を停止
+PASS 予約有効講習の手動授業もメモ保存前に停止し、DBを変更しない
+PASS 予約設定のない通常の講習授業は従来どおりメモを保存
+PASS 予約設定の取得失敗時は書込みを停止
+PASS 予約有効講習の配置確定は直接書込みを停止し仮配置を保持
+PASS 予約授業がある生徒の氏名変更は主データ保存前に停止
+PASS 予約授業を含む生徒削除は関連データを削除する前に停止
+PASS 予約授業を含む全体復元は業務データ書込前に停止
+PASS 非表示講習を含む全体復元は業務データ書込前に停止
+PASS 全体復元で講習を再表示する場合は勤務希望も従来どおり復元
+PASS 予約無効の講習配置は従来どおり確定し通知を保存
+PASS 統合: 新機能未有効なら新コレクションを購読せず従来バックアップを維持
+PASS 統合: 勤務設定の読込拒否時は新規配置とバックアップを停止
+PASS 統合: 通常勤務曜日外は黒枠、臨時出勤よりコマ別欠席を優先
+PASS 統合: 黒枠から日別振替を保存し翌週と毎週設定を維持
+PASS 統合: 仮振替中に勤務曜日が変わると確定を停止
+PASS 統合: 講師勤務曜日の保存は監査と同時、snapshot待ちでも表示を保持
+PASS 統合: 臨時出勤の保存・解除は通常勤務曜日に戻す
+PASS 統合: 同じ講師管理タブを押しても未保存の変更を失わない
+PASS 統合: 他端末で変更済みの勤務曜日を古い画面から上書きしない
+PASS 統合: 勤務設定保存中の遷移とログアウト後の遅延書込を停止
+PASS 統合: 勤務曜日外の新規毎週設定を拒否、既存不一致は保持
+PASS 統合: 固定4コマ以外の個別授業でも勤務曜日外を拒否
+PASS 統合: 週間・臨時勤務をバックアップから復元
+PASS 統合: 旧バックアップの復元で新しい勤務設定を消さない
+PASS 統合: 勤務機能無効時に勤務設定付きバックアップを部分復元しない
+PASS 統合: 通常勤務を変更しても講習勤務希望と予約保護を維持
+PASS 統合: 講師管理画面320pxの入力・保存・はみ出し
+PASS 統合: 講師管理画面768pxの入力・保存・はみ出し
+PASS 統合: 講師管理画面1024pxの入力・保存・はみ出し
+PASS 統合: 講師管理画面1440pxの入力・保存・はみ出し
+PASS 統合: 通常勤務設定が読めなくても独立した講習の個別編集を維持
+PASS API移行: 320pxの担当振替と欠席を同じサーバー処理で保存
+PASS API移行: 768pxの担当振替と欠席を同じサーバー処理で保存
+PASS API移行: 1024pxの担当振替と欠席を同じサーバー処理で保存
+PASS API移行: 1440pxの担当振替と欠席を同じサーバー処理で保存
+PASS API移行: 個別授業の新規・編集・削除を接続し直接書込しない
+PASS API移行: 仮想通常授業の伝達事項をAPI保存し翌週を保持
+PASS API移行: 保存直前に他管理者が変更したメモを上書きしない
+PASS API移行: 保存後の応答喪失を同じリクエストで確認し通知を重複しない
+PASS API移行: 勤務曜日・臨時出勤・解除をAPI経由で保存
+PASS API移行: 休校日・特別開校・模試の登録解除で授業を削除しない
+PASS API移行: 生徒情報の一括保存と未実装の復元適用を分離
+PASS API移行: API拒否時も旧Firestore書込にフォールバックしない
+PASS API移行: 未対応の講習メモを旧Firestoreへ保存しない
+PASS API移行: 曜日外をコマ別欠席として自動保存しない
+PASS API移行: 保存済みメモの再編集と日別担当変更の取り消し
+PASS API移行: 休校編集の古い画面から他管理者の備考を上書きしない
+PASS API移行: 勤務画面を非表示でもバックアップに勤務データを含め履歴復元は停止
+PASS 追加移行: 320pxの生徒登録・毎週設定・表示情報一括更新
+PASS 追加移行: 768pxの生徒登録・毎週設定・表示情報一括更新
+PASS 追加移行: 1024pxの生徒登録・毎週設定・表示情報一括更新
+PASS 追加移行: 1440pxの生徒登録・毎週設定・表示情報一括更新
+PASS 追加移行: 単発授業の複数日移動を同じIDで原子的に保存
+PASS 追加移行: 毎週授業の別日移動は元の日を中止し翌週を保持
+PASS 追加移行: 別日移動先の満席をサーバーが拒否し元の日を残す
+PASS 追加移行: 講習中の休校備考のみ変更し開校状態の変更は停止
+PASS 追加移行: 予約・QRがある生徒の表示情報を部分更新しない
+PASS 追加移行: 予約側の排他連携未設定なら生徒登録を停止
+PASS 追加移行: 生徒削除は計画だけ確認しQRも授業も変更しない
+PASS 追加移行: 復元は部品整合性の計画検査だけ行い不完全復元をしない
+PASS 追加移行: 未保存授業の元担当が変更されたら古い画面から保存しない
+PASS 第2段階: API管理対象なら予約受付停止中でも直接書込を拒否
+PASS 第2段階: QR取得失敗から自動再発行しない
+PASS 第2段階: 失効したQRは印刷直前確認で破棄
+PASS 第2段階: 講師上限の個別編集を廃止し読取を維持
+PASS 第2段階: 管理操作の応答喪失は再送せず受付記録だけ確認
+PASS 第2段階: 保護者の応答喪失後は提出を再送せず結果確認
+PASS 第2段階: 印刷前に最新氏名とQRへ更新
+PASS 第2段階: 保存後の再取得失敗では次のクリックを再送に使わない
+PASS 第4段階: 320pxで講師本人の勤務希望をAPI提出
+PASS 第4段階: 768pxで講師本人の勤務希望をAPI提出
+PASS 第4段階: 1440pxで講師本人の勤務希望をAPI提出
+PASS 第4段階: 講習登録と締切更新をAPIに接続
+PASS 第4段階: 個別講習授業と配置エディターの担当振替
+PASS 第4段階: 予約所有授業の伝達事項だけAPI保存
+PASS 第4段階: QRのみの生徒も未対応の退塾APIでは変更しない
+PASS 第4段階: 旧バックアップに依存せず停止し新形式だけ復元
+PASS 第4段階: API拒否と応答不明時に直接書込へ戻らない
+PASS 第4段階: 講習中のカレンダー変更をAPI保存
+PASS 第4段階: 権限拒否された提出を直接保存しない
+PASS 第4段階: 整合性の確認は業務データを書き換えない
+PASS 最終レビュー: ログアウト前の業務snapshotとエラーを別利用者へ反映しない
+PASS 最終レビュー: 解除した勤務希望snapshotを再購読後に受理しない
+PASS 最終レビュー: 同じUIDで再ログインしても前の権限読取を破棄
+PASS 最終レビュー: ログアウト後のバックアップ一覧応答で運営画面を復活させない
+PASS 簡素化: 履歴は閲覧専用で復元の直接呼出しも無書込
+PASS 簡素化: 年度更新は表示だけで学年を自動保存しない
+PASS 簡素化: 退塾者の履歴を保持し翌週生成と通常一覧を止める
+PASS 簡素化: 履歴保持とQR失効の契約がある退塾だけAPIへ送る
+PASS 簡素化: 個別定員は閲覧だけで予約確保を書き換えない
+PASS 簡素化: 予約締切後も生徒別の公開授業担当と日時を変更できる
+UNVERIFIED WebKit: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/webkit-2336/pw_run.sh
+RESULT 120 passed
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

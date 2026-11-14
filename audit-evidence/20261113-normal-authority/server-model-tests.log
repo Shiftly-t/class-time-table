@@ -1,0 +1,45 @@
+
+> test:normal:server
+> node --test tests/server/normal-authority.test.cjs
+
+✔ unconfigured authority, unauthenticated, teacher, parent and absent App Check are rejected (16.745574ms)
+✔ maintenance denies admin but owner can operate (15.442433ms)
+✔ weekly off day blocks creation; daily attendance allows only selected periods; absence wins (8.80489ms)
+✔ multi-period placement requires all overlapping periods (1.255189ms)
+✔ last capacity place: two admins race, one retries and is refused (3.846748ms)
+✔ concurrent student duplicate across two teachers is rejected (3.143169ms)
+✔ idempotent retry emits one lesson, audit and notice; request reuse with different payload rejected (5.034446ms)
+✔ weekly virtual lessons count toward cap even without stored documents (0.929675ms)
+✔ canonical daily reassignment materializes one occurrence, preserves weekly data and next week (0.694745ms)
+✔ weekly off-day edit retains stored lessons and all weekly templates (0.997586ms)
+✔ work update and assignment share revision; racing work update cannot overwrite after lesson commit (0.943795ms)
+✔ stale lesson cannot overwrite a different administrator memo (0.958838ms)
+✔ memo-only edit of off-day legacy assignment permitted, reassignment to off-day blocked (2.044645ms)
+✔ cancelled weekly occurrence does not regenerate; deleting weekly occurrence is refused (2.265153ms)
+✔ course dates, course documents and reserved booking ids refused without touching booking data (3.613ms)
+✔ closed school refused; explicit open day restores permission (1.783586ms)
+✔ invalid calendar/time, missing students, malicious fields and duplicate periods fail closed (1.369009ms)
+✔ one-off deletion exposing a virtual weekly lesson is checked for capacity (0.724709ms)
+✔ bounded query refuses instead of calculating incomplete capacity (5.055608ms)
+✔ read/write discipline and atomic failure leave no lesson/history/receipt writes (0.735295ms)
+✔ generated rules match full supplied baseline, retain booking protection, and only narrow legacy writes (1.136132ms)
+✔ deletion revealing a weekly lesson on an off-day is refused (0.860251ms)
+✔ history uses existing UI timestamp envelope and excludes display-only id (0.958156ms)
+✔ frontend and server work priorities agree over a weekday/period/override/absence matrix (9.805299ms)
+✔ date exception clear returns to weekly rule, absence update preserves all lessons (1.426644ms)
+✔ overlap across adjacent intervals and malformed legacy labels fail closed (0.843546ms)
+✔ same-command absence and reassignment validate the final absence state atomically (0.965498ms)
+✔ reactivating cancelled off-day assignment is refused; marking existing lesson done preserves history (1.082772ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 233.565931
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

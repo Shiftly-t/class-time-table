@@ -1,0 +1,47 @@
+
+> test:stage3
+> node --test tests/stage3/*.test.cjs
+
+✔ generated index.html: correct blocks external access (1135.362346ms)
+✔ generated index.html: mixed-config blocks external access (566.632498ms)
+✔ generated index.html: wrong-origin blocks external access (580.560009ms)
+✔ generated course-booking.html: correct blocks external access (437.272783ms)
+✔ generated course-booking.html: mixed-config blocks external access (410.822859ms)
+✔ generated course-booking.html: wrong-origin blocks external access (478.431584ms)
+✔ generated course-booking-admin.html: correct blocks external access (416.686277ms)
+✔ generated course-booking-admin.html: mixed-config blocks external access (459.292818ms)
+✔ generated course-booking-admin.html: wrong-origin blocks external access (449.557355ms)
+✔ reviewed inventory covers every current Web file and 36 operation groups (42.87692ms)
+✔ unreviewed Web change stops preparation (2.667603ms)
+✔ fictional isolated manifest accepted offline (0.440788ms)
+✔ reject production id (0.288227ms)
+✔ reject mixed authDomain (0.525271ms)
+✔ reject mixed bucket (0.149156ms)
+✔ reject mixed sender (0.151149ms)
+✔ reject mixed app id (0.155926ms)
+✔ reject reused Web key (0.420109ms)
+✔ reject reused App Check site key (0.53161ms)
+✔ reject unapproved host (0.307075ms)
+✔ reject enabled work flag (0.217254ms)
+✔ reject enabled API flag (0.121996ms)
+✔ reject wrong region (0.225587ms)
+✔ reject secret-bearing configuration (0.144119ms)
+✔ template fails before any output directory is created (50.118774ms)
+✔ local preparation keeps production source intact and inserts guard before all SDK initialization (76.518115ms)
+✔ never output a test configuration inside any Git checkout (33.860358ms)
+✔ runtime rejects origin, marker, flags and configuration substitution before SDK use (0.567702ms)
+✔ CLI parse errors never echo configuration contents (42.99057ms)
+✔ Storage service is not required when Web config has no bucket (0.224425ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5952.773644
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

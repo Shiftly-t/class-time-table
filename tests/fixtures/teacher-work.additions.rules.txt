@@ -1,0 +1,36 @@
+// SUPERSEDED comparison fixture. Never combine with server-candidates/normal-authority/firestore.candidate.rules.
+// UNDEPLOYED REVIEW CANDIDATE. CRUD only; does not enforce timetable assignment.
+match /teacherWeeklyWork/{teacherUid} {
+  allow read: if isMember();
+  allow create, update: if isAdmin()
+    && exists(userPath(teacherUid))
+    && get(userPath(teacherUid)).data.role in ['admin', 'employee']
+    && request.resource.data.keys().hasOnly(['weekdays', 'updatedBy', 'updatedAt'])
+    && request.resource.data.keys().hasAll(['weekdays', 'updatedBy', 'updatedAt'])
+    && request.resource.data.weekdays is list
+    && request.resource.data.weekdays.size() <= 7
+    && request.resource.data.weekdays.hasOnly([0,1,2,3,4,5,6])
+    && request.resource.data.weekdays.toSet().size() == request.resource.data.weekdays.size()
+    && request.resource.data.updatedBy == request.auth.uid
+    && request.resource.data.updatedAt == request.time;
+  allow delete: if isAdmin();
+}
+match /teacherDateWork/{overrideId} {
+  allow read: if isMember();
+  allow create, update: if isAdmin()
+    && request.resource.data.keys().hasOnly(['date', 'teacherUid', 'availablePeriods', 'updatedBy', 'updatedAt'])
+    && request.resource.data.keys().hasAll(['date', 'teacherUid', 'availablePeriods', 'updatedBy', 'updatedAt'])
+    && request.resource.data.date is string
+    && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    && request.resource.data.teacherUid is string
+    && overrideId == request.resource.data.date + '_' + request.resource.data.teacherUid
+    && exists(userPath(request.resource.data.teacherUid))
+    && get(userPath(request.resource.data.teacherUid)).data.role in ['admin', 'employee']
+    && request.resource.data.availablePeriods is list
+    && request.resource.data.availablePeriods.size() <= 4
+    && request.resource.data.availablePeriods.hasOnly([1,2,3,4])
+    && request.resource.data.availablePeriods.toSet().size() == request.resource.data.availablePeriods.size()
+    && request.resource.data.updatedBy == request.auth.uid
+    && request.resource.data.updatedAt == request.time;
+  allow delete: if isAdmin();
+}

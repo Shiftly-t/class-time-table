@@ -1,0 +1,25 @@
+
+> test:rules:static
+> node tests/rules-compatibility.cjs
+
+STATIC PASS registered role and maintenance gates are present
+STATIC PASS client role escalation is denied
+STATIC PASS all seven booking collections deny client read/write
+STATIC PASS reserved b_ IDs are denied in create/update/delete
+STATIC PASS booking active protection covers create/update/delete, including memo-only writes
+STATIC PASS memo form writes the protected timetable document directly
+STATIC PASS lesson form and course editor also write timetable directly
+STATIC PASS booking management UI uses protected callable API actions
+STATIC PASS student label propagation directly updates all linked entries in batches
+STATIC PASS linked student deletion is a direct batch path too
+STATIC PASS normal assignment uses post-commit teacher absence document
+STATIC PASS normal teacher absence and course assignment checks are separate
+STATIC PASS course periods have only list/count validation in supplied rules
+STATIC PASS availability slots have only list/count validation, not element/calendar validation
+STATIC PASS owner is not exempted from archived availability write rejection
+STATIC PASS student write policy has no schema validation function
+STATIC PASS revision counter accepts any positive int, not exact previous+1
+STATIC PASS entry allow conditions require neither audit nor capacity/revision shared state
+STATIC PASS app-sized batches must be tested against rules read-call limits separately
+STATIC PASS backup includes archived availability and directly restores it
+STATIC RESULT 20 source assertions passed; Firestore evaluation UNVERIFIED

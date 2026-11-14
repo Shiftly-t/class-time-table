@@ -1,0 +1,45 @@
+{
+  "baseline_pr4_commit": "7d52c9307dfe879b1e8a8bb25174801237ee0dc9",
+  "flags": {
+    "teacherWorkFeatureEnabled": false,
+    "normalAuthorityApiEnabled": false
+  },
+  "tests": {
+    "server_transaction_model_passed": 29,
+    "client_server_model_passed": 19,
+    "browser_total_passed": 77,
+    "browser_existing_cases": 60,
+    "browser_api_migration_cases": 17,
+    "calendar_days_compared": 3288,
+    "static_rule_contracts_passed": 20,
+    "production_initialization_guards_passed": 3,
+    "disabled_feature_flags_guard_passed": true
+  },
+  "model_boundary": "Chromium UI -> loopback HTTP -> public server candidate -> independent in-memory MVCC model. Firebase SDK/Auth/App Check are mocked.",
+  "unimplemented": [
+    "Student and recurring weekly template mutation/deletion/label propagation API",
+    "Atomic move across multiple dates",
+    "Course period/calendar mutation that changes normal lesson visibility",
+    "History/full restore API including booking-ledger protection",
+    "Durable request recovery after reload/tab close"
+  ],
+  "unverified": [
+    "Actual Firebase callable and App Check",
+    "Actual Firestore Admin SDK concurrency and rule evaluation",
+    "Safari/WebKit, physical iPad/phones",
+    "Production-scale performance, read costs and atomic backup snapshot"
+  ],
+  "production_actions": false,
+  "sha256": {
+    "app.js": "077e14e2704d4530c1b96c21fa319ce5985ed9b0186ca8710407fcb12a31f75c",
+    "normal-authority-client.js": "c03d46636b669bc1b67a27b5f2dea26cac3e82fe6400edbcf8b084fb259f289c",
+    "normal-editor.js": "c48e9a946649d9e0beae5716cec2b9398305334f8ca9340908b2b50f8db73c04",
+    "teacher-work.js": "6dce1deaa5b319cb2688738a21ece847a8010894af0133702b4e96df4d0978a1",
+    "config.js": "771ca98683512b7c03684a69534e98aa9ebc8cab0536cd8bb2eced0c1a2339e9",
+    "server-candidates/normal-authority/service.cjs": "7c780752bfadfae952a5d8aee233951070517ccf9ac8fe723ccdb2b2354bc164",
+    "server-candidates/normal-authority/calendar.cjs": "7c906ff9b2c79bdf6591b6f0da53c5bddace57fa22bd38a26eb82f5dc690b0d6",
+    "tests/audit.cjs": "06f501730c37b844b9bf0f7412b72595b760bcfadcc9132649f74c60d1b8c3e2",
+    "tests/server/normal-client.test.cjs": "ca55fe0444cea09f9c1d07eb7aa4e142ea4b1b378b1999e234d303345820f30a",
+    "tests/server/normal-authority.test.cjs": "81ef554ae6dcd89fab307aa3dce1f887dbf48c3fb12855311fc5fd2bdd623522"
+  }
+}

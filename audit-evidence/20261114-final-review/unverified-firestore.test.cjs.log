@@ -1,0 +1,668 @@
+✖ DENY anonymous: student/timetable read and student write (11.240996ms)
+✖ DENY unknown: student/timetable read and student write (0.812518ms)
+✖ ALLOW owner: registered staff reads (0.104854ms)
+✖ ALLOW admin: registered staff reads (0.044716ms)
+✖ ALLOW teacher: registered staff reads (0.077715ms)
+✖ DENY self role escalation even for owner (0.046438ms)
+✖ DENY teacher student/timetable/absence mutations (0.039658ms)
+✖ ALLOW normal daily override + audit + two notifications as one batch (0.051556ms)
+✖ DENY assigning a normal lesson to an absent period (0.059578ms)
+✖ DENY same-batch absence and new assignment via existsAfter/getAfter (0.068822ms)
+✖ ALLOW unresolved existing normal assignment while adding absence, and unchanged-assignment memo update (0.036994ms)
+✖ DENY moving continuous normal lesson into any absent constituent period (0.028963ms)
+✖ ALLOW cancelled normal lesson despite teacher absence (0.024466ms)
+✖ ALLOW non-booking course assignment with matching availability (0.025858ms)
+✖ DENY course assignment without matching availability (0.042813ms)
+✖ DENY active-booking course e: create/memo/assignment/delete (0.029383ms)
+✖ DENY active-booking course b_reserved: create/memo/assignment/delete (0.025277ms)
+✖ DENY b_ prefix even when booking disabled (0.019389ms)
+✖ DENY direct writes to every server-only booking collection for all staff (0.035592ms)
+✖ ALLOW booking-active deadline/archive metadata update; DENY period change or deletion (0.053549ms)
+✖ DENY archived course availability restore even for owner (0.030856ms)
+✖ ALLOW self availability + audit + admin notices atomically, reject forged sender (0.272992ms)
+✖ DENY teacher availability after deadline and for another teacher (0.070034ms)
+✖ DENY teacher notice without same-commit availability update (0.028913ms)
+✖ DENY reading or marking other recipient notification (0.022113ms)
+✖ ALLOW own read marker only, DENY notification message rewrite (0.066148ms)
+✖ DENY non-owner backup/audit reads and audit modifications (0.023285ms)
+✖ ALLOW owner backup parts before metadata (matches app sequence) (0.021142ms)
+✖ Maintenance blocks admin/teacher business access, keeps own profile and status readable; owner remains allowed (0.019889ms)
+✖ ALLOW owner maintenance config+event atomic write; DENY config without event (0.043955ms)
+✖ GAP: malformed student/regularSlots and monthly target accepted for admin (0.036033ms)
+✖ GAP: teacher availability accepts invalid date/index/non-string slots (0.023665ms)
+✖ GAP: malformed/overlapping course periods accepted (0.022463ms)
+✖ GAP: two concurrent normal entries for the same student/time are allowed (0.021632ms)
+✖ GAP: third same-slot student is allowed (no server-side teacher capacity check) (0.021271ms)
+✖ GAP: virtual weekly settings do not reserve capacity in rules (0.022102ms)
+✖ GAP: closure/Sunday not enforced for normal assignments (0.022352ms)
+✖ GAP: course Sunday accepted with forged self availability; rules have no automatic holiday calendar (0.022013ms)
+✖ GAP: timetable mutation succeeds without audit, notification, or revision write (0.021091ms)
+✖ GAP: admin can create arbitrary-path audit without a corresponding mutation (0.02015ms)
+✖ GAP: student deletion can leave a valid-looking timetable orphan (0.021331ms)
+✖ GAP: revision can be reset to any positive value (0.022583ms)
+✖ DENY app-sized batch with >20 distinct student rule lookups (exact threshold depends on caching) (0.109542ms)
+✖ DENY student label propagation batch containing a reserved entry, after primary student save (0.036043ms)
+✖ DENY student deletion linked-entry batch containing b_ or booking-active entries (0.021983ms)
+✖ ALLOW individual lesson transaction + audit + notice (matches Draft PR #2) (0.023525ms)
+✖ DENY owner restoring reserved lesson while maintenance enabled (0.022844ms)
+ℹ tests 47
+ℹ suites 0
+ℹ pass 0
+ℹ fail 47
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 738.351679
+
+✖ failing tests:
+
+test at firestore.test.cjs:26:35
+✖ DENY anonymous: student/timetable read and student write (11.240996ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:26:35
+✖ DENY unknown: student/timetable read and student write (0.812518ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:27:46
+✖ ALLOW owner: registered staff reads (0.104854ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:27:46
+✖ ALLOW admin: registered staff reads (0.044716ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:27:46
+✖ ALLOW teacher: registered staff reads (0.077715ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:28:1
+✖ DENY self role escalation even for owner (0.046438ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:29:1
+✖ DENY teacher student/timetable/absence mutations (0.039658ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:30:1
+✖ ALLOW normal daily override + audit + two notifications as one batch (0.051556ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:31:1
+✖ DENY assigning a normal lesson to an absent period (0.059578ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:32:1
+✖ DENY same-batch absence and new assignment via existsAfter/getAfter (0.068822ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:33:1
+✖ ALLOW unresolved existing normal assignment while adding absence, and unchanged-assignment memo update (0.036994ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:34:1
+✖ DENY moving continuous normal lesson into any absent constituent period (0.028963ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:35:1
+✖ ALLOW cancelled normal lesson despite teacher absence (0.024466ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:36:1
+✖ ALLOW non-booking course assignment with matching availability (0.025858ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:37:1
+✖ DENY course assignment without matching availability (0.042813ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:38:40
+✖ DENY active-booking course e: create/memo/assignment/delete (0.029383ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:38:40
+✖ DENY active-booking course b_reserved: create/memo/assignment/delete (0.025277ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:39:1
+✖ DENY b_ prefix even when booking disabled (0.019389ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:40:1
+✖ DENY direct writes to every server-only booking collection for all staff (0.035592ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:41:1
+✖ ALLOW booking-active deadline/archive metadata update; DENY period change or deletion (0.053549ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:42:1
+✖ DENY archived course availability restore even for owner (0.030856ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:43:1
+✖ ALLOW self availability + audit + admin notices atomically, reject forged sender (0.272992ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:44:1
+✖ DENY teacher availability after deadline and for another teacher (0.070034ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:45:1
+✖ DENY teacher notice without same-commit availability update (0.028913ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:46:1
+✖ DENY reading or marking other recipient notification (0.022113ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:47:1
+✖ ALLOW own read marker only, DENY notification message rewrite (0.066148ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:48:1
+✖ DENY non-owner backup/audit reads and audit modifications (0.023285ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:49:1
+✖ ALLOW owner backup parts before metadata (matches app sequence) (0.021142ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:50:1
+✖ Maintenance blocks admin/teacher business access, keeps own profile and status readable; owner remains allowed (0.019889ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:51:1
+✖ ALLOW owner maintenance config+event atomic write; DENY config without event (0.043955ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:54:1
+✖ GAP: malformed student/regularSlots and monthly target accepted for admin (0.036033ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:55:1
+✖ GAP: teacher availability accepts invalid date/index/non-string slots (0.023665ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:56:1
+✖ GAP: malformed/overlapping course periods accepted (0.022463ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:57:1
+✖ GAP: two concurrent normal entries for the same student/time are allowed (0.021632ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:58:1
+✖ GAP: third same-slot student is allowed (no server-side teacher capacity check) (0.021271ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:59:1
+✖ GAP: virtual weekly settings do not reserve capacity in rules (0.022102ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:60:1
+✖ GAP: closure/Sunday not enforced for normal assignments (0.022352ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:61:1
+✖ GAP: course Sunday accepted with forged self availability; rules have no automatic holiday calendar (0.022013ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:62:1
+✖ GAP: timetable mutation succeeds without audit, notification, or revision write (0.021091ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:63:1
+✖ GAP: admin can create arbitrary-path audit without a corresponding mutation (0.02015ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:64:1
+✖ GAP: student deletion can leave a valid-looking timetable orphan (0.021331ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:65:1
+✖ GAP: revision can be reset to any positive value (0.022583ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:66:1
+✖ DENY app-sized batch with >20 distinct student rule lookups (exact threshold depends on caching) (0.109542ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:67:1
+✖ DENY student label propagation batch containing a reserved entry, after primary student save (0.036043ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:68:1
+✖ DENY student deletion linked-entry batch containing b_ or booking-active entries (0.021983ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:69:1
+✖ ALLOW individual lesson transaction + audit + notice (matches Draft PR #2) (0.023525ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at firestore.test.cjs:70:1
+✖ DENY owner restoring reserved lesson while maintenance enabled (0.022844ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }

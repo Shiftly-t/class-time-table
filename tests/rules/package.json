@@ -7,6 +7,9 @@
   "name": "shiftly-firestore-rule-verification",
   "private": true,
   "scripts": {
-    "test": "firebase emulators:exec --project demo-shiftly-rules --config ../firebase.emulator.json --only firestore \"node --test firestore.test.cjs\""
+    "test": "firebase emulators:exec --project demo-shiftly-rules --config ../firebase.emulator.json --only firestore \"node --test firestore.test.cjs\"",
+    "test:work": "firebase emulators:exec --project demo-shiftly-rules --config ../firebase.emulator.json --only firestore \"node --test work-integration.test.cjs\"",
+    "test:normal-authority": "firebase emulators:exec --project demo-shiftly-rules --config ../firebase.emulator.json --only firestore \"node --test normal-authority.test.cjs\"",
+    "test:seasonal": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8095 node --test seasonal-workflows.test.cjs"
   }
 }
