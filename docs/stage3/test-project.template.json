@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "environment": "test",
+  "approvedProjectId": "REPLACE_AFTER_USER_APPROVAL",
+  "approvedProjectNumber": "REPLACE_FROM_TEST_CONSOLE",
+  "approvedTestOrigin": "REPLACE_WITH_TEST_HOSTING_ORIGIN",
+  "functionsRegion": "asia-northeast1",
+  "firebaseConfig": {
+    "apiKey": "REPLACE_WITH_TEST_WEB_API_KEY",
+    "authDomain": "REPLACE_WITH_TEST_AUTH_DOMAIN",
+    "projectId": "REPLACE_WITH_APPROVED_TEST_PROJECT_ID",
+    "storageBucket": "REPLACE_WITH_TEST_STORAGE_BUCKET_NAME",
+    "messagingSenderId": "REPLACE_WITH_TEST_PROJECT_NUMBER",
+    "appId": "REPLACE_WITH_TEST_WEB_APP_ID"
+  },
+  "appCheckSiteKey": "REPLACE_WITH_TEST_DOMAIN_SITE_KEY",
+  "teacherWorkFeatureEnabled": false,
+  "normalAuthorityApiEnabled": false
+}

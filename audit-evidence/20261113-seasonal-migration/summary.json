@@ -1,0 +1,28 @@
+{
+  "publicPolicyAndClient": 29,
+  "stage3Preparation": 30,
+  "bookingTransport": 12,
+  "normalServer": 29,
+  "normalClient": 19,
+  "normalExtended": 41,
+  "chromium": 110,
+  "privateCandidateModelNew": 42,
+  "privateCandidateModelPrior": 31,
+  "privateHandlerChromium": 12,
+  "rulesStaticPrior": 20,
+  "rulesEmulatorNew": {
+    "cases": 12,
+    "status": "NOT_RUN"
+  },
+  "realFirebase": {
+    "cases": 43,
+    "status": "NOT_RUN",
+    "previouslyBlocked": 11,
+    "codePrepared": 6,
+    "partial": 5
+  },
+  "productionChanged": false,
+  "testProjectCreated": false,
+  "featureFlagsEnabled": false,
+  "privateSourceIncluded": false
+}

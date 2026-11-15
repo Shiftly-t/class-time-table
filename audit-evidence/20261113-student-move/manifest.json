@@ -1,0 +1,59 @@
+{
+  "baseline_pr4_commit": "e8311d18fd5b77f788dd7e0590128bb3b4f30dd0",
+  "flags": {
+    "teacherWorkFeatureEnabled": false,
+    "normalAuthorityApiEnabled": false
+  },
+  "tests": {
+    "existing_server_model_passed": 29,
+    "existing_client_model_passed": 19,
+    "new_extended_model_passed": 41,
+    "new_extended_server": 31,
+    "new_extended_client": 10,
+    "browser_total_passed": 90,
+    "browser_new_cases": 13,
+    "browser_prior_cases_updated_for_implemented_student_support": 77,
+    "static_source_assertions_passed": 20,
+    "production_initialization_guards_passed": 3,
+    "disabled_flags_guard_passed": true
+  },
+  "boundary": "Loopback-only browser -> HTTP -> public service -> independent in-memory MVCC. Auth/App Check and booking fence are mock values.",
+  "private_booking_fence": "NOT IMPLEMENTED for real deployment; default is null and refuses registration/identity updates. Never deploy the true-valued test stub.",
+  "read_only_plans": [
+    "planStudentDelete always canApply false",
+    "planRestore always canApply false, owner+maintenance only"
+  ],
+  "unimplemented": [
+    "Private booking/QR writer fence",
+    "Creation/identity propagation while any booking data exists",
+    "Deletion apply with QR revocation and booking ledger cancellation",
+    "Complete history/full restore apply",
+    "Course open-state/time/period changes",
+    "Cross-course/done/cancelled and multi-lesson bulk moves",
+    "Moves exposing a hidden weekly occurrence",
+    "Durable operation recovery after reload"
+  ],
+  "unverified": [
+    "Real Firestore/Admin transaction/query/rule behavior",
+    "Deployed callable/Auth/App Check",
+    "Real private booking API races",
+    "Safari/WebKit and physical devices",
+    "Production-scale reads/cost/atomic snapshot recovery"
+  ],
+  "production_actions": false,
+  "sha256": {
+    "app.js": "51bff97ee1f6a2b5327c45c2b40b331b77cda34a56715de63144a831c0aa7f67",
+    "normal-authority-client.js": "2e0f49a926febb336077f23334053eb89fa20e245ee3d1eac85c2d0adccf72a0",
+    "server-candidates/normal-authority/service.cjs": "41141d2e89bcfe42247585ca8db3b08d2453021039edb9d343fb7842b65159e6",
+    "server-candidates/normal-authority/callable.cjs": "6901d8f4657cda65726718d063f5715900411a314dea4a75ed40aee2cc21a834",
+    "server-candidates/normal-authority/policy.cjs": "f49b2074c701c87f5867532a82e256a0fe7a0eefac5f85194dfde27cafe9cf2e",
+    "server-candidates/normal-authority/extended-operations.cjs": "67ac1044a0b87362f68cd2629468fa8d26d322ae657ff87b1bb62f0ab3161444",
+    "server-candidates/normal-authority/student-policy.cjs": "fc048d394512dc59f9716834425886a161716ba948b9cf0be52bdcd544e0464f",
+    "tests/server/extended-operations.test.cjs": "1059f7ebe046b47b0c545d1493a2c74594560598c4ec385e49cf8fb35cd5b92e",
+    "tests/server/extended-client.test.cjs": "2b85bb9ca12ea042ef9f41bb7c80cae94bea11b5733838d6699d87dbd5648836",
+    "tests/audit.cjs": "0d1b87ee85be86e6df4fca11e9676c8a6c7439c96f3b6a4cc076118c190d8b15",
+    "config.js": "771ca98683512b7c03684a69534e98aa9ebc8cab0536cd8bb2eced0c1a2339e9",
+    "server-candidates/normal-authority/firestore.candidate.rules": "a8c4c548648be71caaa57d88e4ff25ac54cc800c2b6bebd55d670fdb00bc19ed",
+    "tests/fixtures/firestore.supplied.rules": "9c210ab272571909ae27da0d082c5d41592ed2d65c58dd5fb2e0441528c4dbba"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "base": "c28dbb9a5493275b98799db92ee204f9ce870def",
+  "simplificationPolicyAndFacade": 13,
+  "seasonalPolicyAndClient": 33,
+  "stage3Preparation": 30,
+  "bookingTransport": 12,
+  "normalServer": 29,
+  "normalClient": 19,
+  "normalExtended": 41,
+  "chromium": 120,
+  "staticRules": 20,
+  "legacySinkSites": 109,
+  "legacySinkSitesRemoved": 13,
+  "privatePrior": 31,
+  "privateSeasonal": 42,
+  "privateHandlerUI": 12,
+  "privatePostCloseIndividualChanges": 3,
+  "originalCharacterization": {
+    "normal": 16,
+    "reproducedFindings": 14
+  },
+  "triggerComparison": {
+    "characterization": 2,
+    "reproducedFindings": 7,
+    "candidatePass": 5,
+    "candidateGap": 2
+  },
+  "retirementServer": "UNIMPLEMENTED; unsupported capability safely blocked",
+  "fixedCapacityServerMigration": "UNIMPLEMENTED; old lower limits and holds preserved",
+  "realFirebaseCases": {
+    "count": 43,
+    "status": "NOT_RUN"
+  },
+  "emulator": "UNVERIFIED: localhost unavailable",
+  "productionChanged": false,
+  "mainChanged": false,
+  "flagsEnabled": false,
+  "privateSourcePublished": false
+}

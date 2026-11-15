@@ -1,0 +1,192 @@
+✖ authority blocks direct normal create/update/delete: owner (7.132902ms)
+✖ authority blocks direct normal create/update/delete: admin (0.524583ms)
+✖ authority blocks direct normal create/update/delete: t (0.819277ms)
+✖ authority blocks direct normal create/update/delete: null (0.05415ms)
+✖ authority off retains original admin normal lesson permission (0.245242ms)
+✖ new collection teacherWeeklyWork denies client writes even owner (0.05428ms)
+✖ new collection teacherDateWork denies client writes even owner (0.038897ms)
+✖ new collection normalAuthorityState denies client writes even owner (0.1086ms)
+✖ new collection normalAuthorityRequests denies client writes even owner (0.070454ms)
+✖ staff may read work settings but not server receipt/revision; anonymous cannot read settings (0.068942ms)
+✖ normal source changes cannot bypass authority through students or calendars (0.044005ms)
+✖ course-only workflow remains available; cannot convert normal into course entry (0.071155ms)
+✖ booking and maintenance protection preserved (0.032848ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 0
+ℹ fail 13
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 421.064885
+
+✖ failing tests:
+
+test at normal-authority.test.cjs:13:45
+✖ authority blocks direct normal create/update/delete: owner (7.132902ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:13:45
+✖ authority blocks direct normal create/update/delete: admin (0.524583ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:13:45
+✖ authority blocks direct normal create/update/delete: t (0.819277ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:13:45
+✖ authority blocks direct normal create/update/delete: null (0.05415ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:14:1
+✖ authority off retains original admin normal lesson permission (0.245242ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:15:114
+✖ new collection teacherWeeklyWork denies client writes even owner (0.05428ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:15:114
+✖ new collection teacherDateWork denies client writes even owner (0.038897ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:15:114
+✖ new collection normalAuthorityState denies client writes even owner (0.1086ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:15:114
+✖ new collection normalAuthorityRequests denies client writes even owner (0.070454ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:16:1
+✖ staff may read work settings but not server receipt/revision; anonymous cannot read settings (0.068942ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:17:1
+✖ normal source changes cannot bypass authority through students or calendars (0.044005ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:18:1
+✖ course-only workflow remains available; cannot convert normal into course entry (0.071155ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at normal-authority.test.cjs:19:1
+✖ booking and maintenance protection preserved (0.032848ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }

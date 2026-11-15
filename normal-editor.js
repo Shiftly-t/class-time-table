@@ -4,8 +4,9 @@
 export function installNormalEditor(ctx){
   const {state,$,make,db,collection,doc,getDocs,query,where,writeBatch,serverTimestamp,
     auditChange,lessonNoticePayload,isAdmin,isAssignableTeacher,lessonsOnDate,
-    courseFor,closureFor,CLASS_PERIODS,todayKey,prettyDate,showMessage,
+    courseFor,closureFor,CLASS_PERIODS,todayKey,prettyDate,canTeacherWork,teacherWorkReady,showMessage,
     trapError,openLessonForm,openCourseEditor,nav,renderAll}=ctx;
+  const normalAuthority=ctx.normalAuthority;
   const capacity=2;
   const page=document.createElement('section');
   page.id='normalEditorPage';
@@ -46,7 +47,7 @@ export function installNormalEditor(ctx){
       <div class="modal-head"><h2 id="normalAbsenceTitle">講師の欠席コマ</h2>
       <button type="button" id="normalAbsenceClose" class="close-modal" aria-label="閉じる">×</button></div>
       <p class="muted" id="normalAbsenceDate"></p>
-      <p class="muted">欠席にすると該当コマが黒くなり、新たな授業は配置できません。ここでの選択は「変更を確定」するまで仮変更です。</p>
+      <p class="muted">欠席にすると該当コマが黒くなり、新たな授業は配置できません。ここでの選択は「変更を確定」するまで仮変更です。</p><p class="normal-editor-warning" id="normalAbsenceScheduleHint"></p>
       <div class="normal-absence-options" id="normalAbsenceOptions"></div>
       <div class="normal-absence-quick">
         <button type="button" class="mini-button" data-normal-preset="none">全コマ出勤可能</button>
@@ -57,6 +58,14 @@ export function installNormalEditor(ctx){
       <div class="modal-actions"><button class="primary" type="submit">仮設定に反映</button></div>
     </form>`;
   document.body.append(absenceDialog);
+  // A touch selection re-renders the card. Its synthesized click may target the
+  // replacement node, so a closure on the removed button cannot suppress it.
+  let pointerClickGuard=null;
+  $('normalGrid').addEventListener('click',event=>{
+    const g=pointerClickGuard;if(!g||performance.now()>g.until)return;
+    const samePointer=('pointerId' in event)?event.pointerId===g.id:Math.hypot(event.clientX-g.x,event.clientY-g.y)<25;
+    if(samePointer&&Math.hypot(event.clientX-g.x,event.clientY-g.y)<25){pointerClickGuard=null;event.preventDefault();event.stopImmediatePropagation();}
+  },true);
   const m={date:todayKey(),loadedDate:'',draft:new Map(),originals:new Map(),
     absent:new Map(),absentOriginals:new Map(),baseline:'',history:[],
     selected:'',drag:null,busy:false,external:false,openUid:''};
@@ -68,7 +77,8 @@ export function installNormalEditor(ctx){
   const absentKey=(date,uid)=>`${date}_${uid}`;
   const statusReady=()=>state.entriesStatus==='ready'&&state.coursesStatus==='ready'
     &&state.closuresStatus==='ready'&&state.openDaysStatus==='ready'
-    &&state.teacherAbsencesStatus==='ready';
+    &&state.teacherAbsencesStatus==='ready'
+    &&teacherWorkReady();
   const activeEntries=()=>lessonsOnDate(m.date).filter(e=>!e.courseId);
   function absenceSource(){
     const out=new Map();
@@ -82,7 +92,8 @@ export function installNormalEditor(ctx){
     const lessons=activeEntries().map(e=>[e.id,e.studentId,e.start,e.end,e.teacherUid,e.status,e.subject,e.studentName,e.teacherName])
       .sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
     const absent=[...absenceSource()].map(([uid,set])=>[uid,[...set].sort()]).sort((a,b)=>a[0].localeCompare(b[0]));
-    return JSON.stringify([lessons,absent]);
+    const weekly=teacherList().map(p=>[p.id,CLASS_PERIODS.map(period=>canTeacherWork(p.id,m.date,period.number))]);
+    return JSON.stringify([lessons,absent,weekly]);
   }
   function load(){
     if(!statusReady())return false;
@@ -110,7 +121,7 @@ export function installNormalEditor(ctx){
     if(m.history.length>40)m.history.shift();
   }
   function teacherAbsent(uid,number){
-    return m.absent.get(uid)?.has(number)===true;
+    return m.absent.get(uid)?.has(number)===true || !canTeacherWork(uid,m.date,number);
   }
   function pendingLessons(){
     return [...m.draft.values()].filter(e=>e.status!=='cancelled'&&periodNumbers(e).some(n=>teacherAbsent(e.teacherUid,n)));
@@ -205,6 +216,7 @@ export function installNormalEditor(ctx){
     b.addEventListener('pointerup',event=>{
       const drag=m.drag;
       if(!drag||drag.id!==entry.id||drag.pointerId!==event.pointerId)return;
+      if(drag.moved||event.pointerType==='touch')pointerClickGuard={id:event.pointerId,x:event.clientX,y:event.clientY,until:performance.now()+650};
       m.drag=null;b.classList.remove('is-dragging');
       document.querySelectorAll('.normal-cell.is-drop-target').forEach(el=>el.classList.remove('is-drop-target'));
       if(drag.moved){
@@ -304,7 +316,7 @@ export function installNormalEditor(ctx){
     $('normalEditorWarning').textContent='';
     $('normalAdd').disabled=m.busy;
     if(!statusReady()){
-      $('normalEditorWarning').textContent=state.teacherAbsencesStatus==='error'
+      $('normalEditorWarning').textContent=!teacherWorkReady()?'勤務設定を確認できないため、新規配置を停止しています。':state.teacherAbsencesStatus==='error'
         ?'講師の欠席情報を読み込めません。FirestoreのteacherDayAbsencesルールを設定してください。'
         :'生徒・授業・勤務情報を読み込んでいます。';
       $('normalPublish').disabled=true;return;
@@ -353,11 +365,13 @@ export function installNormalEditor(ctx){
     const teacher=state.people.find(p=>p.id===uid);
     $('normalAbsenceTitle').textContent=`${teacher?.name||'講師'}｜コマ別欠席`;
     $('normalAbsenceDate').textContent=`${m.date.slice(0,4)}年${prettyDate(m.date)}`;
+    const off=CLASS_PERIODS.filter(p=>!canTeacherWork(uid,m.date,p.number));
+    $('normalAbsenceScheduleHint').textContent=off.length?'通常勤務曜日・臨時出勤設定により'+off.map(p=>p.number+'限').join('・')+'は勤務不可です。出勤を認める場合は「講師管理」でこの日の臨時出勤を設定してください。':'';
     const options=$('normalAbsenceOptions');options.replaceChildren();
     for(const p of CLASS_PERIODS){
       const row=make('label','normal-absence-row');
       const input=make('input');input.type='checkbox';input.value=String(p.number);
-      input.checked=teacherAbsent(uid,p.number);
+      input.checked=m.absent.get(uid)?.has(p.number)===true; // explicit absence only; weekly off-days stay separate
       row.append(make('strong','',`${p.number}限　${p.start}〜${p.end}`),make('span','', '欠席'),input);
       options.append(row);
     }
@@ -400,6 +414,14 @@ export function installNormalEditor(ctx){
     if(moves.length+absences.length>100){showMessage('変更が多すぎます。数回に分けて保存してください。');return;}
     m.busy=true;render();
     try{
+      if(normalAuthority?.enabled()){
+        await normalAuthority.saveDay({date:m.date,
+          changes:moves.map(entry=>({id:entry.id,before:m.originals.get(entry.id),value:entry})),
+          absences:absences.map(([teacherUid,ps])=>({teacherUid,periods:[...ps].sort(),before:state.teacherAbsences?.[absentKey(m.date,teacherUid)]||null}))});
+        m.history=[];m.selected='';m.external=false;m.loadedDate='';
+        showMessage(`担当振替${moves.length}件、講師欠席設定${absences.length}件を保存しました。毎週の通常授業設定は変更していません。`);
+        renderAll();return;
+      }
       // Re-read currently stored lessons for this day before any write.
       const latest=await getDocs(query(collection(db,'timetableEntries'),where('date','==',m.date)));
       if(m.baseline!==liveSignature())throw Error('保存中に時間割が変更されました。変更を破棄して再読み込みしてください。');

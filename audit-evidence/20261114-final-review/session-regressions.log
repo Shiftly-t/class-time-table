@@ -1,0 +1,6 @@
+PASS 最終レビュー: ログアウト前の業務snapshotとエラーを別利用者へ反映しない
+PASS 最終レビュー: 解除した勤務希望snapshotを再購読後に受理しない
+PASS 最終レビュー: 同じUIDで再ログインしても前の権限読取を破棄
+PASS 最終レビュー: ログアウト後のバックアップ一覧応答で運営画面を復活させない
+UNVERIFIED WebKit: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/webkit-2336/pw_run.sh
+RESULT 4 passed

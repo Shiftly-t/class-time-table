@@ -1,0 +1,331 @@
+
+> test:rules:static
+> node tests/rules-compatibility.cjs
+
+STATIC PASS registered role and maintenance gates are present
+STATIC PASS client role escalation is denied
+STATIC PASS all seven booking collections deny client read/write
+STATIC PASS reserved b_ IDs are denied in create/update/delete
+STATIC PASS booking active protection covers create/update/delete, including memo-only writes
+STATIC PASS memo form writes the protected timetable document directly
+STATIC PASS lesson form and course editor also write timetable directly
+STATIC PASS booking management UI uses protected callable API actions
+STATIC PASS student label propagation directly updates all linked entries in batches
+STATIC PASS linked student deletion is a direct batch path too
+STATIC PASS normal assignment uses post-commit teacher absence document
+STATIC PASS normal teacher absence and course assignment checks are separate
+STATIC PASS course periods have only list/count validation in supplied rules
+STATIC PASS availability slots have only list/count validation, not element/calendar validation
+STATIC PASS owner is not exempted from archived availability write rejection
+STATIC PASS student write policy has no schema validation function
+STATIC PASS revision counter accepts any positive int, not exact previous+1
+STATIC PASS entry allow conditions require neither audit nor capacity/revision shared state
+node:assert:885
+    throw err;
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /changes.length>90/. Input:
+
+"import {createSeasonalAuthorityClient} from './seasonal-authority-client.js';\n" +
+  "import {createBookingTransport} from './booking-transport.js';\n" +
+  "import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';\n" +
+  "import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';\n" +
+  "import { getFirestore, collection, doc, getDoc, getDocs, query, where, setDoc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, writeBatch, runTransaction, increment, arrayUnion, Timestamp, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';\n" +
+  "import { firebaseConfig, teacherWorkFeatureEnabled, normalAuthorityApiEnabled } from './config.js';\n" +
+  "import { bookingAppCheckSiteKey } from './booking-config.js';\n" +
+  "import { createNormalAuthorityClient } from './normal-authority-client.js';\n" +
+  "import { installNormalEditor } from './normal-editor.js';\n" +
+  "import { installTeacherWorkPage } from './teacher-work.js';\n" +
+  "import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';\n" +
+  "import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';\n" +
+  '\n' +
+  '// A staging build must never contact the production Firebase project.\n' +
+  "const IS_TEST_BUILD = document.documentElement.dataset.shiftlyEnvironment === 'test';\n" +
+  "if(IS_TEST_BUILD && (!firebaseConfig.projectId || JSON.stringify(firebaseConfig).includes('shiftly-d02f6') || firebaseConfig.projectId.startsWith('REPLACE_'))){\n" +
+  `  document.body.innerHTML='<main class="test-configuration-error"><h1>Shiftly-T TEST：設定が必要です</h1><p>テスト専用のFirebaseプロジェクトを作成し、config.jsをテスト用の値に差し替えてください。本番用プロジェクトへの接続は禁止されています。</p></main>';\n` +
+  "  throw new Error('テスト用のFirebase設定が未完了、または本番のprojectIdを指定しています。');\n" +
+  '}\n' +
+  'const fbApp = initializeApp(firebaseConfig);\n' +
+  "if (bookingAppCheckSiteKey && !bookingAppCheckSiteKey.startsWith('REPLACE_')) {\n" +
+  '  initializeAppCheck(fbApp,{provider:new ReCaptchaEnterpriseProvider(bookingAppCheckSiteKey),isTokenAutoRefreshEnabled:true});\n' +
+  '}\n' +
+  "const bookingEditorTransport=createBookingTransport({call:httpsCallable(getFunctions(fbApp,'asia-northeast1'),'bookingAdminApi'),getSession:()=>state.user?.uid});\n" +
+  'const bookingEditorCall=fields=>bookingEditorTransport.call(fields);\n' +
+  "const normalAuthorityCall=httpsCallable(getFunctions(fbApp,'asia-northeast1'),'normalAuthorityApi');\n" +
+  'const normalAuthority=createNormalAuthorityClient({enabled:normalAuthorityApiEnabled,call:normalAuthorityCall,getSession:()=>state.user?.uid});\n' +
+  "const seasonalAuthority=createSeasonalAuthorityClient({enabled:normalAuthorityApiEnabled,call:httpsCallable(getFunctions(fbApp,'asia-northeast1'),'seasonalAuthorityApi'),getSession:()=>state.user?.uid});\n" +
+  'const auth = getAuth(fbApp);\n' +
+  'const db = getFirestore(fbApp);\n' +
+  'const $ = id => document.getElementById(id);\n' +
+  '// 既存HTMLのrequired属性を解除（教科は文字列として空欄保存する）。\n' +
+  "for (const id of ['lessonSubject','editorNewSubject']) { const el=$(id); if(el){el.required=false;el.placeholder='未入力でも保存できます';const label=el.closest('label');if(label?.firstChild?.nodeType===Node.TEXT_NODE)label.firstChild.textContent='教科（任意）';} }\n" +
+  "const japanDateKey = () => new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());\n" +
+  'const todayKey = () => japanDateKey();\n' +
+  "const dateKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;\n" +
+  "const datePlus = (value, increment) => { const [y,m,d] = value.split('-').map(Number); return dateKey(new Date(y,m-1,d+increment)); };\n" +
+  "const prettyDate = value => { if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(value||'')) return value||''; const [y,m,d] = value.split('-').map(Number); return `${m}月${d}日（${'日月火水木金土'[new Date(y,m-1,d).getDay()]}）`; };\n" +
+  "const isOwner = () => state.profile?.role === 'owner';\n" +
+  "const isManagementRole = role => role === 'owner' || role === 'admin';\n" +
+  '// 管理権限とは別に、担当講師として割り当て可能なロールを限定する。\n' +
+  "const isAssignableTeacher = role => role === 'employee' || role === 'admin';\n" +
+  'const isAdmin = () => isManagementRole(state.profile?.role);\n' +
+  "const maintenanceState={loaded:false,enabled:false,message:'',version:'',updatedAt:null,startedAt:null,unsub:null,dataStarted:false,history:[],busy:false};\n" +
+  "const state = { user:null, profile:null, date:todayKey(), scheduleView:'day', page:'', students:[], people:[], entries:[], entriesStatus:'loading', closures:{}, closuresStatus:'loading', openDays:{}, openDaysStatus:'loading', examEvents:{}, examStatus:'loading', courses:[], coursesStatus:'loading', notices:[], officialAnnouncements:[], officialSeenIds:new Set(), officialSeenReady:false, activeLesson:null, availability:new Map(), availabilityStatus:{}, availabilityUnsub:[], teacherAbsences:{}, teacherAbsencesStatus:'loading', teacherWeeklyWork:{}, teacherWeeklyWorkStatus:teacherWorkFeatureEnabled?'loading':'disabled', teacherDateWork:{}, teacherDateWorkStatus:teacherWorkFeatureEnabled?'loading':'disabled', unsub:[] };\n" +
+  'let regularEditor=null;\n' +
+  'let teacherWorkPage=null;\n' +
+  "const WEEKDAYS = ['日','月','火','水','木','金','土'];\n" +
+  'const closureCalendarView={month:todayKey().slice(0,7),selected:todayKey()};\n' +
+  "const everySlot = student => Object.values(student.regularSlots || {}).filter(s=>s && typeof s==='object');\n" +
+  "const slotDescription = s => `${WEEKDAYS[Number(s.weekday)]||'?'}曜 ${s.start}〜${s.end}`;\n" +
+  "function formatRegular(slots){return Object.values(slots).map(slotDescription).join(' / ');}\n" +
+  "const collator = new Intl.Collator('ja-JP', {numeric:true,sensitivity:'base'});\n" +
+  "function gradeInfo(value=''){\n" +
+  "  const raw=String(value||'').trim();\n" +
+  '  // Examples: 小2 / 小学2年 / 小学校2年 / 中3 / 中学3年 / 高校1年.\n' +
+  '  const m=raw.match(/^(小学生|小学(?:校)?|小|中学生|中学(?:校)?|中|高校生|高校|高)\\s*([1-6一二三四五六１-６]?)/);\n' +
+  "  if(!m)return {level:'other',rank:3,year:99};\n" +
+  "  const prefix=m[1];const level=prefix.startsWith('小')?'elementary':prefix.startsWith('中')?'middle':'high';\n" +
+  '  const ranks={elementary:0,middle:1,high:2};\n' +
+  "  const numerals={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6};\n" +
+  "  const year=m[2]?Number(m[2].normalize('NFKC'))||numerals[m[2]]||99:99;\n" +
+  '  return {level,rank:ranks[level],year};\n' +
+  '}\n' +
+  "// Academic-year rollover is based on JST, not the device's local timezone.\n" +
+  '// Legacy students created before this feature are assumed to have a 2026 school-year grade.\n' +
+  'const LEGACY_GRADE_YEAR = 2026;\n' +
+  "const GRADE_STAGES = ['小1','小2','小3','小4','小5','小6','中1','中2','中3','高1','高2','高3','卒業'];\n" +
+  'function academicYearForDate(date){\n' +
+  "  const [year,month]=String(date||japanDateKey()).split('-').map(Number);\n" +
+  '  return year-(month<4?1:0);\n' +
+  '}\n' +
+  'const academicYearJST = () => academicYearForDate(japanDateKey());\n' +
+  'function gradeRecordYear(student){\n' +
+  '  const v=Number(student?.gradeYear);\n' +
+  '  return Number.isInteger(v) && v>=2000 && v<=2100 ? v : LEGACY_GRADE_YEAR;\n' +
+  '}\n' +
+  'function shiftGrade(value,years){\n' +
+  "  const original=String(value||'').trim();\n" +
+  '  if(!years)return original;\n' +
+  '  const info=gradeInfo(original);\n' +
+  "  let index=original==='卒業'?12:\n" +
+  "    info.level==='elementary'?info.year-1:\n" +
+  "    info.level==='middle'?5+info.year:\n" +
+  "    info.level==='high'?8+info.year:-1;\n" +
+  '  if(!Number.isInteger(years)||index<0||index>=GRADE_STAGES.length)return original;\n' +
+  '  return GRADE_STAGES[Math.min(GRADE_STAGES.length-1,Math.max(0,index+years))];\n' +
+  '}\n' +
+  'function displayStudentGrade(student,date){\n' +
+  '  return shiftGrade(student.grade,academicYearForDate(date)-gradeRecordYear(student));\n' +
+  '}\n' +
+  'function displayLessonGrade(lesson){\n' +
+  '  const student=state.students.find(s=>s.id===lesson.studentId);\n' +
+  "  return student?displayStudentGrade(student,lesson.date):lesson.grade||'';\n" +
+  '}\n' +
+  '\n' +
+  'function sortedStudents(students, search, level, sort){\n' +
+  "  const term=(search||'').trim().toLocaleLowerCase('ja');\n" +
+  '  const list=students.filter(s=>{\n' +
+  "    if(level!=='all' && gradeInfo(displayStudentGrade(s)).level!==level)return false;\n" +
+  "    return [s.name,displayStudentGrade(s),s.grade,s.school,s.textbook,s.remarks, s.regular].some(v=>String(v||'').toLocaleLowerCase('ja').includes(term));\n" +
+  '  });\n' +
+  "  const name=(a,b)=>collator.compare(a.name||'',b.name||'');\n" +
+  '  list.sort((a,b)=>{\n' +
+  '    const ag=gradeInfo(displayStudentGrade(a)),bg=gradeInfo(displayStudentGrade(b));\n' +
+  "    if(sort==='nameAsc')return name(a,b);\n" +
+  "    if(sort==='nameDesc')return name(b,a);\n" +
+  "    if(sort==='schoolAsc')return collator.compare(a.school||'',b.school||'')||name(a,b);\n" +
+  "    if(sort==='lessonCountDesc')return everySlot(b).length-everySlot(a).length||name(a,b);\n" +
+  '    const gradeOrder=ag.rank-bg.rank||ag.year-bg.year||collator.compare(displayStudentGrade(a),displayStudentGrade(b))||name(a,b);\n' +
+  "    return sort==='gradeDesc'?-gradeOrder:gradeOrder;\n" +
+  '  });\n' +
+  '  return list;\n' +
+  '}\n' +
+  'function regularDescription(student){\n' +
+  '  const slots=everySlot(student);\n' +
+  "  if(!slots.length)return student.regular||'―';\n" +
+  '  return slots.sort((a,b)=>Number(a.weekday)-Number(b.weekday)||a.start.localeCompare(b.start))\n' +
+  '    .map(slot=>{\n' +
+  '      const teacher=state.people.find(p=>p.id===slot.teacherUid);\n' +
+  "      return `${slotDescription(slot)}　${slot.subject||''} / ${teacher?.name||'担当未登録'}`;\n" +
+  "    }).join('\\n');\n" +
+  '}\n' +
+  '\n' +
+  '// A regular occurrence may have been saved as a separate Firestore document when\n' +
+  "// someone edited that day's lesson or memo. If its parent weekly slot is later\n" +
+  "// removed or moved to another weekday, don't show the obsolete future lesson.\n" +
+  '// Historical entries stay visible to preserve records, and independently added\n' +
+  '// one-off lessons are never removed by changing a weekly schedule.\n' +
+  'function isCurrentRegularOccurrence(entry){\n' +
+  '  if(!entry.regularId)return true;\n' +
+  '  const student=state.students.find(s=>s.id===entry.studentId);\n' +
+  '  const slot=student?.regularSlots?.[entry.regularId];\n' +
+  '  if(!slot)return false;\n' +
+  "  const [year,month,day]=entry.date.split('-').map(Number);\n" +
+  '  const weekday=new Date(year,month-1,day).getDay();\n' +
+  '  return Number(slot.weekday)===weekday\n' +
+  '    && (!slot.activeFrom || entry.date>=slot.activeFrom)\n' +
+  '    && (!slot.activeUntil || entry.date<=slot.activeUntil);\n' +
+  '}\n' +
+  'function isVisibleEntry(entry){\n' +
+  '  return !entry.regularId || entry.date<todayKey() || isCurrentRegularOccurrence(entry);\n'... 206293 more characters
+
+    at /workspace/class-time-table-integration/tests/rules-compatibility.cjs:42:153
+    at check (/workspace/class-time-table-integration/tests/rules-compatibility.cjs:23:41)
+    at Object.<anonymous> (/workspace/class-time-table-integration/tests/rules-compatibility.cjs:42:1)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: "import {createSeasonalAuthorityClient} from './seasonal-authority-client.js';\n" +
+    "import {createBookingTransport} from './booking-transport.js';\n" +
+    "import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';\n" +
+    "import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';\n" +
+    "import { getFirestore, collection, doc, getDoc, getDocs, query, where, setDoc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, writeBatch, runTransaction, increment, arrayUnion, Timestamp, orderBy, limit } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';\n" +
+    "import { firebaseConfig, teacherWorkFeatureEnabled, normalAuthorityApiEnabled } from './config.js';\n" +
+    "import { bookingAppCheckSiteKey } from './booking-config.js';\n" +
+    "import { createNormalAuthorityClient } from './normal-authority-client.js';\n" +
+    "import { installNormalEditor } from './normal-editor.js';\n" +
+    "import { installTeacherWorkPage } from './teacher-work.js';\n" +
+    "import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';\n" +
+    "import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';\n" +
+    '\n' +
+    '// A staging build must never contact the production Firebase project.\n' +
+    "const IS_TEST_BUILD = document.documentElement.dataset.shiftlyEnvironment === 'test';\n" +
+    "if(IS_TEST_BUILD && (!firebaseConfig.projectId || JSON.stringify(firebaseConfig).includes('shiftly-d02f6') || firebaseConfig.projectId.startsWith('REPLACE_'))){\n" +
+    `  document.body.innerHTML='<main class="test-configuration-error"><h1>Shiftly-T TEST：設定が必要です</h1><p>テスト専用のFirebaseプロジェクトを作成し、config.jsをテスト用の値に差し替えてください。本番用プロジェクトへの接続は禁止されています。</p></main>';\n` +
+    "  throw new Error('テスト用のFirebase設定が未完了、または本番のprojectIdを指定しています。');\n" +
+    '}\n' +
+    'const fbApp = initializeApp(firebaseConfig);\n' +
+    "if (bookingAppCheckSiteKey && !bookingAppCheckSiteKey.startsWith('REPLACE_')) {\n" +
+    '  initializeAppCheck(fbApp,{provider:new ReCaptchaEnterpriseProvider(bookingAppCheckSiteKey),isTokenAutoRefreshEnabled:true});\n' +
+    '}\n' +
+    "const bookingEditorTransport=createBookingTransport({call:httpsCallable(getFunctions(fbApp,'asia-northeast1'),'bookingAdminApi'),getSession:()=>state.user?.uid});\n" +
+    'const bookingEditorCall=fields=>bookingEditorTransport.call(fields);\n' +
+    "const normalAuthorityCall=httpsCallable(getFunctions(fbApp,'asia-northeast1'),'normalAuthorityApi');\n" +
+    'const normalAuthority=createNormalAuthorityClient({enabled:normalAuthorityApiEnabled,call:normalAuthorityCall,getSession:()=>state.user?.uid});\n' +
+    "const seasonalAuthority=createSeasonalAuthorityClient({enabled:normalAuthorityApiEnabled,call:httpsCallable(getFunctions(fbApp,'asia-northeast1'),'seasonalAuthorityApi'),getSession:()=>state.user?.uid});\n" +
+    'const auth = getAuth(fbApp);\n' +
+    'const db = getFirestore(fbApp);\n' +
+    'const $ = id => document.getElementById(id);\n' +
+    '// 既存HTMLのrequired属性を解除（教科は文字列として空欄保存する）。\n' +
+    "for (const id of ['lessonSubject','editorNewSubject']) { const el=$(id); if(el){el.required=false;el.placeholder='未入力でも保存できます';const label=el.closest('label');if(label?.firstChild?.nodeType===Node.TEXT_NODE)label.firstChild.textContent='教科（任意）';} }\n" +
+    "const japanDateKey = () => new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());\n" +
+    'const todayKey = () => japanDateKey();\n' +
+    "const dateKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;\n" +
+    "const datePlus = (value, increment) => { const [y,m,d] = value.split('-').map(Number); return dateKey(new Date(y,m-1,d+increment)); };\n" +
+    "const prettyDate = value => { if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(value||'')) return value||''; const [y,m,d] = value.split('-').map(Number); return `${m}月${d}日（${'日月火水木金土'[new Date(y,m-1,d).getDay()]}）`; };\n" +
+    "const isOwner = () => state.profile?.role === 'owner';\n" +
+    "const isManagementRole = role => role === 'owner' || role === 'admin';\n" +
+    '// 管理権限とは別に、担当講師として割り当て可能なロールを限定する。\n' +
+    "const isAssignableTeacher = role => role === 'employee' || role === 'admin';\n" +
+    'const isAdmin = () => isManagementRole(state.profile?.role);\n' +
+    "const maintenanceState={loaded:false,enabled:false,message:'',version:'',updatedAt:null,startedAt:null,unsub:null,dataStarted:false,history:[],busy:false};\n" +
+    "const state = { user:null, profile:null, date:todayKey(), scheduleView:'day', page:'', students:[], people:[], entries:[], entriesStatus:'loading', closures:{}, closuresStatus:'loading', openDays:{}, openDaysStatus:'loading', examEvents:{}, examStatus:'loading', courses:[], coursesStatus:'loading', notices:[], officialAnnouncements:[], officialSeenIds:new Set(), officialSeenReady:false, activeLesson:null, availability:new Map(), availabilityStatus:{}, availabilityUnsub:[], teacherAbsences:{}, teacherAbsencesStatus:'loading', teacherWeeklyWork:{}, teacherWeeklyWorkStatus:teacherWorkFeatureEnabled?'loading':'disabled', teacherDateWork:{}, teacherDateWorkStatus:teacherWorkFeatureEnabled?'loading':'disabled', unsub:[] };\n" +
+    'let regularEditor=null;\n' +
+    'let teacherWorkPage=null;\n' +
+    "const WEEKDAYS = ['日','月','火','水','木','金','土'];\n" +
+    'const closureCalendarView={month:todayKey().slice(0,7),selected:todayKey()};\n' +
+    "const everySlot = student => Object.values(student.regularSlots || {}).filter(s=>s && typeof s==='object');\n" +
+    "const slotDescription = s => `${WEEKDAYS[Number(s.weekday)]||'?'}曜 ${s.start}〜${s.end}`;\n" +
+    "function formatRegular(slots){return Object.values(slots).map(slotDescription).join(' / ');}\n" +
+    "const collator = new Intl.Collator('ja-JP', {numeric:true,sensitivity:'base'});\n" +
+    "function gradeInfo(value=''){\n" +
+    "  const raw=String(value||'').trim();\n" +
+    '  // Examples: 小2 / 小学2年 / 小学校2年 / 中3 / 中学3年 / 高校1年.\n' +
+    '  const m=raw.match(/^(小学生|小学(?:校)?|小|中学生|中学(?:校)?|中|高校生|高校|高)\\s*([1-6一二三四五六１-６]?)/);\n' +
+    "  if(!m)return {level:'other',rank:3,year:99};\n" +
+    "  const prefix=m[1];const level=prefix.startsWith('小')?'elementary':prefix.startsWith('中')?'middle':'high';\n" +
+    '  const ranks={elementary:0,middle:1,high:2};\n' +
+    "  const numerals={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6};\n" +
+    "  const year=m[2]?Number(m[2].normalize('NFKC'))||numerals[m[2]]||99:99;\n" +
+    '  return {level,rank:ranks[level],year};\n' +
+    '}\n' +
+    "// Academic-year rollover is based on JST, not the device's local timezone.\n" +
+    '// Legacy students created before this feature are assumed to have a 2026 school-year grade.\n' +
+    'const LEGACY_GRADE_YEAR = 2026;\n' +
+    "const GRADE_STAGES = ['小1','小2','小3','小4','小5','小6','中1','中2','中3','高1','高2','高3','卒業'];\n" +
+    'function academicYearForDate(date){\n' +
+    "  const [year,month]=String(date||japanDateKey()).split('-').map(Number);\n" +
+    '  return year-(month<4?1:0);\n' +
+    '}\n' +
+    'const academicYearJST = () => academicYearForDate(japanDateKey());\n' +
+    'function gradeRecordYear(student){\n' +
+    '  const v=Number(student?.gradeYear);\n' +
+    '  return Number.isInteger(v) && v>=2000 && v<=2100 ? v : LEGACY_GRADE_YEAR;\n' +
+    '}\n' +
+    'function shiftGrade(value,years){\n' +
+    "  const original=String(value||'').trim();\n" +
+    '  if(!years)return original;\n' +
+    '  const info=gradeInfo(original);\n' +
+    "  let index=original==='卒業'?12:\n" +
+    "    info.level==='elementary'?info.year-1:\n" +
+    "    info.level==='middle'?5+info.year:\n" +
+    "    info.level==='high'?8+info.year:-1;\n" +
+    '  if(!Number.isInteger(years)||index<0||index>=GRADE_STAGES.length)return original;\n' +
+    '  return GRADE_STAGES[Math.min(GRADE_STAGES.length-1,Math.max(0,index+years))];\n' +
+    '}\n' +
+    'function displayStudentGrade(student,date){\n' +
+    '  return shiftGrade(student.grade,academicYearForDate(date)-gradeRecordYear(student));\n' +
+    '}\n' +
+    'function displayLessonGrade(lesson){\n' +
+    '  const student=state.students.find(s=>s.id===lesson.studentId);\n' +
+    "  return student?displayStudentGrade(student,lesson.date):lesson.grade||'';\n" +
+    '}\n' +
+    '\n' +
+    'function sortedStudents(students, search, level, sort){\n' +
+    "  const term=(search||'').trim().toLocaleLowerCase('ja');\n" +
+    '  const list=students.filter(s=>{\n' +
+    "    if(level!=='all' && gradeInfo(displayStudentGrade(s)).level!==level)return false;\n" +
+    "    return [s.name,displayStudentGrade(s),s.grade,s.school,s.textbook,s.remarks, s.regular].some(v=>String(v||'').toLocaleLowerCase('ja').includes(term));\n" +
+    '  });\n' +
+    "  const name=(a,b)=>collator.compare(a.name||'',b.name||'');\n" +
+    '  list.sort((a,b)=>{\n' +
+    '    const ag=gradeInfo(displayStudentGrade(a)),bg=gradeInfo(displayStudentGrade(b));\n' +
+    "    if(sort==='nameAsc')return name(a,b);\n" +
+    "    if(sort==='nameDesc')return name(b,a);\n" +
+    "    if(sort==='schoolAsc')return collator.compare(a.school||'',b.school||'')||name(a,b);\n" +
+    "    if(sort==='lessonCountDesc')return everySlot(b).length-everySlot(a).length||name(a,b);\n" +
+    '    const gradeOrder=ag.rank-bg.rank||ag.year-bg.year||collator.compare(displayStudentGrade(a),displayStudentGrade(b))||name(a,b);\n' +
+    "    return sort==='gradeDesc'?-gradeOrder:gradeOrder;\n" +
+    '  });\n' +
+    '  return list;\n' +
+    '}\n' +
+    'function regularDescription(student){\n' +
+    '  const slots=everySlot(student);\n' +
+    "  if(!slots.length)return student.regular||'―';\n" +
+    '  return slots.sort((a,b)=>Number(a.weekday)-Number(b.weekday)||a.start.localeCompare(b.start))\n' +
+    '    .map(slot=>{\n' +
+    '      const teacher=state.people.find(p=>p.id===slot.teacherUid);\n' +
+    "      return `${slotDescription(slot)}　${slot.subject||''} / ${teacher?.name||'担当未登録'}`;\n" +
+    "    }).join('\\n');\n" +
+    '}\n' +
+    '\n' +
+    '// A regular occurrence may have been saved as a separate Firestore document when\n' +
+    "// someone edited that day's lesson or memo. If its parent weekly slot is later\n" +
+    "// removed or moved to another weekday, don't show the obsolete future lesson.\n" +
+    '// Historical entries stay visible to preserve records, and independently added\n' +
+    '// one-off lessons are never removed by changing a weekly schedule.\n' +
+    'function isCurrentRegularOccurrence(entry){\n' +
+    '  if(!entry.regularId)return true;\n' +
+    '  const student=state.students.find(s=>s.id===entry.studentId);\n' +
+    '  const slot=student?.regularSlots?.[entry.regularId];\n' +
+    '  if(!slot)return false;\n' +
+    "  const [year,month,day]=entry.date.split('-').map(Number);\n" +
+    '  const weekday=new Date(year,month-1,day).getDay();\n' +
+    '  return Number(slot.weekday)===weekday\n' +
+    '    && (!slot.activeFrom || entry.date>=slot.activeFrom)\n' +
+    '    && (!slot.activeUntil || entry.date<=slot.activeUntil);\n' +
+    '}\n' +
+    'function isVisibleEntry(entry){\n' +
+    '  return !entry.regularId || entry.date<todayKey() || isCurrentRegularOccurrence(entry);\n'... 206293 more characters,
+  expected: /changes.length>90/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v24.22.1

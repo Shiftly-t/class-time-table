@@ -1,5 +1,6 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
+import {createBookingTransport} from './booking-transport.js';
 import {firebaseConfig} from './config.js';
 import {bookingAppCheckSiteKey} from './booking-config.js';
 import {initializeAppCheck,ReCaptchaEnterpriseProvider} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
@@ -13,12 +14,13 @@ const params=new URLSearchParams(location.hash.slice(1));
 const ids={courseId:params.get('c')||'',studentId:params.get('s')||'',token:params.get('t')||''};
 const okIds=/^[a-zA-Z0-9_-]{1,150}$/;
 const validQR=okIds.test(ids.courseId)&&okIds.test(ids.studentId)&&/^[A-Za-z0-9_-]{42,64}$/.test(ids.token);
-let name='',data=null,selected=new Set(),remarks='',mode='home',calendarMode='list',busy=false;
+let name='',data=null,selected=new Set(),remarks='',mode='home',calendarMode='list',busy=false,refreshRequired=false;
 const fbApp=initializeApp(firebaseConfig);if(bookingAppCheckSiteKey && !bookingAppCheckSiteKey.startsWith('REPLACE_'))initializeAppCheck(fbApp,{provider:new ReCaptchaEnterpriseProvider(bookingAppCheckSiteKey),isTokenAutoRefreshEnabled:true});const fns=getFunctions(fbApp,'asia-northeast1'),call=httpsCallable(fns,'bookingPublicApi');
-function notify(s,error=false){$('message').textContent=s;$('message').className='status'+(error?' error':'');}
-async function api(action,fields={}){return (await call({...ids,studentName:name,action,...fields})).data;}
+const transport=createBookingTransport({call,getSession:()=>validQR&&name?ids.courseId+':'+ids.studentId+':'+name:null});
+function notify(s,error=false){$('message').textContent=s;$('message').className='status'+(error?' error':'');document.getElementById('bookingResultCheck')?.remove();if(transport.hasPending()){const b=document.createElement('button');b.id='bookingResultCheck';b.type='button';b.className='secondary';b.textContent='送信結果を確認';b.addEventListener('click',async()=>{if(busy)return;setBusy(true);try{await transport.confirmPending();await reload();mode='home';render();notify('保存済みであることを確認しました。');}catch(e){notify(message(e),true);}finally{setBusy(false);}});$('message').after(b);}}
+async function api(action,fields={}){return (await transport.call({...ids,studentName:name,action,...fields})).data;}
 function setBusy(b){busy=b;document.querySelectorAll('button').forEach(x=>x.disabled=b||x.dataset.disabled==='1');}
-async function act(action,fields={},success){if(busy)return false;setBusy(true);notify('処理しています…');try{await api(action,fields);await reload();if(success)notify(success);return true;}catch(e){notify(message(e),true);return false;}finally{setBusy(false);}}
+async function act(action,fields={},success){if(busy)return false;let saved=false;setBusy(true);notify('処理しています…');try{if(refreshRequired){await reload();refreshRequired=false;mode='home';render();notify('最新の内容を確認しました。予約内容を確認してから操作してください。');return false;}await api(action,fields);saved=true;await reload();if(success)notify(success);return true;}catch(e){if(saved)refreshRequired=true;notify(saved?'保存は完了しましたが、最新表示を取得できませんでした。同じ操作を再送せず、再読み込みして確認してください。':message(e),true);return false;}finally{setBusy(false);}}
 function message(e){const text=String(e?.message||'通信に失敗しました');return text.replace(/^.*?functions\//,'').slice(0,240);}
 function dateText(d){const p=d.split('-').map(Number),day=new Date(p[0],p[1]-1,p[2]).getDay();return `${p[1]}/${p[2]}（${'日月火水木金土'[day]}）`;}
 function datetime(x){if(!x)return'未設定';return new Date(x).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});}

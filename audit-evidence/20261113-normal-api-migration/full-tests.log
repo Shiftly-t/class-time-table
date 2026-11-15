@@ -1,0 +1,188 @@
+
+> test
+> npm run test:normal:server && npm run test:normal:client && node tests/config-guard.cjs && node tests/teacher-weekly-work.cjs && node tests/pr1-review.cjs && node tests/audit.cjs
+
+
+> test:normal:server
+> node --test tests/server/normal-authority.test.cjs
+
+✔ unconfigured authority, unauthenticated, teacher, parent and absent App Check are rejected (7.700748ms)
+✔ maintenance denies admin but owner can operate (11.23502ms)
+✔ weekly off day blocks creation; daily attendance allows only selected periods; absence wins (4.806008ms)
+✔ multi-period placement requires all overlapping periods (1.048766ms)
+✔ last capacity place: two admins race, one retries and is refused (3.01042ms)
+✔ concurrent student duplicate across two teachers is rejected (2.988758ms)
+✔ idempotent retry emits one lesson, audit and notice; request reuse with different payload rejected (1.784672ms)
+✔ weekly virtual lessons count toward cap even without stored documents (0.986976ms)
+✔ canonical daily reassignment materializes one occurrence, preserves weekly data and next week (0.743626ms)
+✔ weekly off-day edit retains stored lessons and all weekly templates (1.188543ms)
+✔ work update and assignment share revision; racing work update cannot overwrite after lesson commit (1.87137ms)
+✔ stale lesson cannot overwrite a different administrator memo (0.964573ms)
+✔ memo-only edit of off-day legacy assignment permitted, reassignment to off-day blocked (2.019339ms)
+✔ cancelled weekly occurrence does not regenerate; explicit undo safely restores weekly occurrence (1.755279ms)
+✔ course dates, course documents and reserved booking ids refused without touching booking data (2.082351ms)
+✔ closed school refused; explicit open day restores permission (0.573005ms)
+✔ invalid calendar/time, missing students, malicious fields and duplicate periods fail closed (5.405183ms)
+✔ one-off deletion exposing a virtual weekly lesson is checked for capacity (0.502912ms)
+✔ bounded query refuses instead of calculating incomplete capacity (7.291103ms)
+✔ read/write discipline and atomic failure leave no lesson/history/receipt writes (0.577181ms)
+✔ generated rules match full supplied baseline, retain booking protection, and only narrow legacy writes (1.648341ms)
+✔ deletion revealing a weekly lesson on an off-day is refused (0.817937ms)
+✔ history uses existing UI timestamp envelope and excludes display-only id (1.768618ms)
+✔ frontend and server work priorities agree over a weekday/period/override/absence matrix (8.541297ms)
+✔ date exception clear returns to weekly rule, absence update preserves all lessons (1.148915ms)
+✔ overlap across adjacent intervals and malformed legacy labels fail closed (0.793891ms)
+✔ same-command absence and reassignment validate the final absence state atomically (1.063178ms)
+✔ reactivating cancelled off-day assignment is refused; marking existing lesson done preserves history (0.721454ms)
+✔ undo daily override validates the weekly teacher work and capacity and notifies both teachers (1.368308ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 200.986024
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice
+
+> test:normal:client
+> node --test tests/server/normal-client.test.cjs
+
+✔ disabled adapter cannot call or write (1.458531ms)
+✔ inspect returns only normal raw records and tokens and makes no document writes (3.798322ms)
+✔ connected adapter inspects then commits a valid lesson without client timestamp (9.768939ms)
+✔ stale UI baseline is refused before a write command (0.973335ms)
+✔ server rejects a race after inspection and receipt is not created (0.967827ms)
+✔ uncertain response retries exact request id; a different target is blocked (1.445963ms)
+✔ logout during inspection cannot send a mutation (5.938377ms)
+✔ work inspection uses current revision and refuses stale work UI (1.079372ms)
+✔ virtual occurrence assignment and absence are sent in one command (1.386805ms)
+✔ normal calendar edits use tokens, preserve lessons, and course dates are refused (1.853664ms)
+✔ automatic Sunday and national holiday cannot be bypassed; open-day exception permits registration (1.582144ms)
+✔ cross-day moves, course/booking entries and oversized batches never issue mutation (1.072011ms)
+✔ calendar/work restore guards and malformed responses never fall back to Firestore (0.778978ms)
+✔ SDK timestamps normalize against transport envelopes without forging memoUpdatedAt (0.178693ms)
+✔ stale calendar snapshot cannot replace another administrator note (0.863914ms)
+✔ reopening an overcapacity normal day is refused without removing the closure (0.821492ms)
+✔ calendar edits and assignment serialize on the same transaction revision (0.755555ms)
+✔ public server holiday calculation matches public app calendar for 2020..2028 (31.923563ms)
+✔ pending own-work timestamp does not block a new semantic work edit (0.706923ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 129.413765
+PASS production initialization blocked: app.js
+PASS production initialization blocked: course-booking.js
+PASS production initialization blocked: course-booking-admin.js
+PASS teacher management and API migration flags remain disabled
+teacher workday behavior and integration contracts: passed
+starting chromium
+launched chromium
+opening app
+browser: 通常授業エディター確定エラー Error: 保存中に時間割が変更されました。変更を破棄して再読み込みしてください。
+    at HTMLButtonElement.publish (http://127.0.0.1:37069/normal-editor.js:427:45)
+browser: Error: 保存中に時間割が変更されました。変更を破棄して再読み込みしてください。
+    at HTMLButtonElement.publish (http://127.0.0.1:37069/normal-editor.js:427:45)
+chromium: PASS absence staging, blocked destination, touch drag, next tap, undo, split warnings, save guard, daily override, weekly preservation, notifications, archive/restore
+starting webkit
+webkit unavailable: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/webkit-2336/pw_run.sh
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     npx playwright install                                 ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+PASS 通常授業の適用終了日を生徒編集後も保持・重複設定を拒否
+PASS 生徒編集の他端末更新を拒否し上書きしない
+PASS 生徒登録・更新・削除と監査ログをメモリーDBで実行
+PASS 日別変更・講習非表示が毎週設定を壊さず、次回予定・休校例外が一致
+PASS 通常の個別登録も同一生徒の重複・同時刻3人目を拒否
+PASS 日本時間の締切入力・年度境界をUTC端末でも一致
+PASS 全体バックアップ復元で特別開校日と講師欠席を復元
+PASS 模試未読込時は時間割を開校と誤表示しない
+PASS 画面幅320: 全ロール主要画面・生徒入力・スクロール領域
+PASS 画面幅390: 全ロール主要画面・生徒入力・スクロール領域
+PASS 画面幅768: 全ロール主要画面・生徒入力・スクロール領域
+PASS 画面幅1024: 全ロール主要画面・生徒入力・スクロール領域
+PASS 画面幅1440: 全ロール主要画面・生徒入力・スクロール領域
+PASS ログイン失敗・成功・未登録拒否・ログアウトの状態遷移
+PASS 予約管理の全タブ・QR印刷・確定要求・ログアウト時QR消去
+PASS 予約管理の取得中ログアウトで遅延応答から個人情報が復活しない
+PASS 予約管理の書込中は講習選択欄を固定
+PASS 予約画面320px: QR氏名確認・希望提出・公開確認・入力のエスケープ
+PASS 予約画面768px: QR氏名確認・希望提出・公開確認・入力のエスケープ
+PASS 予約画面1440px: QR氏名確認・希望提出・公開確認・入力のエスケープ
+PASS 不正QRはAPIを呼ばず拒否
+PASS 勤務希望: 保存・提出通知・他端末の更新拒否・締切後拒否
+PASS お知らせ・伝達事項は講師から編集できず、通知既読は本人宛のみ
+PASS 休校・特別開校・模試の登録削除は基の休校データを維持
+PASS 講習ドラッグ後の最初のタップ・担当上限・勤務希望を検証
+PASS 全体復元はメンテナンス外と不正なバックアップを拒否
+PASS スマホの通常・講習エディターはタップ再描画後も横スクロールを維持
+PASS 授業・伝達事項: 他端末の変更を拒否し、通常予定のメモ保存を翌週へ漏らさない
+PASS 予約授業の詳細は読取専用で、直接編集の導線を停止
+PASS 予約有効講習の手動授業もメモ保存前に停止し、DBを変更しない
+PASS 予約設定のない通常の講習授業は従来どおりメモを保存
+PASS 予約設定の取得失敗時は書込みを停止
+PASS 予約有効講習の配置確定は直接書込みを停止し仮配置を保持
+PASS 予約授業がある生徒の氏名変更は主データ保存前に停止
+PASS 予約授業を含む生徒削除は関連データを削除する前に停止
+PASS 予約授業を含む全体復元は業務データ書込前に停止
+PASS 非表示講習を含む全体復元は業務データ書込前に停止
+PASS 全体復元で講習を再表示する場合は勤務希望も従来どおり復元
+PASS 予約無効の講習配置は従来どおり確定し通知を保存
+PASS 統合: 新機能未有効なら新コレクションを購読せず従来バックアップを維持
+PASS 統合: 勤務設定の読込拒否時は新規配置とバックアップを停止
+PASS 統合: 通常勤務曜日外は黒枠、臨時出勤よりコマ別欠席を優先
+PASS 統合: 黒枠から日別振替を保存し翌週と毎週設定を維持
+PASS 統合: 仮振替中に勤務曜日が変わると確定を停止
+PASS 統合: 講師勤務曜日の保存は監査と同時、snapshot待ちでも表示を保持
+PASS 統合: 臨時出勤の保存・解除は通常勤務曜日に戻す
+PASS 統合: 同じ講師管理タブを押しても未保存の変更を失わない
+PASS 統合: 他端末で変更済みの勤務曜日を古い画面から上書きしない
+PASS 統合: 勤務設定保存中の遷移とログアウト後の遅延書込を停止
+PASS 統合: 勤務曜日外の新規毎週設定を拒否、既存不一致は保持
+PASS 統合: 固定4コマ以外の個別授業でも勤務曜日外を拒否
+PASS 統合: 週間・臨時勤務をバックアップから復元
+PASS 統合: 旧バックアップの復元で新しい勤務設定を消さない
+PASS 統合: 勤務機能無効時に勤務設定付きバックアップを部分復元しない
+PASS 統合: 通常勤務を変更しても講習勤務希望と予約保護を維持
+PASS 統合: 講師管理画面320pxの入力・保存・はみ出し
+PASS 統合: 講師管理画面768pxの入力・保存・はみ出し
+PASS 統合: 講師管理画面1024pxの入力・保存・はみ出し
+PASS 統合: 講師管理画面1440pxの入力・保存・はみ出し
+PASS 統合: 通常勤務設定が読めなくても独立した講習の個別編集を維持
+PASS API移行: 320pxの担当振替と欠席を同じサーバー処理で保存
+PASS API移行: 768pxの担当振替と欠席を同じサーバー処理で保存
+PASS API移行: 1024pxの担当振替と欠席を同じサーバー処理で保存
+PASS API移行: 1440pxの担当振替と欠席を同じサーバー処理で保存
+PASS API移行: 個別授業の新規・編集・削除を接続し直接書込しない
+PASS API移行: 仮想通常授業の伝達事項をAPI保存し翌週を保持
+PASS API移行: 保存直前に他管理者が変更したメモを上書きしない
+PASS API移行: 保存後の応答喪失を同じリクエストで確認し通知を重複しない
+PASS API移行: 勤務曜日・臨時出勤・解除をAPI経由で保存
+PASS API移行: 休校日・特別開校・模試の登録解除で授業を削除しない
+PASS API移行: 未移行の生徒毎週設定・全体復元を書込前に停止
+PASS API移行: API拒否時も旧Firestore書込にフォールバックしない
+PASS API移行: 独立した講習メモは通常APIへ送信しない
+PASS API移行: 曜日外をコマ別欠席として自動保存しない
+PASS API移行: 保存済みメモの再編集と日別担当変更の取り消し
+PASS API移行: 休校編集の古い画面から他管理者の備考を上書きしない
+PASS API移行: 勤務画面を非表示でもバックアップに勤務データを含め履歴復元は停止
+UNVERIFIED WebKit: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/webkit-2336/pw_run.sh
+RESULT 77 passed
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

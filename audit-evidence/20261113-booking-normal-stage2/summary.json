@@ -1,0 +1,20 @@
+{
+  "productionAccess": false,
+  "publicTransportTests": 12,
+  "existingNormalServerTests": 29,
+  "existingNormalClientTests": 19,
+  "extendedModelTests": 41,
+  "chromiumBrowserTests": 98,
+  "staticRuleAssertions": 20,
+  "privateCandidateModelTests": 31,
+  "privateSourceIncluded": false,
+  "teacherWorkFeatureEnabled": false,
+  "normalAuthorityApiEnabled": false,
+  "unverified": [
+    "Firestore Emulator compilation/evaluation",
+    "actual Admin SDK and multi-instance Functions",
+    "real Auth/App Check/QR",
+    "Safari/WebKit and physical iPad",
+    "production-scale performance and migration"
+  ]
+}

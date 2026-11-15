@@ -1,0 +1,150 @@
+✖ ALLOW owner work settings with same-batch audit (8.789684ms)
+✖ ALLOW admin work settings with same-batch audit (1.056227ms)
+✖ DENY anonymous work settings write (0.562809ms)
+✖ DENY unknown work settings write (0.10149ms)
+✖ DENY teacher work settings write (0.057945ms)
+✖ staff can read; non-staff cannot read (0.048011ms)
+✖ DENY invalid target role, extra fields, duplicate days/periods, wrong document identity (0.037245ms)
+✖ maintenance rejects admin/teacher but owner may restore (0.135099ms)
+✖ admin can remove date exception (0.078295ms)
+✖ GAP: work CRUD additions alone do not reject off-weekday timetable writes (0.071746ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 0
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 293.090925
+
+✖ failing tests:
+
+test at work-integration.test.cjs:15:36
+✖ ALLOW owner work settings with same-batch audit (8.789684ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at work-integration.test.cjs:15:36
+✖ ALLOW admin work settings with same-batch audit (1.056227ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at work-integration.test.cjs:16:45
+✖ DENY anonymous work settings write (0.562809ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at work-integration.test.cjs:16:45
+✖ DENY unknown work settings write (0.10149ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at work-integration.test.cjs:16:45
+✖ DENY teacher work settings write (0.057945ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at work-integration.test.cjs:17:1
+✖ staff can read; non-staff cannot read (0.048011ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at work-integration.test.cjs:18:1
+✖ DENY invalid target role, extra fields, duplicate days/periods, wrong document identity (0.037245ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at work-integration.test.cjs:19:1
+✖ maintenance rejects admin/teacher but owner may restore (0.135099ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at work-integration.test.cjs:20:1
+✖ admin can remove date exception (0.078295ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
+
+test at work-integration.test.cjs:21:1
+✖ GAP: work CRUD additions alone do not reject off-weekday timetable writes (0.071746ms)
+  [TypeError [Error]: fetch failed] {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8095
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8095
+    }
+  }
