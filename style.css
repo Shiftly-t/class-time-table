@@ -1059,3 +1059,27 @@
 .practice-live-screen .practice-target{outline-offset:-2px;box-shadow:0 0 0 2px #fff2c9}
 @media(max-width:900px){.practice-live-header .header-actions button{width:44px;min-width:44px;padding:0;justify-content:center}.practice-live-header .header-actions button span{display:none}.practice-live-screen .nav-tabs.practice-role-admin,.practice-live-screen .nav-tabs.practice-role-owner{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.practice-live-screen .nav-tabs.practice-role-employee{grid-template-columns:repeat(4,minmax(0,1fr))}.practice-live-screen .nav-tabs.practice-role-employee>.nav-tab{font-size:clamp(10px,3vw,12px);white-space:nowrap;padding-inline:2px}.practice-live-screen .section-title{flex-wrap:wrap}.practice-live-screen{padding-inline:8px}.practice-live-header .brand{font-size:16px;gap:5px}.practice-live-header .brand-mark{width:30px;height:30px;flex-basis:30px}.practice-live-header .header-actions{gap:4px}.practice-live-header .topbar{padding-inline:8px}}
+
+/* Date selection and time-aware timetable indicators. */
+.schedule-date-open{border:0;background:transparent;color:#24344f;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:5px 2px;min-width:0;max-width:100%;border-radius:7px}
+.schedule-date-open strong{min-width:0;overflow-wrap:anywhere}.schedule-date-open svg{flex:none;color:#5265d8}.schedule-date-open:hover{background:#edf1ff}
+.schedule-date-dialog{width:min(420px,calc(100% - 24px))}
+.schedule-date-dialog .modal-head{margin-bottom:14px}
+.schedule-picker-nav{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:10px;margin-bottom:12px;text-align:center}
+.schedule-picker-nav button{height:44px;font-size:24px;padding:0}
+.schedule-picker-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.schedule-picker-weekday{font-size:11px;font-weight:700;color:#64748b;text-align:center;padding:5px 0}
+.schedule-picker-day{border:1px solid transparent;background:#f5f7fc;color:#24344f;border-radius:8px;min-height:40px;padding:4px 0;font-size:14px;font-weight:650}
+.schedule-picker-day:hover{background:#e9eeff}.schedule-picker-day.is-today{border-color:#8194f2;color:#4057de}.schedule-picker-day.is-selected{background:#4f63e9;color:white;border-color:#4f63e9}
+.schedule-picker-bottom{display:flex;justify-content:space-between;gap:8px;margin-top:16px}
+.time-group-title.is-current-period{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;border-left:3px solid #4f63e9;border-radius:7px;background:#edf1ff;color:#4057de;padding:9px 11px}
+.current-period-label{font-size:11px;font-weight:750;letter-spacing:0;color:#4057de}
+.lesson-card.is-current-period:not(.is-absent):not(.is-teacher-absent),.week-lesson.is-current-period:not(.is-absent):not(.is-teacher-absent){border-color:#8194f2;box-shadow:inset 3px 0 0 #4f63e9}
+.week-lesson.is-current-period .week-lesson-time{font-weight:900}
+/* Connection banner is part of the measured sticky header, not an overlay. */
+.sticky-site-header{position:sticky;top:0;z-index:60;background:white}
+.sticky-site-header>.topbar{position:static}
+.connection-warning{display:flex;align-items:center;justify-content:center;gap:10px;padding:9px 14px;background:#fff4dd;border-bottom:1px solid #efd49a;color:#854d0e}
+.connection-warning svg{flex:none}.connection-warning div{min-width:0;display:grid;gap:2px}
+.connection-warning strong{font-size:13px;line-height:1.4}.connection-warning span{font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+@media print{.sticky-site-header{position:static}.connection-warning{display:none}}

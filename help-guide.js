@@ -1,4 +1,4 @@
-import {renderPractice} from './help-practice.js?v=20261125-live-layout';
+import {renderPractice} from './help-practice.js?v=20261125-schedule-tools';
 // Static, role-filtered Shiftly-T operation guide. No Firebase access or writes.
 const topics=[
   [

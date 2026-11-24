@@ -1,5 +1,5 @@
 import {sameCourseStructure,assertCourseStructureEditable} from './course-structure.js';
-import {installHelpGuide} from './help-guide.js?v=20261125-live-layout';
+import {installHelpGuide} from './help-guide.js?v=20261125-schedule-tools';
 import {createAuthorityCommands} from './authority-commands.js';
 import {isWithdrawn,canReceiveLesson} from './student-enrollment.js';
 import {gradeInfo,academicYearForDate,academicYearJST,displayStudentGrade} from './student-grade.js';
@@ -51,13 +51,19 @@ const state = { user:null, profile:null, date:todayKey(), scheduleView:'day', pa
 installHelpGuide({getRole:()=>state.profile?.role,getUser:()=>state.user?.uid});
 // Derive sticky offsets from the actual bars, including role/device-specific wrapping.
 {
-  const header=document.querySelector('.topbar'),menu=document.querySelector('#appPanel > .welcome-line');
+  const header=$('stickySiteHeader'),menu=document.querySelector('#appPanel > .welcome-line');
   const syncBars=()=>{
     const root=document.documentElement;
     root.style.setProperty('--shiftly-header-height',Math.ceil(header.getBoundingClientRect().height)+'px');
     root.style.setProperty('--shiftly-menu-height',Math.ceil(menu.getBoundingClientRect().height)+'px');
   };
-  syncBars();
+  const syncConnectionWarning=()=>{
+    $('connectionWarning').hidden=navigator.onLine!==false;
+    syncBars();
+  };
+  window.addEventListener('online',syncConnectionWarning);
+  window.addEventListener('offline',syncConnectionWarning);
+  syncConnectionWarning();
   if(typeof ResizeObserver==='function'){
     const observer=new ResizeObserver(syncBars);observer.observe(header);observer.observe(menu);
   }
@@ -1096,6 +1102,38 @@ document.querySelectorAll('[data-schedule-view]').forEach(button=>button.addEven
 $('prevDay').addEventListener('click',()=>moveSchedule(-1));
 $('nextDay').addEventListener('click',()=>moveSchedule(1));
 $('today').addEventListener('click',()=>{state.date=todayKey();renderLessons();});
+// Calendar date picker: choosing a day keeps the active day/week/month view.
+let schedulePickerMonth='';
+function chooseScheduleDate(date){
+  if(!state.user||$('appPanel').hidden)return;
+  state.date=date;closeDialog('scheduleDateDialog');renderLessons();
+}
+function renderSchedulePicker(){
+  const [year,month]=schedulePickerMonth.split('-').map(Number);
+  $('scheduleDateMonth').textContent=year+'年'+month+'月';
+  const grid=$('scheduleDateGrid');grid.replaceChildren();
+  for(const day of ['月','火','水','木','金','土','日'])grid.append(make('span','schedule-picker-weekday',day));
+  const first=new Date(year,month-1,1),leading=(first.getDay()+6)%7;
+  for(let i=0;i<leading;i++)grid.append(make('span','schedule-picker-empty'));
+  const days=new Date(year,month,0).getDate(),today=todayKey();
+  for(let n=1;n<=days;n++){
+    const date=dateKey(new Date(year,month-1,n));
+    const button=make('button','schedule-picker-day'+(date===today?' is-today':'')+(date===state.date?' is-selected':''),n);
+    button.type='button';button.setAttribute('aria-label',year+'年'+prettyDate(date));button.setAttribute('aria-pressed',String(date===state.date));
+    if(date===today)button.setAttribute('aria-current','date');
+    button.addEventListener('click',()=>chooseScheduleDate(date));grid.append(button);
+  }
+}
+$('scheduleDateOpen').addEventListener('click',()=>{
+  schedulePickerMonth=state.date.slice(0,7);renderSchedulePicker();showDialog('scheduleDateDialog');
+});
+function moveSchedulePicker(delta){
+  const [year,month]=schedulePickerMonth.split('-').map(Number);
+  schedulePickerMonth=dateKey(new Date(year,month-1+delta,1)).slice(0,7);renderSchedulePicker();
+}
+$('scheduleDatePrev').addEventListener('click',()=>moveSchedulePicker(-1));
+$('scheduleDateNext').addEventListener('click',()=>moveSchedulePicker(1));
+$('scheduleDateToday').addEventListener('click',()=>chooseScheduleDate(todayKey()));
 $('studentLevel').addEventListener('change',renderCount);
 $('studentSort').addEventListener('change',renderCount);
 $('studentSearch').addEventListener('input',renderCount);
@@ -1200,6 +1238,26 @@ function courseBanner(date, compact=false){
   if(hasCourseConflict(date))banner.append(make('span','course-overlap-warning','講習期間が重複しています。管理者に確認してください。'));
   return banner;
 }
+// Highlight by Japan time and the displayed lesson's actual start/end.
+const scheduleTimeFormatter=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+function markScheduleTime(node,date,start,end){
+  node.dataset.scheduleDate=date;node.dataset.scheduleStart=start;node.dataset.scheduleEnd=end;
+}
+function refreshScheduleTimeHighlight(){
+  if(!state.user||$('lessonsPage').hidden||$('appPanel').hidden)return;
+  const now=new Date(),date=todayKey(),time=scheduleTimeFormatter.format(now);
+  for(const el of $('lessonList').querySelectorAll('[data-schedule-date]')){
+    const active=el.dataset.scheduleDate===date&&el.dataset.scheduleStart<=time&&time<el.dataset.scheduleEnd;
+    el.classList.toggle('is-current-period',active);
+    if(el.classList.contains('time-group-title')){
+      let badge=el.querySelector('.current-period-label');
+      if(active&&!badge){badge=make('span','current-period-label','授業時間中');el.append(badge);}
+      else if(!active&&badge)badge.remove();
+    }
+  }
+}
+setInterval(refreshScheduleTimeHighlight,15000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshScheduleTimeHighlight();});
 function renderDaySchedule(parent){
   parent.className='lesson-list';
   const banner=courseBanner(state.date);if(banner)parent.append(banner);
@@ -1210,8 +1268,10 @@ function renderDaySchedule(parent){
   let lastTime='';
   for(const item of rows){
     const time=`${item.displayPeriod?item.displayPeriod+'限　':''}${item.start} – ${item.end}`;
-    if(time!==lastTime){parent.append(make('div','time-group-title',time));lastTime=time;}
-    parent.append(fullLessonCard(item));
+    if(time!==lastTime){
+      const heading=make('div','time-group-title',time);markScheduleTime(heading,state.date,item.start,item.end);parent.append(heading);lastTime=time;
+    }
+    const card=fullLessonCard(item);markScheduleTime(card,state.date,item.start,item.end);parent.append(card);
   }
 }
 function renderWeekSchedule(parent){
@@ -1238,6 +1298,7 @@ function renderWeekSchedule(parent){
       if(item.status==='cancelled')topline.append(make('strong','week-absence','欠席'));
       if(item.teacherAbsent)topline.append(make('strong','week-absence','⚠ 要振替'));
       else if(item.status==='done')topline.append(make('span','week-done','実施済'));
+      markScheduleTime(lesson,date,item.start,item.end);
       lesson.append(topline);
       lesson.append(make('strong','week-student',`${displayLessonGrade(item)} ${item.studentName||'生徒名未登録'}`));
       lesson.append(make('span','week-meta',`${item.subject||'教科未登録'} / ${item.teacherName||'担当教師未登録'}`));
@@ -1331,6 +1392,7 @@ function renderLessons(){
   if(view==='week')renderWeekSchedule(parent);
   else if(view==='month')renderMonthSchedule(parent);
   else renderDaySchedule(parent);
+  refreshScheduleTimeHighlight();
 }
 // The admin and teacher directories use the exact same table-rendering path.
 // Teacher rows never have an edit/action column or write handlers.
