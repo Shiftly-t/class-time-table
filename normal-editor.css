@@ -76,3 +76,159 @@
  .normal-editor-title .ghost{width:100%}
  .availability-overview-emphasis strong{flex-basis:100%}
 }
+
+
+/* SHIFTLY UI UX COURSE DATE V1 */
+.editor-day-nav {
+  box-sizing: border-box;
+  max-width: 100%;
+  gap: 8px;
+}
+.editor-day-nav > label {
+  box-sizing: border-box;
+  flex: 1 1 200px;
+  width: 200px;
+  min-width: 0;
+  max-width: 220px;
+}
+.editor-day-nav #editorDate {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 12px;
+  font-size: 16px;
+  text-align: left;
+  color: #24344f;
+}
+.editor-day-nav #editorDate::-webkit-date-and-time-value {
+  text-align: left;
+}
+.editor-day-nav #editorDate::-webkit-datetime-edit {
+  padding: 0;
+}
+
+
+/* SHIFTLY COURSE DATE GRID FIX V2 */
+.editor-day-nav {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 8px;
+  width: min(100%, 340px);
+  max-width: 100%;
+  min-width: 0;
+  align-items: end;
+}
+
+.editor-day-nav > label {
+  display: block;
+  flex: none;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.editor-day-nav #editorDate {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 650px) {
+  .editor-day-nav {
+    width: 100%;
+  }
+}
+
+
+/* SHIFTLY DATE CONTROL V5 */
+
+#courseEditorDateNav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 0 1 360px;
+  width: min(100%, 360px);
+  max-width: 100%;
+  min-width: 0;
+  margin-left: auto;
+}
+
+#courseEditorDateNav > label {
+  display: block;
+  flex: 0 0 auto;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  color: #526487;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#courseEditorDateNav .course-date-pager {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 268px;
+  width: 268px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#courseEditorDateNav .course-date-pager > button {
+  box-sizing: border-box;
+  width: 44px;
+  min-width: 0;
+  height: 46px;
+  margin: 0;
+  padding: 0;
+}
+
+#courseEditorDateNav #editorDate {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 46px;
+  min-height: 46px;
+  margin: 0;
+  padding: 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #24344f;
+  background: #fff;
+  border: 1px solid #d8e1f2;
+  border-radius: 10px;
+}
+
+@media (max-width: 850px) {
+  #courseEditorDateNav {
+    flex: 1 1 100%;
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  #courseEditorDateNav {
+    gap: 8px;
+  }
+  #courseEditorDateNav .course-date-pager {
+    flex: 1 1 auto;
+    width: auto;
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+  }
+  #courseEditorDateNav .course-date-pager > button {
+    width: 40px;
+  }
+}
