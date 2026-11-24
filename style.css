@@ -926,3 +926,40 @@
 /* Confirmed operation feedback: shared success path only. */
 #message:not(:empty){background:#166534;color:#fff;border:1px solid #14532d;font-size:15px;font-weight:650;line-height:1.6;padding:14px 18px;z-index:1200;overflow-wrap:anywhere;bottom:max(18px,env(safe-area-inset-bottom));}
 #message:not(:empty)::before{content:'✓';display:inline-block;margin-right:8px;font-weight:800;}
+
+/* Role-aware user guide; isolated styles. */
+.header-actions .help-guide-button{gap:6px;color:#4057de;font-size:13px;font-weight:750;white-space:nowrap;padding:9px 11px}
+.help-guide-button svg{flex:none}
+#helpGuideDialog{width:min(860px,calc(100% - 24px));max-height:90vh;max-height:90dvh}
+.help-guide-shell{padding:0;max-height:90vh;max-height:90dvh;overflow:auto}
+.help-guide-top{padding:24px 24px 8px;background:white;position:sticky;top:0;z-index:2}
+.help-guide-top .modal-head{margin-bottom:10px}
+.help-guide-top .eyebrow{margin-bottom:5px}
+.help-guide-intro{color:#60708a;font-size:13px;line-height:1.65;margin:0 0 14px}
+.help-guide-search label{display:block;font-size:13px;font-weight:700;color:#526487;margin-bottom:5px}
+.help-guide-search>div{display:flex;gap:8px;align-items:center}
+.help-guide-search input{flex:1;min-width:0;width:100%;min-height:44px;font-size:16px}
+.help-guide-tabs{display:flex;gap:7px;margin:13px 0 0}
+.help-guide-tab{flex:1;min-width:0;border:1px solid #dce4f2;border-radius:9px;padding:10px 5px;background:#f7f9fe;color:#526487;font-size:13px;font-weight:700;min-height:42px}
+.help-guide-tab[aria-pressed="true"]{background:#e9eeff;border-color:#9eaff7;color:#4057de}
+.help-guide-count{color:#64748b;font-size:12px;margin:12px 0 5px}
+.help-guide-list{padding:0 24px 12px;display:grid;gap:10px}
+.help-guide-item{border:1px solid #e0e6f1;border-radius:12px;background:#fff;overflow:hidden}
+.help-guide-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;cursor:pointer;list-style:none}
+.help-guide-summary::-webkit-details-marker{display:none}
+.help-guide-heading{display:grid;gap:4px;min-width:0;color:#24344f;overflow-wrap:anywhere}
+.help-guide-heading strong{font-size:15px}
+.help-guide-category{color:#4f63e9;font-size:11px;font-weight:800}
+.help-guide-desc{color:#63748e;font-size:12px;line-height:1.6}
+.help-guide-chevron{color:#4f63e9;font-size:21px;flex:none}
+.help-guide-item[open] .help-guide-chevron{transform:rotate(180deg)}
+.help-guide-item[open] .help-guide-summary{background:#f5f7ff;border-bottom:1px solid #e1e7f5}
+.help-guide-content{padding:14px 16px}
+.help-guide-steps{list-style:none;counter-reset:guide-step;padding:0;margin:0 0 14px;display:grid;gap:8px}
+.help-guide-steps li{counter-increment:guide-step;display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #e0e7f6;background:#f6f8ff;border-radius:9px;color:#24344f;font-size:14px;line-height:1.65}
+.help-guide-steps li::before{content:counter(guide-step);display:grid;place-items:center;flex:0 0 25px;height:25px;border-radius:50%;background:#4f63e9;color:#fff;font-size:12px;font-weight:750}
+.help-guide-tip{background:#fff8e9;border:1px solid #f0dfb6;padding:12px;border-radius:9px;color:#795018;font-size:13px;line-height:1.7}
+.help-guide-tip p{margin:4px 0 0}
+.help-guide-empty,.help-guide-footer{color:#64748b;font-size:12px;text-align:center;padding:12px;margin:0}
+@media(max-width:600px){.header-actions .help-guide-button{padding:9px 10px}.help-guide-button span{display:none}.help-guide-top{padding:15px 14px 6px}.help-guide-list{padding:0 14px 12px}.help-guide-content{padding:12px}.help-guide-summary{padding:12px}}
+@media(max-height:480px){.help-guide-top{position:static}}
