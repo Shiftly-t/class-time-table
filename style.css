@@ -922,3 +922,7 @@
   .welcome-line .nav-tabs{display:flex;flex-wrap:nowrap;}
   .welcome-line .nav-tabs > .nav-tab{flex:1 1 auto;min-width:0;padding-inline:6px;white-space:normal;overflow-wrap:anywhere;}
 }
+
+/* Confirmed operation feedback: shared success path only. */
+#message:not(:empty){background:#166534;color:#fff;border:1px solid #14532d;font-size:15px;font-weight:650;line-height:1.6;padding:14px 18px;z-index:1200;overflow-wrap:anywhere;bottom:max(18px,env(safe-area-inset-bottom));}
+#message:not(:empty)::before{content:'✓';display:inline-block;margin-right:8px;font-weight:800;}

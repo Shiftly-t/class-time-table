@@ -8,7 +8,7 @@
 .normal-editor-actions .ghost,.normal-editor-actions .primary{min-height:40px;white-space:normal}
 .normal-editor-warning{font-size:13px;font-weight:700;color:#98530a;line-height:1.65;overflow-wrap:anywhere;margin:8px 0 12px}
 .normal-editor-warning:empty{display:none}
-.normal-editor-scroll{max-width:100%;overflow-x:auto;overflow-y:visible;border:1px solid #dae3ef;border-radius:13px;background:#fff;-webkit-overflow-scrolling:touch}
+.normal-editor-scroll{max-width:100%;max-height:min(72vh,850px);max-height:min(72dvh,850px);overflow:auto;border:1px solid #dae3ef;border-radius:13px;background:#fff;-webkit-overflow-scrolling:touch}
 .normal-table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .normal-table th,.normal-table td{border-right:1px solid #e5eaf1;border-bottom:1px solid #e5eaf1;vertical-align:top}
 .normal-table tr:last-child td,.normal-table tr:last-child th{border-bottom:0}
