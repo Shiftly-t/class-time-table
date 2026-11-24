@@ -819,6 +819,13 @@ $("restoreJobRefresh").addEventListener("click",()=>runRestoreUi(false));
 $("restoreJobResume").addEventListener("click",()=>runRestoreUi(true));
 $("restoreJobRollback").addEventListener("click",()=>runRestoreUi("rollback"));
 function restoreBlocked(){return isOwner()&&seasonalAuthority.enabled()&&(!restoreGate.known||restoreGate.active);}
+// The header shows the existing saved maintenance version, not an unsaved input.
+function renderBrandVersion(version){
+  const el=$('brandVersion');
+  const value=String(version??'').trim();
+  const label=value?'ver '+value.replace(/^(?:ver\.?\s*|v\s*)(?=\d)/i,''):'';
+  el.textContent=label;el.title=label;el.hidden=!label;
+}
 function applyMaintenanceState(){
   $("restoreJobPanel").hidden=!restoreBlocked();
   if(restoreBlocked()){if($('bookingFrameHost').firstElementChild)resetBookingFrame();$("appPanel").hidden=true;$("maintenancePanel").hidden=true;$("notificationButton").hidden=true;return;}
@@ -3313,6 +3320,7 @@ const loginFormNode=$('loginForm');
 const loginFormParent=loginFormNode.parentElement;
 
 function loggedOut(){
+  renderBrandVersion('');
   resetWorkspaceScroll();
   resetBookingFrame();
   resetRestoreGate();
@@ -3333,6 +3341,7 @@ function loggedOut(){
   for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();
 }
 async function loggedIn(user){
+  renderBrandVersion('');
   resetWorkspaceScroll();
   resetBookingFrame();
   resetRestoreGate();
@@ -3395,10 +3404,11 @@ async function loggedIn(user){
     maintenanceState.enabled=data.enabled===true;
     maintenanceState.message=String(data.message||'');
     maintenanceState.version=String(data.version||'');
+    renderBrandVersion(maintenanceState.version.trim()||'26.0');
     maintenanceState.startedAt=data.startedAt||null;
     maintenanceState.updatedAt=data.updatedAt||null;
     $('maintenanceNoticeInput').value=maintenanceState.message;
-    if(maintenanceState.version)$('maintenanceVersionInput').value=maintenanceState.version;
+    $('maintenanceVersionInput').value=maintenanceState.version;
     if(maintenanceState.enabled&&!isOwner()){
       seasonalAuthority.reset();bookingEditorTransport.reset();document.getElementById('bookingResultCheck')?.remove();normalAuthority.reset();document.getElementById('normalAuthorityRetry')?.remove();
       if(maintenanceState.dataStarted){resetSubscriptions();clearAvailabilitySubscriptions();maintenanceState.dataStarted=false;}
@@ -3413,6 +3423,7 @@ async function loggedIn(user){
   },error=>{
     if(!current())return;
     console.error('メンテナンス状態を確認できません',error);
+    renderBrandVersion('');
     maintenanceState.loaded=false;$('appPanel').hidden=true;
     $('maintenancePanel').hidden=false;
     $('maintenanceStatus').textContent='利用状況を確認できません';
