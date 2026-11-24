@@ -7,3 +7,8 @@ export const firebaseConfig = {
   messagingSenderId: "85446950632",
   appId: "1:85446950632:web:2d0394a4052c8ac53f935d"
 };
+
+// Production runtime feature gates; backend readiness is verified before publication.
+export const qaFirestoreDatabaseId = '';
+export const teacherWorkFeatureEnabled = true;
+export const normalAuthorityApiEnabled = true;

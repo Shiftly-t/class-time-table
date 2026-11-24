@@ -576,3 +576,236 @@
  .student-toolbar input,.student-toolbar select{width:100%;min-width:0;box-sizing:border-box}
  #adminCountPage .table-wrap{max-width:100%;width:100%;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
+
+
+/* Global error dialog */
+#shiftlyNotice{
+  box-sizing:border-box;
+  width:min(540px,calc(100% - 32px));
+  max-width:none;
+  max-height:calc(100vh - 32px);
+  max-height:calc(100dvh - 32px);
+  margin:auto;
+  padding:24px;
+  border:2px solid #dc2626;
+  border-radius:20px;
+  background:#fff;
+  color:#18243c;
+  box-shadow:0 24px 80px #0004;
+  overflow:auto;
+}
+#shiftlyNotice::backdrop{
+  background:rgba(15,23,42,.48);
+}
+.shiftly-notice-heading{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:20px;
+}
+.shiftly-notice-heading span{
+  display:grid;
+  place-items:center;
+  flex:0 0 40px;
+  height:40px;
+  border-radius:50%;
+  background:#fee2e2;
+  color:#b91c1c;
+  font-size:26px;
+  font-weight:800;
+}
+#shiftlyNoticeTitle{
+  margin:0;
+  color:#b91c1c;
+  font-size:22px;
+}
+#shiftlyNoticeText{
+  font-size:17px;
+  line-height:1.8;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  margin:0 0 22px;
+}
+#shiftlyNoticeActions{
+  display:grid;
+  gap:10px;
+}
+#shiftlyNoticeActions button{
+  min-height:48px;
+  font-size:15px;
+}
+#shiftlyNoticeClose{
+  width:100%;
+  min-height:48px;
+  margin-top:10px;
+  border:0;
+  border-radius:12px;
+  background:#4f63e9;
+  color:white;
+  font-size:16px;
+  font-weight:750;
+}
+@media(max-width:480px){
+  #shiftlyNotice{padding:18px}
+  #shiftlyNoticeTitle{font-size:20px}
+}
+@media print{
+  #shiftlyNotice{display:none!important}
+}
+
+/* SHIFTLY UI UX STUDENT PATCH V1 */
+#adminCountPage .student-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+#adminCountPage .student-toolbar > label {
+  min-width: 0;
+}
+#adminCountPage .student-toolbar > label.grow {
+  flex: 2 1 280px;
+  max-width: 480px;
+}
+#adminCountPage .student-toolbar label:has(input[type="checkbox"]) {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+#adminCountPage .student-toolbar input[type="checkbox"] {
+  appearance: auto;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  max-width: 18px;
+  flex: 0 0 18px;
+  margin: 0;
+  padding: 0;
+  accent-color: #5062e8;
+}
+@media (max-width: 640px) {
+  #adminCountPage .student-toolbar > label {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  #adminCountPage .student-toolbar > label.grow {
+    max-width: none;
+  }
+}
+
+
+/* SHIFTLY UI UX EDITOR PATCH V1 */
+.editor-day-nav {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.editor-day-nav > button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0 12px;
+  border-radius: 11px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.editor-day-nav #editorPrevious,
+.editor-day-nav #editorNext {
+  font-size: 21px;
+  padding: 0;
+}
+.editor-day-nav > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 170px;
+  min-width: 0;
+  font-size: 14px;
+}
+.editor-day-nav #editorDate {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  min-height: 46px;
+  padding: 0 10px;
+  font-size: 15px;
+  color: #24344f;
+  border-radius: 11px;
+}
+.editor-action-buttons button {
+  box-sizing: border-box;
+  min-height: 46px;
+  border-radius: 11px;
+  font-size: 14px;
+  line-height: 1.3;
+}
+@media (max-width: 600px) {
+  .editor-day-nav {
+    gap: 8px;
+  }
+  .editor-day-nav > label {
+    max-width: 100%;
+  }
+  .editor-action-buttons {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+
+/* SHIFTLY UI UX HOLIDAY PATCH V3 */
+#closureSelectedAction,
+#closureSelectedOpenAction {
+  box-sizing: border-box;
+  min-height: 46px;
+  border-radius: 11px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+#closureSelectedAction:not([hidden])
++ #closureSelectedOpenAction:not([hidden]) {
+  margin-top: 12px;
+}
+
+
+/* SHIFTLY UI UX TYPOGRAPHY V1 */
+
+/* 説明文の視認性 */
+.muted {
+  color: #53627a;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+/* 小見出し */
+.eyebrow {
+  color: #465bc7;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+/* 一覧表のグループ見出し */
+.group-row td {
+  color: #34466b;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* 授業種別タグ */
+.origin-tag {
+  color: #485a76;
+  font-size: 12px;
+  font-weight: 700;
+}
