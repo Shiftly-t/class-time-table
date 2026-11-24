@@ -1083,3 +1083,9 @@
 .connection-warning svg{flex:none}.connection-warning div{min-width:0;display:grid;gap:2px}
 .connection-warning strong{font-size:13px;line-height:1.4}.connection-warning span{font-size:11px;line-height:1.5;overflow-wrap:anywhere}
 @media print{.sticky-site-header{position:static}.connection-warning{display:none}}
+
+/* View granularity is selected inside the date dialog, not the timetable toolbar. */
+.schedule-picker-viewbar{justify-content:center;gap:8px;margin:0 0 16px;flex-wrap:nowrap}
+.schedule-picker-viewbar .schedule-view-switch{flex:1;min-width:0;display:flex}
+.schedule-picker-viewbar .view-choice{flex:1;min-width:0;padding-inline:8px}
+.schedule-picker-bottom{flex-wrap:wrap}.schedule-picker-bottom button{flex:1 1 auto;min-height:40px;white-space:nowrap;padding-inline:8px}

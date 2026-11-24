@@ -1,4 +1,4 @@
-import {renderPractice} from './help-practice.js?v=20261125-schedule-tools';
+import {renderPractice} from './help-practice.js?v=20261125-compact-date';
 // Static, role-filtered Shiftly-T operation guide. No Firebase access or writes.
 const topics=[
   [
@@ -9,7 +9,7 @@ const topics=[
     [
       "「今日の時間割」を開く。",
       "「自分の担当授業」または「全教師の授業」を選択する。",
-      "日・週・月を選択し、左右の矢印で日付を移動する。",
+      "日付を押してカレンダーを開き、日・週・月の表示範囲と日付を選択する。左右の矢印でも期間を移動できる。",
       "授業カードを押すと授業詳細を確認できる。"
     ],
     "赤い授業カードは生徒欠席。連続授業はコマごとに表示されます。「要振替」がある場合は管理者に確認してください。"

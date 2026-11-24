@@ -1,5 +1,5 @@
 import {sameCourseStructure,assertCourseStructureEditable} from './course-structure.js';
-import {installHelpGuide} from './help-guide.js?v=20261125-schedule-tools';
+import {installHelpGuide} from './help-guide.js?v=20261125-compact-date';
 import {createAuthorityCommands} from './authority-commands.js';
 import {isWithdrawn,canReceiveLesson} from './student-enrollment.js';
 import {gradeInfo,academicYearForDate,academicYearJST,displayStudentGrade} from './student-grade.js';
@@ -1098,15 +1098,22 @@ function selectScheduleView(view){
   });
   renderLessons();
 }
-document.querySelectorAll('[data-schedule-view]').forEach(button=>button.addEventListener('click',()=>selectScheduleView(button.dataset.scheduleView)));
+document.querySelectorAll('[data-schedule-view]').forEach(button=>button.addEventListener('click',()=>{
+  if(!$('scheduleDateDialog').open)return;
+  schedulePickerView=button.dataset.scheduleView;
+  syncSchedulePickerView();
+}));
 $('prevDay').addEventListener('click',()=>moveSchedule(-1));
 $('nextDay').addEventListener('click',()=>moveSchedule(1));
 $('today').addEventListener('click',()=>{state.date=todayKey();renderLessons();});
 // Calendar date picker: choosing a day keeps the active day/week/month view.
-let schedulePickerMonth='';
+let schedulePickerMonth='',schedulePickerView='day';
+function syncSchedulePickerView(){
+  document.querySelectorAll('#scheduleDateDialog [data-schedule-view]').forEach(button=>{const active=button.dataset.scheduleView===schedulePickerView;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
+}
 function chooseScheduleDate(date){
   if(!state.user||$('appPanel').hidden)return;
-  state.date=date;closeDialog('scheduleDateDialog');renderLessons();
+  state.date=date;closeDialog('scheduleDateDialog');selectScheduleView(schedulePickerView);
 }
 function renderSchedulePicker(){
   const [year,month]=schedulePickerMonth.split('-').map(Number);
@@ -1125,7 +1132,7 @@ function renderSchedulePicker(){
   }
 }
 $('scheduleDateOpen').addEventListener('click',()=>{
-  schedulePickerMonth=state.date.slice(0,7);renderSchedulePicker();showDialog('scheduleDateDialog');
+  schedulePickerMonth=state.date.slice(0,7);schedulePickerView=state.scheduleView;syncSchedulePickerView();renderSchedulePicker();showDialog('scheduleDateDialog');
 });
 function moveSchedulePicker(delta){
   const [year,month]=schedulePickerMonth.split('-').map(Number);
@@ -1134,6 +1141,7 @@ function moveSchedulePicker(delta){
 $('scheduleDatePrev').addEventListener('click',()=>moveSchedulePicker(-1));
 $('scheduleDateNext').addEventListener('click',()=>moveSchedulePicker(1));
 $('scheduleDateToday').addEventListener('click',()=>chooseScheduleDate(todayKey()));
+$('scheduleDateApply').addEventListener('click',()=>chooseScheduleDate(state.date));
 $('studentLevel').addEventListener('change',renderCount);
 $('studentSort').addEventListener('change',renderCount);
 $('studentSearch').addEventListener('input',renderCount);
