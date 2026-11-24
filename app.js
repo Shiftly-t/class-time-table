@@ -12,7 +12,7 @@ import { firebaseTargetForPage } from './firebase-target.js';
 import { bookingAppCheckSiteKey } from './booking-config.js';
 import { createNormalAuthorityClient } from './normal-authority-client.js?v=qa-errorui-20261119-01';
 import { installNormalEditor } from './normal-editor.js?v=qa-errorui-20261119-01';
-import { installTeacherWorkPage } from './teacher-work.js?v=qa-errorui-20261119-01';
+import { installTeacherWorkPage } from './teacher-work.js?v=prod-ui-20261124-teacher-grid';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
 

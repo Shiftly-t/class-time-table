@@ -29,7 +29,8 @@ export function installTeacherWorkPage(ctx){
   const sorted=a=>[...a].sort((x,y)=>x-y);
   const same=(a,b)=>JSON.stringify(sorted(a))===JSON.stringify(sorted(b));
   const teachers=()=>state.people.filter(p=>isAssignableTeacher(p.role))
-    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ja'));
+    .sort((a,b)=>Number(a.role==='admin')-Number(b.role==='admin') ||
+      String(a.name||'').localeCompare(String(b.name||''),'ja',{numeric:true}));
   const storedWeek=uid=>state.teacherWeeklyWork?.[uid]||null;
   const dayId=(date,uid)=>date+'_'+uid;
   const storedDay=(date,uid)=>state.teacherDateWork?.[dayId(date,uid)]||null;
@@ -143,10 +144,10 @@ export function installTeacherWorkPage(ctx){
     weekOptions.style.gridTemplateColumns='minmax(0,1fr)';
     for(const d of days){
       const row=document.createElement('div');
-      row.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+      row.className='teacher-work-week-row';
       const title=document.createElement('strong');
       title.textContent=d.t+'曜';
-      title.style.minWidth='2.5em';
+      title.className='teacher-work-weekday';
       row.append(title);
       for(const p of CLASS_PERIODS){
         checkbox(row,p.number,p.number+'限',

@@ -48,3 +48,35 @@
     max-width: 100%;
   }
 }
+
+/* Keep each weekday and its four periods in a single aligned row. */
+#workWeekDays{min-width:0;width:100%}
+#workWeekDays .teacher-work-week-row{
+  display:grid;
+  grid-template-columns:2.5em repeat(4,minmax(0,1fr));
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+#workWeekDays .teacher-work-weekday{white-space:nowrap;font-size:13px}
+#workWeekDays .teacher-work-choice{
+  min-width:0;
+  min-height:44px;
+  padding:6px 3px;
+  gap:4px;
+  white-space:nowrap;
+}
+#workWeekDays .teacher-work-choice input[type=checkbox]{
+  flex:0 0 16px;
+  width:16px;
+  min-width:16px;
+  height:16px;
+  min-height:16px;
+  padding:0;
+}
+@media(max-width:560px){
+  #workWeekDays .teacher-work-week-row{grid-template-columns:2em repeat(4,minmax(0,1fr));gap:4px}
+  #workWeekDays .teacher-work-weekday{font-size:12px}
+  #workWeekDays .teacher-work-choice{font-size:11px;gap:3px;padding:5px 1px;border-radius:8px}
+  #workWeekDays .teacher-work-choice input[type=checkbox]{flex-basis:14px;width:14px;min-width:14px;height:14px;min-height:14px}
+}
