@@ -1,4 +1,4 @@
-import {renderPractice} from './help-practice.js?v=20261125-timetable-label';
+import {renderPractice} from './help-practice.js?v=20261125-all-timetable-label';
 // Static, role-filtered Shiftly-T operation guide. No Firebase access or writes.
 const topics=[
   [
@@ -7,7 +7,7 @@ const topics=[
     "時間割を確認する",
     "毎日の授業・週予定・月予定を確認します。",
     [
-      "「今日の時間割」を開く。",
+      "「時間割」を開く。",
       "「自分の担当授業」または「全教師の授業」を選択する。",
       "日付を押してカレンダーを開き、日・週・月の表示範囲と日付を選択する。左右の矢印でも期間を移動できる。",
       "授業カードを押すと授業詳細を確認できる。"

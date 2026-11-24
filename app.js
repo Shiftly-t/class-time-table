@@ -1,5 +1,5 @@
 import {sameCourseStructure,assertCourseStructureEditable} from './course-structure.js';
-import {installHelpGuide} from './help-guide.js?v=20261125-timetable-label';
+import {installHelpGuide} from './help-guide.js?v=20261125-all-timetable-label';
 import {createAuthorityCommands} from './authority-commands.js';
 import {isWithdrawn,canReceiveLesson} from './student-enrollment.js';
 import {gradeInfo,academicYearForDate,academicYearJST,displayStudentGrade} from './student-grade.js';
@@ -1037,7 +1037,7 @@ function nav(page) {
   else if(page==='maintenanceOwner'){renderMaintenanceOwner();loadMaintenanceHistory();}
   else if(page==='bookingManagement')openBookingFrame();
   else {
-    $('scheduleHeading').textContent=isAdmin()?'時間割':'今日の時間割';
+    $('scheduleHeading').textContent='時間割';
     $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'全教師の時間割と伝達事項を閲覧できます。';
     renderLessons();
   }
