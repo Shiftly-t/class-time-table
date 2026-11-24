@@ -11,7 +11,7 @@ import * as config from './config.js';
 import { firebaseTargetForPage } from './firebase-target.js';
 import { bookingAppCheckSiteKey } from './booking-config.js';
 import { createNormalAuthorityClient } from './normal-authority-client.js?v=qa-errorui-20261119-01';
-import { installNormalEditor } from './normal-editor.js?v=qa-errorui-20261119-01';
+import { installNormalEditor } from './normal-editor.js?v=prod-ui-20261124-schedule-first';
 import { installTeacherWorkPage } from './teacher-work.js?v=prod-ui-20261124-teacher-grid';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
@@ -957,6 +957,7 @@ function nav(page) {
   $('availabilityPage').hidden=page!=='availability';
   $('ownerHistoryPage').hidden=page!=='ownerHistory';
   $('maintenanceOwnerPage').hidden=page!=='maintenanceOwner';
+  $('openNormalEditor').hidden=!isAdmin()||page!=='adminSchedule';
   $('lessonsPage').hidden=page==='count'||page==='students'||page==='closures'||page==='courses'||page==='courseEditor'||page==='availability'||page==='ownerHistory'||page==='maintenanceOwner'||page==='adminLessons'||page==='teacherManagement'||page==='bookingManagement';
   for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navTeacherManagement','teacherManagement'],['navClosures','closures'],['navCourses','courses'],['navAvailability','availability'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students'],['navOwnerHistory','ownerHistory'],['navMaintenanceOwner','maintenanceOwner']]) $(''+id).classList.toggle('active',page===p || (id==='navCourses'&&isAdmin()&&(page==='availability'||page==='courseEditor'))||(id==='navAdminLessons'&&page==='adminSchedule'));
   if(page==='count')renderCount();
@@ -971,14 +972,15 @@ function nav(page) {
   else if(page==='maintenanceOwner'){renderMaintenanceOwner();loadMaintenanceHistory();}
   else if(page==='bookingManagement')openBookingFrame();
   else {
-    $('scheduleHeading').textContent=isAdmin()?'授業管理':'今日の時間割';
+    $('scheduleHeading').textContent=isAdmin()?'時間割':'今日の時間割';
     $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'全教師の時間割と伝達事項を閲覧できます。';
     renderLessons();
   }
   renderAvailabilityHome();
 }
 $('navCount').addEventListener('click',()=>nav('count'));
-$('navAdminLessons').addEventListener('click',()=>nav('adminLessons'));
+$('navAdminLessons').addEventListener('click',()=>nav('adminSchedule'));
+$('openNormalEditor').addEventListener('click',()=>{if(isAdmin())nav('adminLessons');});
 $('navClosures').addEventListener('click',()=>nav('closures'));
 $('navCourses').addEventListener('click',()=>{if(isAdmin())nav('courses');});
 $('navAvailability').addEventListener('click',()=>nav('availability'));
