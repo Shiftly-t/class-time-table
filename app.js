@@ -3300,7 +3300,7 @@ async function loggedIn(user){
   if(!current())return;
   state.profile=profileSnap.data();
   const name=state.profile.name?.trim()||user.email||'ユーザー';
-  $('welcomeName').textContent=`ようこそ、${name}さん`;
+  $('welcomeName').textContent=`${name}でログイン中`;
   $('identity').textContent=`${name}（${isOwner()?'運営':isAdmin()?'管理者':'教師'}）`;
   $('welcomeSub').textContent=isAdmin()?'生徒情報と授業の状況をまとめて管理できます。':'今日の授業・全教師の時間割・生徒情報を確認できます。';
   $('availabilityPageTitle').textContent=isAdmin()?'勤務希望登録・提出状況':'勤務希望登録';

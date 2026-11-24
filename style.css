@@ -997,3 +997,6 @@
 .header-actions #helpGuideButton:hover,.header-actions #notificationButton:hover,.header-actions #logout:hover{background:#f5f7fc}
 .header-actions #helpGuideButton span{display:inline}
 @media(max-width:680px){.header-actions{flex-wrap:wrap}.header-actions #helpGuideButton,.header-actions #notificationButton,.header-actions #logout{padding-inline:9px}}
+
+/* Compact workspace login status; does not affect other headings. */
+#welcomeName{font-size:16px;font-weight:700;line-height:1.5;letter-spacing:0;color:#374a6c;margin-bottom:6px;overflow-wrap:anywhere}
