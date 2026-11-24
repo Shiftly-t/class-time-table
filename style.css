@@ -986,3 +986,14 @@
 .logout-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
 .logout-confirm-actions button{min-height:46px;font-size:14px;white-space:normal}
 @media(max-width:680px){.topbar{flex-wrap:wrap;gap:9px}.header-actions{margin-left:auto;gap:6px;max-width:100%}.header-actions #notificationButton{padding:9px 10px}.header-actions #logout{padding-inline:10px;white-space:nowrap}}
+
+/* Unified account header typography and controls. */
+.header-actions{color:#374a6c;font-size:13px;font-weight:700}
+.header-actions #identity{color:inherit;font-size:inherit;font-weight:inherit;line-height:1.4}
+.header-actions #helpGuideButton,
+.header-actions #notificationButton,
+.header-actions #logout{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;height:44px;padding:9px 11px;border:1px solid #dfe5f0;border-radius:10px;background:#fff;color:#374a6c;font-size:13px;font-weight:700;line-height:1.4;white-space:nowrap}
+.header-actions #helpGuideButton svg,.header-actions #notificationButton svg{width:22px;height:22px;color:inherit;flex:none}
+.header-actions #helpGuideButton:hover,.header-actions #notificationButton:hover,.header-actions #logout:hover{background:#f5f7fc}
+.header-actions #helpGuideButton span{display:inline}
+@media(max-width:680px){.header-actions{flex-wrap:wrap}.header-actions #helpGuideButton,.header-actions #notificationButton,.header-actions #logout{padding-inline:9px}}
