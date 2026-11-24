@@ -1000,3 +1000,19 @@
 
 /* Compact workspace login status; does not affect other headings. */
 #welcomeName{font-size:16px;font-weight:700;line-height:1.5;letter-spacing:0;color:#374a6c;margin-bottom:6px;overflow-wrap:anywhere}
+
+/* Compact phone header: preserve labels on wider screens and accessible names on all sizes. */
+@media(max-width:600px){
+  .topbar{flex-wrap:nowrap;gap:8px;padding-inline:12px}
+  .topbar .brand{flex:0 1 auto;min-width:0;gap:8px;white-space:nowrap}
+  .topbar .brand-mark{flex:0 0 38px}
+  .topbar .header-actions{flex:0 0 auto;flex-wrap:nowrap;gap:6px;margin-left:auto}
+  .header-actions #helpGuideButton,.header-actions #notificationButton,.header-actions #logout{flex:0 0 44px;width:44px;min-width:44px;height:44px;padding:0;gap:0}
+  .header-actions #helpGuideButton span,.header-actions #notificationButton .notification-label,.header-actions #logout span{display:none}
+}
+@media(max-width:340px){
+  .topbar{padding-inline:8px;gap:5px}
+  .topbar .brand{gap:5px;font-size:16px}
+  .topbar .brand-mark{flex-basis:32px;width:32px;height:32px}
+  .topbar .header-actions{gap:4px}
+}
