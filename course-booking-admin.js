@@ -1,3 +1,4 @@
+import {mountQrPrintEditor} from './qr-print-editor.js?v=20261124-editor-v1';
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getFirestore,doc,getDoc} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
@@ -477,38 +478,18 @@ function openPrintWindow(){
 }
 function populatePrintWindow(popup){
   if(popup!==printWindow||popup.closed||!authorized)return false;
-  const d=popup.document;
-  d.documentElement.lang='ja';
-  d.head.replaceChildren();
-  d.body.replaceChildren();
-  const meta=d.createElement('meta');meta.name='viewport';meta.content='width=device-width,initial-scale=1';
-  const referrer=d.createElement('meta');referrer.name='referrer';referrer.content='no-referrer';
-  const title=d.createElement('title');title.textContent='Shiftly-T | QRコード印刷';
-  const css=d.createElement('link');css.rel='stylesheet';css.href=new URL('./booking.css?v=20261111-closures',location.href).href;
-  const style=d.createElement('style');
-  style.textContent=`
-    body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;margin:0;color:#18243c;background:#f6f8fc}
-    .print-toolbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 16px;background:#fff;border-bottom:1px solid #dfe5f0}
-    .print-toolbar strong{flex:1 1 140px}
-    .print-toolbar button{font:inherit;font-size:14px;font-weight:750;min-height:44px;padding:10px 14px;border:1px solid #dfe5f0;border-radius:10px;background:#fff;color:#40526f;cursor:pointer}
-    .print-toolbar .print-now{background:#4f63e9;color:white;border-color:#4f63e9}
-    .print-toolbar button:disabled{opacity:.5}
-    @media screen{#printRoot{display:block;max-width:210mm;margin:16px auto;padding:0 12px}#printRoot .printsheet{background:#fff;box-shadow:0 2px 10px #18243c12;border-radius:12px;margin:0 0 16px;padding:16px}#printRoot .printitem{min-height:0;height:auto;padding:20px 12px}#printRoot .printitem svg{width:min(85mm,100%)}}
-    @media print{.print-toolbar{display:none!important}#printRoot{display:block!important}}
-  `;
-  const bar=d.createElement('header');bar.className='print-toolbar';
-  const label=d.createElement('strong');label.textContent='Shiftly-T｜QRコード印刷';
-  const print=d.createElement('button');print.type='button';print.className='print-now';print.textContent='印刷・PDF保存';print.disabled=true;
-  const close=d.createElement('button');close.type='button';close.textContent='閉じる';
-  print.addEventListener('click',()=>{if(authorized&&popup===printWindow&&!popup.closed)popup.print();});
-  close.addEventListener('click',()=>{if(popup===printWindow)closePrintWindow();else popup.close();});
-  bar.append(label,print,close);
-  const root=d.importNode($('printRoot'),true);root.removeAttribute('aria-hidden');
-  css.addEventListener('load',()=>{print.disabled=false;},{once:true});
-  css.addEventListener('error',()=>{label.textContent='印刷スタイルを取得できません。閉じてやり直してください。';},{once:true});
-  d.head.append(meta,referrer,title,css,style);d.body.append(bar,root);
-  try{popup.focus();}catch(e){}
-  return true;
+  const epoch=authEpoch;
+  const items=printItems.slice();
+  const ok=mountQrPrintEditor(popup,{
+    items,
+    courseStart:course?.startDate,
+    courseTitle:'Shiftly-T｜'+datedCourseName(items[0]?.courseName,course?.startDate),
+    formatDeadline:value=>value?fmtTime(value).replace('T',' '):'教室にご確認ください',
+    canPrint:()=>authorized&&epoch===authEpoch&&popup===printWindow&&!popup.closed,
+    onClose:()=>{if(popup===printWindow)closePrintWindow();else popup.close();}
+  });
+  if(ok)try{popup.focus();}catch(e){}
+  return ok;
 }
 $('printReady').addEventListener('click',()=>{
   if(!canInteract()||!printItems.length)return;
