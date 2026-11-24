@@ -7,7 +7,7 @@ QA の接続先は Firebase `shiftly-t-test`、Firestore `shiftly-qa-v1`、Funct
 ローカルの契約・Chromiumテストはモックで実行する。QA の Firebase 認証、App Check、Rules、Functions と Firestore の統合結果は別に記録する。
 
 1. `node tools/qa-hosting.mjs preflight --config "$WEB_JSON"` で、Firebase CLI が認識する QA の Web App 設定、Hosting サイト、名前付き Firestore、リージョン、対象関数を照合する。配布する Web に `shiftly-qa-v1` が指定されていることも確認する。Hosting の静的プレビューは外部サービス接続が遮断されているため、接続試験は下記の確認後に QA 結合用ビルドで実施する。
-2. ブラウザが参照する `bookingAdminApi`、`bookingPublicApi`、`normalAuthorityApi`、`seasonalAuthorityApi` の、QA のリビジョンとトラフィック配分を記録する。Cloud Run のリビジョン、ビルド、配備ソースを対応付け、各関数が使用する Admin SDK の初期化と DB 選択を確認する。Admin SDK の `getFirestore(app)` は既定 DB を使用する。プロジェクト `shiftly-t-test` と DB `shiftly-qa-v1` を明示した実行経路を確認するまで、結合試験の更新操作は保留する。 [Admin SDK の DB 選択](https://firebase.google.com/docs/reference/admin/node/firebase-admin.firestore#getfirestore)
+2. ブラウザが参照する `qaBookingAdminApi`、`qaBookingPublicApi`、`qaNormalAuthorityApi`、`qaSeasonalAuthorityApi` のQAリビジョンとトラフィック配分を記録する。削除トリガー `qaBookingStudentDeleted` のイベント配信元DBも照合する。Cloud Run のリビジョン、ビルド、配備ソースを対応付け、各関数が使用する Admin SDK の初期化と DB 選択を確認する。Admin SDK の `getFirestore(app)` は既定 DB を使用する。プロジェクト `shiftly-t-test` と DB `shiftly-qa-v1` を明示した実行経路を確認するまで、結合試験の更新操作は保留する。 [Admin SDK の DB 選択](https://firebase.google.com/docs/reference/admin/node/firebase-admin.firestore#getfirestore)
 3. QA の既存ログで、対応する読み取り処理に Firestore のプロジェクト・DB が記録されていれば、該当リビジョンと合わせて照合する。一般の Functions メタデータは Admin SDK の接続先を示さないため、ログがなければソースと設定を照合する。共有用の結果は時刻、リビジョン、対象プロジェクト・DB、操作名、エラーコードに絞る。
 4. QA 用の発行済み Rules と対象 DB を取得する。SDK の認証を利用するクライアントと、Rules の対象外であるサーバー側 Admin SDK を別々に確認する。配備構成にジョブ・トリガー・通知連携がある場合は、それらの接続先も同じ QA 環境に限定されていることを確認する。
 

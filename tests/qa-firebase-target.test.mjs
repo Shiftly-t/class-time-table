@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import qa from './qa-firebase-fixture.cjs';
-import {resolveFirebaseTarget} from '../production-hosting/firebase-target.js';
+import {qaFunctionNames,resolveFirebaseTarget} from '../production-hosting/firebase-target.js';
 
 const valid = {firebaseConfig:qa.config,qaFirestoreDatabaseId:qa.databaseId};
+const production = {firebaseConfig:{projectId:'shiftly-d02f6'}};
 
 test('QA selects the named Firestore database and the expected Functions region', () => {
-  assert.deepEqual(resolveFirebaseTarget('qa',valid,qa.siteKey),{databaseId:qa.databaseId,functionsRegion:qa.region});
+  const {databaseId,functionsRegion}=resolveFirebaseTarget('qa',valid,qa.siteKey);
+  assert.deepEqual({databaseId,functionsRegion},{databaseId:qa.databaseId,functionsRegion:qa.region});
 });
 
 test('QA rejects a foreign Firebase project, wrong database, and a mismatched Firebase App ID', () => {
@@ -35,7 +37,26 @@ test('a QA configuration cannot accidentally use the default database via anothe
 
 test('unconfigured source fails closed and valid production configuration retains its default database', () => {
   assert.throws(() => resolveFirebaseTarget('production',{firebaseConfig:{projectId:'REPLACE_FIREBASE_PROJECT_ID'}},''),/接続設定が必要/);
-  const production = {firebaseConfig:{projectId:'shiftly-d02f6'}};
   assert.throws(() => resolveFirebaseTarget('test',production,''),/本番には接続しません/);
-  assert.deepEqual(resolveFirebaseTarget('production',production,''),{databaseId:undefined,functionsRegion:qa.region});
+  const {databaseId,functionsRegion}=resolveFirebaseTarget('production',production,'');
+  assert.deepEqual({databaseId,functionsRegion},{databaseId:undefined,functionsRegion:qa.region});
+});
+
+test('QA and production resolve their own exact callable names', () => {
+  const qaTarget=resolveFirebaseTarget('qa',valid,qa.siteKey);
+  const productionTarget=resolveFirebaseTarget('production',production,'');
+  assert.deepEqual(qaTarget.callableNames,{
+    bookingAdmin:'qaBookingAdminApi',bookingPublic:'qaBookingPublicApi',
+    normalAuthority:'qaNormalAuthorityApi',seasonalAuthority:'qaSeasonalAuthorityApi',
+  });
+  assert.deepEqual(productionTarget.callableNames,{
+    bookingAdmin:'bookingAdminApi',bookingPublic:'bookingPublicApi',
+    normalAuthority:'normalAuthorityApi',seasonalAuthority:'seasonalAuthorityApi',
+  });
+});
+
+test('QA preflight inventory includes the deletion trigger outside the callable names', () => {
+  const {callableNames}=resolveFirebaseTarget('qa',valid,qa.siteKey);
+  assert.deepEqual(qaFunctionNames,[...Object.values(callableNames),'qaBookingStudentDeleted']);
+  assert.ok(!Object.values(callableNames).includes('qaBookingStudentDeleted'));
 });

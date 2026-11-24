@@ -43,8 +43,11 @@ if (command === 'firebase' && args[0] === 'apps:sdkconfig') {
   const id = process.env.SHIFTLY_QA_MOCK_DEFAULT_DB ? '(default)' : 'shiftly-qa-v1';
   console.log(JSON.stringify({name:'projects/shiftly-t-test/databases/' + id}));
 } else if (command === 'gcloud' && args[0] === 'functions') {
-  const names = ['bookingAdminApi','bookingPublicApi','normalAuthorityApi','seasonalAuthorityApi'];
-  console.log(JSON.stringify(names.map(name => ({name:'projects/shiftly-t-test/locations/asia-northeast1/functions/' + name, state:'ACTIVE'}))));
+  const qaNames = ['qaBookingAdminApi','qaBookingPublicApi','qaNormalAuthorityApi','qaSeasonalAuthorityApi','qaBookingStudentDeleted'];
+  const names = process.env.SHIFTLY_QA_MOCK_PROD_NAMES
+    ? ['bookingAdminApi','bookingPublicApi','normalAuthorityApi','seasonalAuthorityApi','bookingStudentDeleted']
+    : qaNames.filter(name => !process.env.SHIFTLY_QA_MOCK_MISSING_TRIGGER || name !== 'qaBookingStudentDeleted');
+  console.log(JSON.stringify(names.map(name => ({name:'projects/shiftly-t-test/locations/asia-northeast1/functions/' + name, state:'ACTIVE', environment:'GEN_2'}))));
 } else if (command === 'firebase' && args[0] === 'hosting:channel:deploy') {
   console.log(JSON.stringify({result:{'shiftly-t-test':{url:'https://shiftly-t-test--fixture.web.app'}}}));
 } else {
@@ -116,6 +119,7 @@ test('preview scopes all operations to QA and excludes Auth domain changes', asy
   const {root, run, stageFlags, calls} = await fixture(t);
   const result = run('preview', [...stageFlags('preview'), '--channel', 'shiftly-qa-test']);
   assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /5 ACTIVE functions in asia-northeast1/);
   assert.match(result.stdout, /NOT TESTED actual Functions Admin SDK database selection/);
   assert.match(result.stdout, /https:\/\/shiftly-t-test--fixture.web.app/);
   assert.doesNotMatch(result.stdout, /AIza/);
@@ -144,4 +148,24 @@ test('foreign site, wrong database, and integration deployment cannot create a p
   assert.equal(result.status, 1);
   assert.match(result.stderr, /static files only/);
   assert.ok((await calls()).every(row => row.args[0] !== 'hosting:channel:deploy'));
+});
+
+test('QA preflight rejects production function names even in the QA project', async t => {
+  const {run, calls} = await fixture(t);
+  const result = run('preflight', [], {SHIFTLY_QA_MOCK_PROD_NAMES: '1'});
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /QA functions missing or not ACTIVE/);
+  for (const name of ['qaBookingAdminApi','qaBookingPublicApi','qaNormalAuthorityApi','qaSeasonalAuthorityApi','qaBookingStudentDeleted']) {
+    assert.ok(result.stderr.includes(name));
+  }
+  assert.ok((await calls()).every(row => row.args[0] !== 'hosting:channel:deploy'));
+});
+
+test('QA preview is blocked when the student-deletion trigger is missing', async t => {
+  const {root, run, stageFlags, calls} = await fixture(t);
+  const result = run('preview', stageFlags('missing-trigger'), {SHIFTLY_QA_MOCK_MISSING_TRIGGER: '1'});
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /missing or not ACTIVE in asia-northeast1: qaBookingStudentDeleted\./);
+  assert.ok((await calls()).every(row => row.args[0] !== 'hosting:channel:deploy'));
+  await assert.rejects(access(join(root, 'missing-trigger')), {code: 'ENOENT'});
 });

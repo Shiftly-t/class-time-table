@@ -7,6 +7,9 @@ const qa = require('./qa-firebase-fixture.cjs');
 
 const sourceDir = path.resolve(__dirname, '../production-hosting');
 const origin = 'https://shiftly.invalid';
+const productionProjectId = 'shiftly-production-fixture';
+const productionConfigModule = `export const firebaseConfig = { projectId: '${productionProjectId}' };
+export const teacherWorkFeatureEnabled = true, normalAuthorityApiEnabled = true;`;
 
 const firebase = {
   'firebase-app.js': 'export const initializeApp = config => config;',
@@ -19,7 +22,7 @@ const firebase = {
   `,
   'firebase-firestore.js': `
     export const getFirestore = (app, databaseId) => {
-      window.backupTest.firestoreTargets.push([app.projectId,databaseId]);
+      window.backupTest.firestoreTargets.push([app.projectId,databaseId ?? null]);
       return {};
     };
     export const collection = (source, ...parts) => ({ path: [source.path, ...parts].filter(Boolean).join('/') });
@@ -58,7 +61,10 @@ const firebase = {
       window.backupTest.functionsTargets.push([app.projectId,region]);
       return {};
     };
-    export const httpsCallable = (_, name) => fields => window.backupTest.call(name, fields);
+    export const httpsCallable = (_, name) => {
+      window.backupTest.callableNames.push(name);
+      return fields => window.backupTest.call(name, fields);
+    };
   `,
   'firebase-app-check.js': `
     export const initializeAppCheck = () => {};
@@ -66,7 +72,7 @@ const firebase = {
   `,
 };
 
-function installBackupFixture(mode) {
+function installBackupFixture({mode, seasonalCallable}) {
   const actions = [];
   let created = false;
   let unexpected = 0;
@@ -77,6 +83,7 @@ function installBackupFixture(mode) {
     collectionReads,
     firestoreTargets:[],
     functionsTargets:[],
+    callableNames:[],
     unexpected() {
       unexpected++;
       throw Error('Unexpected SDK operation');
@@ -91,7 +98,7 @@ function installBackupFixture(mode) {
     },
     async call(name, fields) {
       actions.push([name, fields.action]);
-      if (name !== 'seasonalAuthorityApi') throw Error('Unexpected test service');
+      if (name !== seasonalCallable) throw Error('Unexpected test service');
       const { action } = fields;
       if (action === 'capabilities') {
         return { data: { protocolVersion, operations: ['listSnapshots', 'createSnapshot'] } };
@@ -120,7 +127,7 @@ function installBackupFixture(mode) {
   };
 }
 
-async function serveOffline(route, blocked) {
+async function serveOffline(route, blocked, production) {
   const url = new URL(route.request().url());
   const name = path.posix.basename(url.pathname);
   const javascript = body => route.fulfill({
@@ -132,7 +139,7 @@ async function serveOffline(route, blocked) {
     return javascript(firebase[name]);
   }
   if (url.origin === origin && url.pathname === '/' + name) {
-    if (name === 'config.js') return javascript(qa.configModule);
+    if (name === 'config.js') return javascript(production ? productionConfigModule : qa.configModule);
     if (name === 'booking-config.js') return javascript(qa.bookingConfigModule);
     if (name === 'favicon.ico') return route.fulfill({ status: 204 });
     const source = path.join(sourceDir, name);
@@ -140,7 +147,7 @@ async function serveOffline(route, blocked) {
       const body = await readFile(source, 'utf8');
       if (name.endsWith('.js')) return javascript(body);
       return route.fulfill(name.endsWith('.html')
-        ? { contentType: 'text/html', body: body.replace('data-shiftly-environment="production"', 'data-shiftly-environment="qa"') }
+        ? { contentType: 'text/html', body: production ? body : body.replace('data-shiftly-environment="production"', 'data-shiftly-environment="qa"') }
         : { contentType: 'text/css', body });
     }
   }
@@ -148,21 +155,31 @@ async function serveOffline(route, blocked) {
   return route.abort('blockedbyclient');
 }
 
-async function runScenario(browser, mode) {
+async function runScenario(browser, mode, production=false) {
   const context = await browser.newContext({ serviceWorkers: 'block' });
   const blocked = [];
   const errors = [];
+  const seasonalCallable = production ? 'seasonalAuthorityApi' : 'qaSeasonalAuthorityApi';
   try {
-    await context.route('**/*', route => serveOffline(route, blocked));
-    await context.addInitScript(installBackupFixture, mode);
+    await context.route('**/*', route => serveOffline(route, blocked, production));
+    await context.addInitScript(installBackupFixture, {mode,seasonalCallable});
     const page = await context.newPage();
     page.setDefaultTimeout(5000);
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(origin + '/index.html');
     await page.locator('#navOwnerHistory').click();
-    const targets = await page.evaluate(() => ({firestore:window.backupTest.firestoreTargets,functions:window.backupTest.functionsTargets}));
-    assert.deepEqual(targets.firestore, [[qa.projectId,qa.databaseId]]);
-    assert.deepEqual(targets.functions, [[qa.projectId,qa.region]]);
+    const targets = await page.evaluate(() => ({
+      firestore:window.backupTest.firestoreTargets,
+      functions:window.backupTest.functionsTargets,
+      names:window.backupTest.callableNames,
+    }));
+    const projectId = production ? productionProjectId : qa.projectId;
+    const expected = production
+      ? ['bookingAdminApi','normalAuthorityApi','seasonalAuthorityApi']
+      : ['qaBookingAdminApi','qaNormalAuthorityApi','qaSeasonalAuthorityApi'];
+    assert.deepEqual(targets.firestore, [[projectId,production ? null : qa.databaseId]]);
+    assert.deepEqual(targets.functions, [[projectId,qa.region]]);
+    assert.deepEqual(targets.names, expected);
     const archiveList = page.locator('#ownerArchiveList');
     if (mode === 'initial-list') {
       const warning = archiveList.locator('.owner-backup-warning');
@@ -190,12 +207,12 @@ async function runScenario(browser, mode) {
     }
     const actions = await page.evaluate(() => window.backupTest.actions);
     assert.equal(actions.filter(([, action]) => action === 'createSnapshot').length, mode === 'initial-list' ? 0 : 1);
-    assert.ok(actions.every(([fn, action]) => fn === 'seasonalAuthorityApi' && ['capabilities', 'listSnapshots', 'createSnapshot'].includes(action)));
+    assert.ok(actions.length > 0 && actions.every(([fn, action]) => fn === seasonalCallable && ['capabilities', 'listSnapshots', 'createSnapshot'].includes(action)));
     assert.doesNotMatch(await page.locator('body').textContent(), /SYNTHETIC_PRIVATE/);
     assert.equal(await page.evaluate(() => window.backupTest.getUnexpected()), 0);
     assert.deepEqual(errors, []);
     assert.deepEqual(blocked, []);
-    console.log('PASS ' + mode);
+    console.log('PASS ' + (production ? 'ownerUsesProductionFunctions' : mode));
   } finally {
     await context.close();
   }
@@ -210,6 +227,7 @@ async function main() {
   });
   try {
     for (const mode of ['initial-list', 'list-refresh', 'audit-refresh']) await runScenario(browser, mode);
+    await runScenario(browser,'initial-list',true);
   } finally {
     await browser.close();
   }

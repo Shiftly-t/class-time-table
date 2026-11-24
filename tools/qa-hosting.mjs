@@ -3,6 +3,7 @@ import {copyFile, mkdir, readFile, writeFile} from 'node:fs/promises';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseArgs} from 'node:util';
+import {qaFunctionNames} from '../production-hosting/firebase-target.js';
 
 const project = 'shiftly-t-test';
 const database = 'shiftly-qa-v1';
@@ -17,7 +18,6 @@ const assets = [
   'seasonal-authority-client.js', 'student-enrollment.js', 'student-grade.js', 'style.css',
   'teacher-work.css', 'teacher-work.js'
 ];
-const callables = ['bookingAdminApi', 'bookingPublicApi', 'normalAuthorityApi', 'seasonalAuthorityApi'];
 const authDomain = `${project}.firebaseapp.com`;
 const cliFlags = ['--project', project, '--non-interactive', '--json'];
 
@@ -83,13 +83,13 @@ function preflight(config) {
     'functions', 'list', `--project=${project}`, `--regions=${region}`, '--v2', '--format=json'
   ], 'QA Functions inventory');
   if (!Array.isArray(functions)) throw Error('QA Functions inventory is unavailable.');
-  const missing = callables.filter(name => !functions.some(fn => {
+  const missing = qaFunctionNames.filter(name => !functions.some(fn => {
     const matches = matchesResource(fn.name, `locations/${region}/functions/${name}`);
     return matches && (fn.state ?? fn.status) === 'ACTIVE';
   }));
-  if (missing.length) throw Error(`QA callables missing or not ACTIVE in ${region}: ${missing.join(', ')}.`);
+  if (missing.length) throw Error(`QA functions missing or not ACTIVE in ${region}: ${missing.join(', ')}.`);
 
-  console.log(`PASS Web app, site ${site}, client Firestore ${database}, and ${callables.length} ACTIVE functions in ${region}.`);
+  console.log(`PASS Web app, site ${site}, client Firestore ${database}, and ${qaFunctionNames.length} ACTIVE functions in ${region}.`);
   console.log('NOT TESTED actual Functions Admin SDK database selection, Firestore Rules, and App Check binding.');
 }
 

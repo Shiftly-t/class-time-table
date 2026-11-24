@@ -34,7 +34,7 @@ Node.js 20以上が必要です。ブラウザテストは Playwright と Chromi
 )
 ```
 
-`preview` はQA Webアプリ、Hostingサイト、`shiftly-qa-v1`、`asia-northeast1` の対象Functionsを照合してから、1日間のQA Hostingプレビューを配備します。画面表示用のプレビューはJavaScript実行とAPI接続を停止し、Authの承認済みドメインは更新しません。読み取り確認だけ行う場合は、`node tools/qa-hosting.mjs preflight --config WEB_JSON` を使います。
+`preview` はQA Webアプリ、Hostingサイト、`shiftly-qa-v1`、`asia-northeast1` の対象Functions 5件を照合してから、1日間のQA Hostingプレビューを配備します。QAのCallableは `qaBookingAdminApi`、`qaBookingPublicApi`、`qaNormalAuthorityApi`、`qaSeasonalAuthorityApi` です。`qaBookingStudentDeleted` は配備確認の対象となるトリガーです。画面表示用のプレビューはJavaScript実行とAPI接続を停止し、Authの承認済みドメインは更新しません。読み取り確認だけ行う場合は、`node tools/qa-hosting.mjs preflight --config WEB_JSON` を使います。
 
 ## Firebase結合テストへ進む条件
 

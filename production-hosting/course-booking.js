@@ -6,7 +6,7 @@ import {firebaseTargetForPage} from './firebase-target.js';
 import {bookingAppCheckSiteKey} from './booking-config.js';
 import {initializeAppCheck,ReCaptchaEnterpriseProvider} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
 const {firebaseConfig}=config;
-const {functionsRegion}=firebaseTargetForPage(config,bookingAppCheckSiteKey);
+const {functionsRegion,callableNames}=firebaseTargetForPage(config,bookingAppCheckSiteKey);
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const params=new URLSearchParams(location.hash.slice(1));
 const ids={courseId:params.get('c')||'',studentId:params.get('s')||'',token:params.get('t')||''};
@@ -15,7 +15,7 @@ const validQR=okIds.test(ids.courseId)&&okIds.test(ids.studentId)&&/^[A-Za-z0-9_
 let name='',data=null,selected=new Set(),remarks='',mode='home',calendarMode='list',busy=false,refreshRequired=false;
 const fbApp=initializeApp(firebaseConfig);
 if(bookingAppCheckSiteKey && !bookingAppCheckSiteKey.startsWith('REPLACE_'))initializeAppCheck(fbApp,{provider:new ReCaptchaEnterpriseProvider(bookingAppCheckSiteKey),isTokenAutoRefreshEnabled:true});
-const fns=getFunctions(fbApp,functionsRegion),call=httpsCallable(fns,'bookingPublicApi');
+const fns=getFunctions(fbApp,functionsRegion),call=httpsCallable(fns,callableNames.bookingPublic);
 const transport=createBookingTransport({call,getSession:()=>validQR&&name?ids.courseId+':'+ids.studentId+':'+name:null});
 function getBookingNotice(){
   let d=document.getElementById('bookingNotice');

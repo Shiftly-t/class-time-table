@@ -17,17 +17,17 @@ import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
 
 const { firebaseConfig, teacherWorkFeatureEnabled, normalAuthorityApiEnabled } = config;
-const { databaseId, functionsRegion } = firebaseTargetForPage(config, bookingAppCheckSiteKey);
+const { databaseId, functionsRegion, callableNames } = firebaseTargetForPage(config, bookingAppCheckSiteKey);
 const fbApp = initializeApp(firebaseConfig);
 if (bookingAppCheckSiteKey && !bookingAppCheckSiteKey.startsWith('REPLACE_')) {
   initializeAppCheck(fbApp,{provider:new ReCaptchaEnterpriseProvider(bookingAppCheckSiteKey),isTokenAutoRefreshEnabled:true});
 }
 const functions = getFunctions(fbApp, functionsRegion);
-const bookingEditorTransport=createBookingTransport({call:httpsCallable(functions,'bookingAdminApi'),getSession:()=>state.user?.uid});
+const bookingEditorTransport=createBookingTransport({call:httpsCallable(functions,callableNames.bookingAdmin),getSession:()=>state.user?.uid});
 const bookingEditorCall=fields=>bookingEditorTransport.call(fields);
-const normalAuthorityCall=httpsCallable(functions,'normalAuthorityApi');
+const normalAuthorityCall=httpsCallable(functions,callableNames.normalAuthority);
 const normalAuthority=createNormalAuthorityClient({enabled:normalAuthorityApiEnabled,call:normalAuthorityCall,getSession:()=>state.user?.uid});
-const seasonalAuthority=createSeasonalAuthorityClient({enabled:normalAuthorityApiEnabled,call:httpsCallable(functions,'seasonalAuthorityApi'),getSession:()=>state.user?.uid});
+const seasonalAuthority=createSeasonalAuthorityClient({enabled:normalAuthorityApiEnabled,call:httpsCallable(functions,callableNames.seasonalAuthority),getSession:()=>state.user?.uid});
 const commands=createAuthorityCommands({normal:normalAuthority,seasonal:seasonalAuthority});
 const normalEditorCommands={...normalAuthority,saveDay:commands.saveDay,saveWork:commands.saveWork};
 const auth = getAuth(fbApp);

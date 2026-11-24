@@ -8,6 +8,8 @@ const qa = require('./qa-firebase-fixture.cjs');
 const sourceDir = path.resolve(process.argv[2] || path.join(__dirname, '../production-hosting'));
 const origin = 'https://shiftly.invalid';
 const timeout = 4000;
+const productionProjectId = 'shiftly-production-fixture';
+const productionConfigModule = `export const firebaseConfig = { projectId: '${productionProjectId}' };`;
 
 const firebaseModules = {
   'firebase-app.js': 'export const initializeApp = config => config;',
@@ -17,7 +19,7 @@ const firebaseModules = {
   `,
   'firebase-firestore.js': `
     export const getFirestore = (app, databaseId) => {
-      window.bookingTest.firestoreTargets.push([app.projectId,databaseId]);
+      window.bookingTest.firestoreTargets.push([app.projectId,databaseId ?? null]);
       return {};
     };
     export const doc = (_, ...parts) => parts;
@@ -28,7 +30,10 @@ const firebaseModules = {
       window.bookingTest.functionsTargets.push([app.projectId,region]);
       return {};
     };
-    export const httpsCallable = () => window.bookingTest.call;
+    export const httpsCallable = (_, name) => {
+      window.bookingTest.callableNames.push(name);
+      return fields => window.bookingTest.call(name, fields);
+    };
   `,
   'firebase-app-check.js': `
     export const initializeAppCheck = () => {};
@@ -66,6 +71,7 @@ function installFixtures(initialFailure) {
     calls,
     firestoreTargets:[],
     functionsTargets:[],
+    callableNames:[],
     fail: (criterion, error) => { nextFailure = { criterion, error }; },
     reply: (criterion, data) => { nextResponse = { criterion, data }; },
     hold: criterion => { deferred = { criterion }; },
@@ -84,8 +90,8 @@ function installFixtures(initialFailure) {
       account = uid ? { uid } : null;
       void authHandler(account);
     },
-    async call(fields) {
-      calls.push({ ...fields, actor: account?.uid });
+    async call(callableName, fields) {
+      calls.push({ ...fields, actor: account?.uid, callableName });
       let error;
       if (matches(fields, nextFailure?.criterion)) {
         error = nextFailure.error || {};
@@ -118,6 +124,7 @@ function installFixtures(initialFailure) {
         detail: { student: row, booking: { wishes: [], confirmed: [] }, history: [] },
         getQr: { studentId, courseId, studentName: row?.name, svg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>' },
         adminDecline: { ok: true },
+        view: { course: courseA, booking: { status: 'unanswered' }, phase: 'open', slots: [] },
       };
       if (!Object.hasOwn(responses, action)) throw Error('Unexpected synthetic callable action: ' + action);
       return { data: structuredClone(responses[action]) };
@@ -125,7 +132,7 @@ function installFixtures(initialFailure) {
   };
 }
 
-async function serveOffline(route, blocked, configModule=qa.configModule) {
+async function serveOffline(route, blocked, configModule=qa.configModule, production=false) {
   const url = new URL(route.request().url());
   const name = path.posix.basename(url.pathname);
   const javascript = body => route.fulfill({
@@ -146,7 +153,7 @@ async function serveOffline(route, blocked, configModule=qa.configModule) {
       const body = await readFile(path.join(sourceDir, name), 'utf8');
       if (name.endsWith('.js')) return javascript(body);
       return route.fulfill(name.endsWith('.html')
-        ? { contentType: 'text/html', body: body.replace('data-shiftly-environment="production"', 'data-shiftly-environment="qa"') }
+        ? { contentType: 'text/html', body: production ? body : body.replace('data-shiftly-environment="production"', 'data-shiftly-environment="qa"') }
         : { contentType: 'text/css', body });
     }
   }
@@ -358,30 +365,47 @@ async function diagnoseCourseReadFailures(page) {
   await assertNoMutation(page);
 }
 
-async function verifyQaEntry(browser, invalidDatabase=false) {
+async function verifyQrEntry(browser, {invalidDatabase=false, production=false}={}) {
   const context = await browser.newContext({ serviceWorkers: 'block' });
   const blocked = [];
   const errors = [];
   try {
-    const configModule = invalidDatabase ? qa.configModule.replace(qa.databaseId,'(default)') : qa.configModule;
+    const configModule = production ? productionConfigModule
+      : invalidDatabase ? qa.configModule.replace(qa.databaseId,'(default)') : qa.configModule;
     await context.addInitScript(installFixtures);
-    await context.route('**/*', route => serveOffline(route, blocked, configModule));
+    await context.route('**/*', route => serveOffline(route, blocked, configModule, production));
     const page = await context.newPage();
     page.setDefaultTimeout(timeout);
     page.on('pageerror', error => errors.push(error.message));
     const entry = invalidDatabase ? 'course-booking-admin.html' : 'course-booking.html';
-    await page.goto(origin + '/' + entry);
+    const url = origin + '/' + entry;
+    await page.goto(url);
     if (invalidDatabase) {
       await page.getByText('指定のFirebase設定またはQAデータベースを確認できないため、接続を停止しました。',{exact:false}).waitFor();
       assert.equal(errors.length, 1);
     } else {
       await page.getByRole('heading',{name:'QRコードが確認できません'}).waitFor();
+      assert.deepEqual(await page.evaluate(() => window.bookingTest.calls), []);
+      await page.goto(`${url}#c=course-a&s=student-a1&t=${'a'.repeat(42)}`);
+      await page.reload();
+      await page.locator('#nameInput').fill('テスト生徒A1');
+      await page.getByRole('button',{name:'確認して次へ'}).click();
+      await page.getByRole('heading',{name:'講習への参加について'}).waitFor();
       assert.deepEqual(errors, []);
     }
-    const targets = await page.evaluate(() => ({firestore:window.bookingTest.firestoreTargets,functions:window.bookingTest.functionsTargets,calls:window.bookingTest.calls}));
-    assert.deepEqual(targets,{firestore:[],functions:invalidDatabase?[]:[[qa.projectId,qa.region]],calls:[]});
+    const targets = await page.evaluate(() => ({
+      firestore:window.bookingTest.firestoreTargets,
+      functions:window.bookingTest.functionsTargets,
+      names:window.bookingTest.callableNames,
+      calls:window.bookingTest.calls.map(({callableName,action}) => [callableName,action]),
+    }));
+    const projectId = production ? productionProjectId : qa.projectId;
+    const expectedName = production ? 'bookingPublicApi' : 'qaBookingPublicApi';
+    assert.deepEqual(targets,invalidDatabase
+      ? {firestore:[],functions:[],names:[],calls:[]}
+      : {firestore:[],functions:[[projectId,qa.region]],names:[expectedName],calls:[[expectedName,'view']]});
     assert.deepEqual(blocked,[]);
-    console.log('PASS ' + (invalidDatabase?'rejectWrongQaDatabaseBeforeSdk':'publicQrUsesQaFunctions'));
+    console.log('PASS ' + (invalidDatabase?'rejectWrongQaDatabaseBeforeSdk':production?'publicQrUsesProductionFunctions':'publicQrUsesQaFunctions'));
   } finally {
     await context.close();
   }
@@ -403,23 +427,33 @@ async function main() {
       { run: ignorePreviousAccountResponse },
       { run: inactiveCoordination, initialFailure: initialActivationFailure },
       { run: diagnoseCourseReadFailures },
+      { run: async function bookingAdminUsesProductionFunctions(page) { await assertNoMutation(page); }, production:true },
     ];
-    for (const { run, initialFailure } of scenarios) {
+    for (const { run, initialFailure, production=false } of scenarios) {
       const context = await browser.newContext({ serviceWorkers: 'block' });
       const blocked = [];
       const errors = [];
       try {
         await context.addInitScript(installFixtures, initialFailure);
-        await context.route('**/*', route => serveOffline(route, blocked));
+        await context.route('**/*', route => serveOffline(route, blocked, production ? productionConfigModule : qa.configModule, production));
         const page = await context.newPage();
         page.setDefaultTimeout(timeout);
         page.on('pageerror', error => errors.push(error.message));
         await page.goto(origin + '/course-booking-admin.html');
         if (!initialFailure) await waitForCourse(page, 'course-a');
         await run(page);
-        const targets = await page.evaluate(() => ({firestore:window.bookingTest.firestoreTargets,functions:window.bookingTest.functionsTargets}));
-        assert.deepEqual(targets.firestore, [[qa.projectId,qa.databaseId]]);
-        assert.deepEqual(targets.functions, [[qa.projectId,qa.region]]);
+        const targets = await page.evaluate(() => ({
+          firestore:window.bookingTest.firestoreTargets,
+          functions:window.bookingTest.functionsTargets,
+          names:window.bookingTest.callableNames,
+          calls:window.bookingTest.calls.map(call => call.callableName),
+        }));
+        const projectId = production ? productionProjectId : qa.projectId;
+        const expectedName = production ? 'bookingAdminApi' : 'qaBookingAdminApi';
+        assert.deepEqual(targets.firestore, [[projectId,production ? null : qa.databaseId]]);
+        assert.deepEqual(targets.functions, [[projectId,qa.region]]);
+        assert.deepEqual(targets.names, [expectedName]);
+        assert.ok(targets.calls.length > 0 && targets.calls.every(name => name === expectedName));
         assert.deepEqual(blocked, [], 'No fixture requested an external resource');
         assert.deepEqual(errors, [], 'No unhandled browser error');
         console.log('PASS ' + run.name);
@@ -427,8 +461,9 @@ async function main() {
         await context.close();
       }
     }
-    await verifyQaEntry(browser);
-    await verifyQaEntry(browser,true);
+    await verifyQrEntry(browser);
+    await verifyQrEntry(browser,{invalidDatabase:true});
+    await verifyQrEntry(browser,{production:true});
   } finally {
     await browser.close();
   }
