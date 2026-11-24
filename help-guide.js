@@ -1,3 +1,4 @@
+import {renderPractice} from './help-practice.js?v=20261125-b';
 // Static, role-filtered Shiftly-T operation guide. No Firebase access or writes.
 const topics=[
   [
@@ -319,11 +320,11 @@ export function guideTopics(role,selected,query){
 export function installHelpGuide({getRole,getUser}){
   const $=id=>document.getElementById(id);
   const button=$('helpGuideButton'),dialog=$('helpGuideDialog'),search=$('helpGuideSearch'),tabs=$('helpGuideTabs'),list=$('helpGuideList'),count=$('helpGuideCount');
-  const bell=$('notificationButton'),app=$('appPanel');
+  const bell=$('notificationButton'),app=$('appPanel'),practice=$('helpPracticeHost'),supplement=$('helpGuideSupplement');
   let selected='',session='';
   const make=(tag,cls,value)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(value!==undefined)e.textContent=value;return e;};
   const available=()=>Boolean(getUser()&&guideRoles(getRole()).length&&!bell.hidden&&!app.hidden);
-  function clear(){search.value='';selected='';session='';tabs.replaceChildren();list.replaceChildren();count.textContent='';if(dialog.open)dialog.close();}
+  function clear(){search.value='';selected='';session='';tabs.replaceChildren();list.replaceChildren();practice.replaceChildren();supplement.open=false;count.textContent='';if(dialog.open)dialog.close();}
   function sync(){button.hidden=!available();if(button.hidden){clear();return;}const next=getUser()+':'+getRole();if(session&&session!==next)clear();}
   function render(){
     if(!available()){sync();return;}
@@ -336,6 +337,8 @@ export function installHelpGuide({getRole,getUser}){
     tabs.hidden=allowed.length<2;
     const query=search.value.trim(),items=guideTopics(role,selected,query);
     count.textContent=(query?'閲覧可能な全ガイドから検索':labels[selected])+' · '+items.length+'件';
+    renderPractice(practice,{allowed,selected,query});
+    supplement.open=false;
     list.replaceChildren();
     for(const [group,icon,title,desc,steps,tip] of items){
       const details=make('details','help-guide-item'),summary=make('summary','help-guide-summary'),heading=make('span','help-guide-heading');

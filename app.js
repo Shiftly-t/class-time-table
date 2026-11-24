@@ -1,5 +1,5 @@
 import {sameCourseStructure,assertCourseStructureEditable} from './course-structure.js';
-import {installHelpGuide} from './help-guide.js?v=20261125-a';
+import {installHelpGuide} from './help-guide.js?v=20261125-b';
 import {createAuthorityCommands} from './authority-commands.js';
 import {isWithdrawn,canReceiveLesson} from './student-enrollment.js';
 import {gradeInfo,academicYearForDate,academicYearJST,displayStudentGrade} from './student-grade.js';
