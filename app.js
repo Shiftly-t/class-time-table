@@ -3462,7 +3462,14 @@ $('loginForm').addEventListener('submit',async event=>{
   try{await signInWithEmailAndPassword(auth,$('email').value.trim(),$('password').value);}
   catch(e){showMessage('ログインできません。メールアドレスとパスワードを確認してください。');}finally{button.disabled=false;}
 });
-$('logout').addEventListener('click',async()=>{try{await signOut(auth);}catch(e){trapError(e,'ログアウトに失敗しました');}});
+$('logout').addEventListener('click',()=>{if(!state.user||$('logoutConfirmDialog').open)return;showDialog('logoutConfirmDialog');});
+$('logoutConfirm').addEventListener('click',async()=>{
+  if(!state.user||$('logoutConfirm').disabled)return;
+  $('logoutConfirm').disabled=true;$('logoutCancel').disabled=true;$('logout').disabled=true;
+  try{closeDialog('logoutConfirmDialog');await signOut(auth);}
+  catch(e){trapError(e,'ログアウトに失敗しました');}
+  finally{$('logoutConfirm').disabled=false;$('logoutCancel').disabled=false;$('logout').disabled=false;}
+});
 teacherWorkPage=installTeacherWorkPage({
    state,$,db,collection,doc,runTransaction,serverTimestamp,auditChange,isAdmin,isAssignableTeacher,
    showMessage,trapError,nav,prettyDate,todayKey,CLASS_PERIODS,featureEnabled:teacherWorkFeatureEnabled,normalAuthority:normalEditorCommands

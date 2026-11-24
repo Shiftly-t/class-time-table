@@ -976,3 +976,13 @@
 .practice-blocked{padding:8px;background:#303846;color:white;border-radius:6px;min-width:90px}.practice-warning{background:#fff2cf;color:#805511;padding:10px;border-radius:8px}.practice-feedback{min-height:20px;color:#b45309;font-size:13px;margin:8px 0 0}.practice-complete{padding:24px;text-align:center;color:#166534}.practice-complete strong{font-size:20px}.practice-complete p{font-size:13px;color:#526487}
 .help-guide-supplement{margin:0 24px 12px;border:1px solid #dce4f2;border-radius:10px}.help-guide-supplement>summary{cursor:pointer;padding:13px;color:#4057de;font-weight:700;font-size:14px}.help-guide-supplement .help-guide-list{padding:8px 12px 12px}
 @media(max-width:600px){.help-practice-host{padding:0 14px 12px}.practice-fields{grid-template-columns:1fr}.practice-screen{padding:8px}.practice-panel{padding:10px}.help-guide-supplement{margin:0 14px 12px}.help-guide-top{position:static}}
+
+/* Labeled notification button and explicit logout confirmation. */
+.header-actions #notificationButton{gap:6px;color:#374a6c;font-size:13px;font-weight:750;white-space:nowrap;padding:9px 11px}
+#logoutConfirmDialog{width:min(420px,calc(100% - 24px))}
+.logout-confirm-content .modal-head{margin-bottom:12px}
+.logout-confirm-content h2{font-size:20px;line-height:1.4}
+.logout-confirm-content p{font-size:14px;line-height:1.7;margin:0}
+.logout-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
+.logout-confirm-actions button{min-height:46px;font-size:14px;white-space:normal}
+@media(max-width:680px){.topbar{flex-wrap:wrap;gap:9px}.header-actions{margin-left:auto;gap:6px;max-width:100%}.header-actions #notificationButton{padding:9px 10px}.header-actions #logout{padding-inline:10px;white-space:nowrap}}
