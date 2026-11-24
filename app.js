@@ -49,6 +49,20 @@ const isAdmin = () => isManagementRole(state.profile?.role);
 const maintenanceState={loaded:false,enabled:false,message:'',version:'',updatedAt:null,startedAt:null,unsub:null,dataStarted:false,history:[],busy:false};
 const state = { user:null, profile:null, date:todayKey(), scheduleView:'day', page:'', students:[], people:[], entries:[], entriesStatus:'loading', closures:{}, closuresStatus:'loading', openDays:{}, openDaysStatus:'loading', examEvents:{}, examStatus:'loading', courses:[], coursesStatus:'loading', notices:[], officialAnnouncements:[], officialSeenIds:new Set(), officialSeenReady:false, activeLesson:null, availability:new Map(), availabilityStatus:{}, availabilityUnsub:[], teacherAbsences:{}, teacherAbsencesStatus:'loading', teacherWeeklyWork:{}, teacherWeeklyWorkStatus:teacherWorkFeatureEnabled?'loading':'disabled', teacherDateWork:{}, teacherDateWorkStatus:teacherWorkFeatureEnabled?'loading':'disabled', unsub:[] };
 installHelpGuide({getRole:()=>state.profile?.role,getUser:()=>state.user?.uid});
+// Derive sticky offsets from the actual bars, including role/device-specific wrapping.
+{
+  const header=document.querySelector('.topbar'),menu=document.querySelector('#appPanel > .welcome-line');
+  const syncBars=()=>{
+    const root=document.documentElement;
+    root.style.setProperty('--shiftly-header-height',Math.ceil(header.getBoundingClientRect().height)+'px');
+    root.style.setProperty('--shiftly-menu-height',Math.ceil(menu.getBoundingClientRect().height)+'px');
+  };
+  syncBars();
+  if(typeof ResizeObserver==='function'){
+    const observer=new ResizeObserver(syncBars);observer.observe(header);observer.observe(menu);
+  }
+  window.addEventListener('resize',syncBars,{passive:true});
+}
 let regularEditor=null;
 let teacherWorkPage=null;
 const WEEKDAYS = ['日','月','火','水','木','金','土'];
