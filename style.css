@@ -809,3 +809,28 @@
   font-size: 12px;
   font-weight: 700;
 }
+
+/* Mobile student filters: use intrinsic row heights, not column flex-basis. */
+@media(max-width:680px){
+  #adminCountPage .student-toolbar{
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    grid-auto-rows:auto;
+    align-items:start;
+    gap:12px;
+  }
+  #adminCountPage .student-toolbar > label,
+  #adminCountPage .student-toolbar > label.grow{
+    width:100%;
+    min-width:0;
+    max-width:none;
+    margin:0;
+    flex:none;
+  }
+  #adminCountPage .student-toolbar label:has(input[type="checkbox"]){
+    min-height:44px;
+  }
+  #adminCountPage .student-toolbar input[type="checkbox"]{
+    min-height:18px;
+  }
+}
