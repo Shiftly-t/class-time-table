@@ -1,3 +1,7 @@
+// Approved counting method, shared by ranking and profile UI.
+export const RANKING_SLOT_LABEL = '担当授業コマ数（延べ）';
+export const RANKING_SLOT_EXPLANATION = "集計方法：担当した生徒の人数分をカウントします（1コマで2人担当した場合は2コマ分として集計）。";
+
 export function aggregateRanking({facts,teachers,from,to,cutoff}){
   // Each fact is one verified student-lesson slot. The caller must establish historical accuracy.
   const iso=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!Number.isNaN(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s;
