@@ -16,10 +16,12 @@ const call=httpsCallable(getFunctions(app,functionsRegion),callableNames.booking
 const $=s=>document.getElementById(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let courses=[],courseId='',settings=null,course=null,roster=[],demand=[],teachers=[],detail=null,studentId='',search='',filter='all',tab='students',busy=false,draft=[],printItems=[];
 let authEpoch=0,authorized=false,cancelConfirmation=null;
+let printWindow=null;
 const transport=createBookingTransport({call,getSession:()=>authorized?'staff:'+authEpoch:null});
 function clearPrintPreparation(){printItems=[];$('printRoot').replaceChildren();$('printReadyWrap').hidden=true;}
 
 function clearPrivateState(){
+  closePrintWindow();
   cancelConfirmation?.();
   clearBookingNotice();
   transport.reset();busy=false;document.getElementById('bookingResultCheck')?.remove();
@@ -191,7 +193,7 @@ async function api(action,fields={}){
   const epoch=authEpoch;
   if(!authorized)throw new BookingDiagnostic(action,'管理者のログインが必要です。','unauthenticated');
   const payload={action,courseId,...fields};
-  if(transport.isMutation(action))clearPrintPreparation();
+  if(transport.isMutation(action)){closePrintWindow();clearPrintPreparation();}
   let result;
   try{result=await transport.call(payload);}
   catch(error){throw new BookingDiagnostic(action,diagnosticReason(error),diagnosticCode(error));}
@@ -330,7 +332,10 @@ function ask(title,text,options){
       if(dialog.open)dialog.close();
       resolve(confirmed);
     }
-    function accept(){finish(true);}
+    function accept(){
+      if(options.onAccept && options.onAccept()===false){finish(false);return;}
+      finish(true);
+    }
     function dismiss(){finish(false);}
     function cancel(event){event.preventDefault();dismiss();}
     function closed(){if(!dialog.open)dismiss();}
@@ -449,11 +454,68 @@ function wire(){
  });
  document.querySelectorAll('[data-act]').forEach(x=>x.addEventListener('click',()=>{if(x.isConnected)void runAction(x.dataset.act);}));
 }
+/* Top-level, temporary print document; no QR data in URLs or persistent storage. */
+function closePrintWindow(){
+  const popup=printWindow;
+  printWindow=null;
+  if(popup)try{if(!popup.closed)popup.close();}catch(e){}
+}
+window.addEventListener('pagehide',closePrintWindow);
+function openPrintWindow(){
+  closePrintWindow();
+  let popup=null;
+  try{
+    popup=window.open('about:blank','_blank');
+    if(!popup||popup.closed)return null;
+    popup.opener=null;
+    const d=popup.document;
+    d.title='Shiftly-T | QRコード印刷';
+    d.body.textContent='最新のQRコードを確認しています…';
+    printWindow=popup;
+    return popup;
+  }catch(e){try{popup?.close();}catch(err){}return null;}
+}
+function populatePrintWindow(popup){
+  if(popup!==printWindow||popup.closed||!authorized)return false;
+  const d=popup.document;
+  d.documentElement.lang='ja';
+  d.head.replaceChildren();
+  d.body.replaceChildren();
+  const meta=d.createElement('meta');meta.name='viewport';meta.content='width=device-width,initial-scale=1';
+  const referrer=d.createElement('meta');referrer.name='referrer';referrer.content='no-referrer';
+  const title=d.createElement('title');title.textContent='Shiftly-T | QRコード印刷';
+  const css=d.createElement('link');css.rel='stylesheet';css.href=new URL('./booking.css?v=20261111-closures',location.href).href;
+  const style=d.createElement('style');
+  style.textContent=`
+    body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;margin:0;color:#18243c;background:#f6f8fc}
+    .print-toolbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 16px;background:#fff;border-bottom:1px solid #dfe5f0}
+    .print-toolbar strong{flex:1 1 140px}
+    .print-toolbar button{font:inherit;font-size:14px;font-weight:750;min-height:44px;padding:10px 14px;border:1px solid #dfe5f0;border-radius:10px;background:#fff;color:#40526f;cursor:pointer}
+    .print-toolbar .print-now{background:#4f63e9;color:white;border-color:#4f63e9}
+    .print-toolbar button:disabled{opacity:.5}
+    @media screen{#printRoot{display:block;max-width:210mm;margin:16px auto;padding:0 12px}#printRoot .printsheet{background:#fff;box-shadow:0 2px 10px #18243c12;border-radius:12px;margin:0 0 16px;padding:16px}#printRoot .printitem{min-height:0;height:auto;padding:20px 12px}#printRoot .printitem svg{width:min(85mm,100%)}}
+    @media print{.print-toolbar{display:none!important}#printRoot{display:block!important}}
+  `;
+  const bar=d.createElement('header');bar.className='print-toolbar';
+  const label=d.createElement('strong');label.textContent='Shiftly-T｜QRコード印刷';
+  const print=d.createElement('button');print.type='button';print.className='print-now';print.textContent='印刷・PDF保存';print.disabled=true;
+  const close=d.createElement('button');close.type='button';close.textContent='閉じる';
+  print.addEventListener('click',()=>{if(authorized&&popup===printWindow&&!popup.closed)popup.print();});
+  close.addEventListener('click',()=>{if(popup===printWindow)closePrintWindow();else popup.close();});
+  bar.append(label,print,close);
+  const root=d.importNode($('printRoot'),true);root.removeAttribute('aria-hidden');
+  css.addEventListener('load',()=>{print.disabled=false;},{once:true});
+  css.addEventListener('error',()=>{label.textContent='印刷スタイルを取得できません。閉じてやり直してください。';},{once:true});
+  d.head.append(meta,referrer,title,css,style);d.body.append(bar,root);
+  try{popup.focus();}catch(e){}
+  return true;
+}
 $('printReady').addEventListener('click',()=>{
-  if(!canInteract())return;
+  if(!canInteract()||!printItems.length)return;
   const epoch=authEpoch,items=printItems;
-  void confirmAction('印刷プレビューに移行しますか？','最新のQRと氏名を確認してから印刷します。',async()=>{
-    if(printItems!==items)return;
+  let popup=null,blocked=false;
+  void confirmAction('印刷プレビューに移行しますか？','最新のQRと氏名を確認し、別タブに印刷専用画面を開きます。',async()=>{
+    if(!popup||printItems!==items){if(popup===printWindow)closePrintWindow();return;}
     const refreshed=await guarded('印刷前のQR確認',async()=>{
       clearPrintPreparation();
       const fresh=[];
@@ -463,12 +525,29 @@ $('printReady').addEventListener('click',()=>{
       }
       return fresh;
     });
-    if(refreshed&&epoch===authEpoch&&authorized){printAll(refreshed);window.print();}
-  },{yesLabel:'許可',noLabel:'キャンセル',yesClass:'primary',noClass:'secondary'});
+    if(refreshed&&epoch===authEpoch&&authorized){
+      printAll(refreshed);
+      try{
+        if(populatePrintWindow(popup))return;
+      }catch(e){}
+      if(popup===printWindow)closePrintWindow();
+      note('印刷専用画面を開けませんでした。印刷準備は保持しています。もう一度お試しください。',true);
+    }else if(popup===printWindow)closePrintWindow();
+  },{yesLabel:'許可',noLabel:'キャンセル',yesClass:'primary',noClass:'secondary',onAccept:()=>{
+    if(epoch!==authEpoch||!authorized||busy||printItems!==items)return false;
+    popup=openPrintWindow();
+    blocked=!popup;
+    return !!popup;
+  }}).then(()=>{
+    if(blocked&&epoch===authEpoch&&authorized)note('別タブを開けませんでした。ブラウザのポップアップ許可設定を確認してください。印刷準備は保持しています。',true);
+  }).catch(()=>{
+    if(popup&&popup===printWindow)closePrintWindow();
+    if(epoch===authEpoch&&authorized)note('印刷専用画面の準備に失敗しました。再度お試しください。',true);
+  });
 });
 $('printDiscard').addEventListener('click',()=>{
   if(!canInteract())return;
-  clearPrintPreparation();note('印刷準備を閉じました');
+  closePrintWindow();clearPrintPreparation();note('印刷準備を閉じました');
 });
 onAuthStateChanged(auth,async user=>{const epoch=++authEpoch;clearPrivateState();$('app').textContent='管理者のログイン状態を確認しています…';if(!user){$('app').innerHTML='<h2>ログインが必要です</h2><p class="muted">管理者アカウントでShiftly-Tへログインしてから、このページを開いてください。</p><a href="./index.html">ログイン画面へ</a>';return;}try{const sn=await getDoc(doc(db,'users',user.uid));if(epoch!==authEpoch)return;if(!sn.exists()||!['owner','admin'].includes(sn.data().role)){$('app').innerHTML='<h2>管理者のみ利用できます</h2><p class="muted">アクセス権限がありません。</p>';return;}authorized=true;await load();}catch(e){if(epoch!==authEpoch)return;clearPrivateState();$('app').innerHTML='<h2>読み込みに失敗しました</h2><p class="muted">Firebaseの設定や権限を確認してください。</p>';note(errorMessage(e),true);}});
 
