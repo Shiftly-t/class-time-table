@@ -1041,3 +1041,21 @@
 /* Prevent a long custom version label from widening the compact header. */
 #brandVersion{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:600px){#brandVersion{max-width:100px}}
+
+/* Tutorial uses the production components and role-specific navigation, in an inert local workspace. */
+#helpGuideDialog:has(.is-practicing){width:min(1200px,calc(100% - 16px));max-height:96dvh}
+.help-guide-shell.is-practicing{max-height:96dvh}
+.is-practicing .help-guide-intro,.is-practicing .help-guide-search,.is-practicing .help-guide-tabs,.is-practicing .help-guide-count,.is-practicing .help-guide-supplement,.is-practicing .help-guide-footer{display:none}
+.is-practicing .help-guide-top{position:static;padding-block:12px 0}
+.practice-live-header .topbar{position:static;min-height:64px;padding:10px 12px;gap:8px;flex-wrap:nowrap}
+.practice-live-header .brand{gap:8px;font-size:18px;white-space:nowrap}.practice-live-header .brand-mark{flex:0 0 34px;width:34px;height:34px}
+.practice-live-header .header-actions{flex:none;gap:6px;flex-wrap:nowrap}.practice-live-header .header-actions button{height:44px;min-height:44px;display:inline-flex;align-items:center;gap:6px;color:#374a6c;font-size:13px;font-weight:700;border:1px solid #dfe5f0;border-radius:10px;background:#fff;padding:8px 10px}
+.practice-live-screen{padding:0 12px 16px}.practice-live-screen .welcome-line{margin-bottom:20px;padding-top:4px}.practice-live-screen .nav-tabs{margin:0;background:#f6f8fc}.practice-live-screen .nav-tab{min-height:44px;padding:10px 4px 12px}
+.practice-live-screen .page{min-width:0}.practice-live-screen .lesson-group-title{color:#8490a6;font-size:13px}
+.practice-live-screen .practice-mock-dialog{background:#ffffff;border:1px solid #dce4f2;border-radius:18px;box-shadow:0 8px 26px #27355420;margin-top:14px;overflow:hidden}.practice-live-screen .practice-mock-dialog .modal-content{max-height:none;box-shadow:none}
+.practice-live-screen .practice-mock-dialog .modal-actions{position:static}.practice-live-screen .practice-mock-dialog .regular-row{min-width:0}
+.practice-live-screen .practice-availability{width:100%;min-height:44px;border:1px solid #dce4f2;border-radius:7px;background:white;color:#64748b;font-size:12px}
+.practice-live-screen .practice-availability[aria-pressed="true"]{background:#d7f5df;color:#166534;border-color:#8ac89a}
+.practice-live-screen .practice-target{outline-offset:-2px;box-shadow:0 0 0 2px #fff2c9}
+@media(max-width:900px){.practice-live-header .header-actions button{width:44px;min-width:44px;padding:0;justify-content:center}.practice-live-header .header-actions button span{display:none}.practice-live-screen .nav-tabs.practice-role-admin,.practice-live-screen .nav-tabs.practice-role-owner{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.practice-live-screen .nav-tabs.practice-role-employee{grid-template-columns:repeat(4,minmax(0,1fr))}.practice-live-screen .nav-tabs.practice-role-employee>.nav-tab{font-size:clamp(10px,3vw,12px);white-space:nowrap;padding-inline:2px}.practice-live-screen .section-title{flex-wrap:wrap}.practice-live-screen{padding-inline:8px}.practice-live-header .brand{font-size:16px;gap:5px}.practice-live-header .brand-mark{width:30px;height:30px;flex-basis:30px}.practice-live-header .header-actions{gap:4px}.practice-live-header .topbar{padding-inline:8px}}
