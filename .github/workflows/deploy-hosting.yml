@@ -1,0 +1,77 @@
+name: Deploy Shiftly-T Hosting
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*.html'
+      - '*.css'
+      - '*.js'
+      - '.github/workflows/deploy-hosting.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: shiftly-t-production-hosting
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.repository_id == '1444314671'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Prepare static files and validate production target
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/shiftly-hosting"
+          mkdir -p "$work/public"
+          git ls-files | grep -E '^[^/]+\.(html|js|css)$' |
+            while IFS= read -r file; do
+              test -f "$file" && test ! -L "$file"
+              cp "$file" "$work/public/"
+            done
+          test -s "$work/public/index.html"
+          test -s "$work/public/course-booking.html"
+          test -s "$work/public/course-booking-admin.html"
+          grep -Fq 'projectId: "shiftly-d02f6"' "$work/public/config.js"
+          grep -Fq "qaFirestoreDatabaseId = ''" "$work/public/config.js"
+          grep -Fq 'normalAuthorityApiEnabled = true' "$work/public/config.js"
+          grep -Fq 'data-shiftly-environment="production"' "$work/public/index.html"
+          cd "$work"
+          cat > firebase.json <<'JSON'
+          {"hosting":{"target":"shiftly-web","public":"public","ignore":[],"headers":[{"source":"**","headers":[{"key":"Cache-Control","value":"no-cache"}]}]}}
+          JSON
+          cat > .firebaserc <<'JSON'
+          {"projects":{"default":"shiftly-d02f6"},"targets":{"shiftly-d02f6":{"hosting":{"shiftly-web":["shiftly-t"]}}}}
+          JSON
+          npm install --prefix "$RUNNER_TEMP/firebase-cli" --no-audit --no-fund firebase-tools@15.27.0
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: shiftly-d02f6
+          workload_identity_provider: projects/85446950632/locations/global/workloadIdentityPools/shiftly-hosting-ci/providers/github-main
+          service_account: shiftly-hosting-gh@shiftly-d02f6.iam.gserviceaccount.com
+          create_credentials_file: true
+      - name: Publish new Hosting site only
+        working-directory: ${{ runner.temp }}/shiftly-hosting
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/firebase-cli/node_modules/.bin/firebase" deploy --only hosting:shiftly-web --project shiftly-d02f6 --non-interactive
+      - name: Verify published static files
+        working-directory: ${{ runner.temp }}/shiftly-hosting
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in public/*; do
+            name="${file##*/}"
+            curl -fsSL --retry 3 --max-time 30 "https://shiftly-t.web.app/$name?release=$GITHUB_SHA" -o "$RUNNER_TEMP/shiftly-verify"
+            cmp "$file" "$RUNNER_TEMP/shiftly-verify"
+          done
+          echo "SUCCESS SHIFTLY HOSTING CI DEPLOY VERIFIED"
