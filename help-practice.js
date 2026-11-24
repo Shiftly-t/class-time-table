@@ -36,8 +36,8 @@ function mockTemplate(key,edit){
  root.querySelectorAll('[autofocus]').forEach(el=>el.removeAttribute('autofocus'));
  return t.innerHTML;
 }
-const menuItems={employee:['今日の時間割','生徒一覧','休校日管理','勤務希望登録'],admin:['生徒管理','授業管理','休校日管理','講師管理','講習期間管理','講習予約管理'],owner:['生徒管理','授業管理','休校日管理','講師管理','講習期間管理','講習予約管理','変更履歴・バックアップ','システム管理']};
-const menuTarget=t=>t.title==='今日の時間割を確認する'?'今日の時間割':t.title==='講習の勤務希望を提出する'?'勤務希望登録':t.title==='生徒を登録する'?'生徒管理':t.title==='通常授業の担当を振り替える'?'授業管理':t.title==='講習予約を確定・公開する'?'講習予約管理':t.title==='メンテナンス開始・終了'?'システム管理':'変更履歴・バックアップ';
+const menuItems={employee:['今日の時間割','生徒一覧','休校日管理','勤務希望登録'],admin:['生徒管理','時間割','休校日管理','講師管理','講習期間管理','講習予約管理'],owner:['生徒管理','時間割','休校日管理','講師管理','講習期間管理','講習予約管理','変更履歴・バックアップ','システム管理']};
+const menuTarget=t=>t.title==='今日の時間割を確認する'?'今日の時間割':t.title==='講習の勤務希望を提出する'?'勤務希望登録':t.title==='生徒を登録する'?'生徒管理':t.title==='通常授業の担当を振り替える'?'時間割':t.title==='講習予約を確定・公開する'?'講習予約管理':t.title==='メンテナンス開始・終了'?'システム管理':'変更履歴・バックアップ';
 function mockMenu(t,index){
  const label=menuTarget(t),active=index===0?menuItems[t.role][0]:label;
  return '<section class="welcome-line practice-menu-bar"><nav class="nav-tabs practice-role-'+t.role+'" aria-label="練習用メニュー">'+menuItems[t.role].map(name=>btn(name,index===0&&name===label?t.steps[0].action:'wrong','nav-tab'+(name===active?' active':'')+(index===0&&name===label?' practice-target':''))).join('')+'</nav></section>';
@@ -110,13 +110,13 @@ s('対象の講習を選択してください。','course',()=>panel('勤務希�
 s('12月26日の1限と2限を選択し、勤務希望を提出してください。','submit',()=>panel('勤務希望登録','<p>緑：出勤可能　白：出勤不可</p>'+table(['コマ','12/26（土）','12/28（月）'],[1,2,3,4].map(n=>[n+'限','<label class="practice-check"><input type="checkbox" data-practice-field="d'+n+'">出勤可</label>','<label class="practice-check"><input type="checkbox" data-practice-field="e'+n+'">出勤可</label>']))+row(target('勤務希望を提出','submit'))),v=>v.d1&&v.d2&&!v.d3&&!v.d4&&!v.e1&&!v.e2&&!v.e3&&!v.e4)
 ]},
 {role:'admin',title:'生徒を登録する',desc:'基本情報と毎週の通常授業を設定して保存します。',steps:[
-s('「生徒管理」を押してください。','open',()=>panel('ワークスペース',row(target('生徒管理','open'),btn('授業管理','wrong'),btn('講師管理','wrong')))),
+s('「生徒管理」を押してください。','open',()=>panel('ワークスペース',row(target('生徒管理','open'),btn('時間割','wrong'),btn('講師管理','wrong')))),
 s('「＋ 生徒を登録」を押してください。','new',()=>panel('生徒管理',row(target('＋ 生徒を登録','new'))+studentTable())),
 s('練習用の生徒名、学年、学校を入力して「＋ 通常授業を追加」を押してください。','add',()=>panel('生徒を登録','<div class="practice-fields">'+field('生徒名','text','name','練習 太郎')+select('学年','grade',['中学1年','中学2年','中学3年','高校1年'])+field('学校','text','school','練習中学校')+'</div>'+row(target('＋ 通常授業を追加','add'))),required('name','grade','school')),
 s('曜日・時刻・担当講師・適用開始日を入力し、「保存する」を押してください。','save',()=>panel('生徒を登録','<p>通常授業（毎週の時間割へ自動反映）</p><div class="practice-fields">'+select('曜日','weekday',['月','火','水','木','金','土'])+field('開始時刻','time','start')+field('終了時刻','time','end')+select('担当教師','teacher',['練習講師A','練習講師B'])+field('教科（任意）','text','subject','数学')+field('適用開始','date','date')+'</div>'+row(target('保存する','save'))),v=>required('weekday','start','end','teacher','date')(v)&&v.start<v.end)
 ]},
 {role:'admin',title:'通常授業の担当を振り替える',desc:'講師の欠席を設定し、授業カードを別講師へ移動します。',steps:[
-s('「授業管理」を押してください。','open',()=>panel('ワークスペース',row(btn('生徒管理','wrong'),target('授業管理','open'),btn('講師管理','wrong')))),
+s('「時間割」を押してください。','open',()=>panel('ワークスペース',row(btn('生徒管理','wrong'),target('時間割','open'),btn('講師管理','wrong')))),
 s('「時間割を編集」を押してください。','edit',()=>panel('時間割',row(target('時間割を編集','edit'),btn('＋ 授業を登録','wrong'))+'<p>11月25日（水）</p><p>3限　練習 花子／練習講師A</p>')),
 s('欠席する練習講師Aの名前を押してください。','teacher',()=>panel('通常授業エディター',table(['時間・コマ',target('練習講師A','teacher','ghost'),btn('練習講師B','wrong')],[['3限','練習 花子','空き']]))),
 s('3限の欠席を選択し、「仮設定に反映」を押してください。','absent',()=>panel('講師の欠席コマ','<p>練習講師A</p>'+[1,2,3,4].map(n=>'<label class="practice-check"><input type="checkbox" data-practice-field="a'+n+'">'+n+'限 欠席</label>').join('')+row(target('欠席設定を反映','absent'))),v=>v.a3&&!v.a1&&!v.a2&&!v.a4),
