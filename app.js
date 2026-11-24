@@ -49,6 +49,14 @@ const isAdmin = () => isManagementRole(state.profile?.role);
 const maintenanceState={loaded:false,enabled:false,message:'',version:'',updatedAt:null,startedAt:null,unsub:null,dataStarted:false,history:[],busy:false};
 const state = { user:null, profile:null, date:todayKey(), scheduleView:'day', page:'', students:[], people:[], entries:[], entriesStatus:'loading', closures:{}, closuresStatus:'loading', openDays:{}, openDaysStatus:'loading', examEvents:{}, examStatus:'loading', courses:[], coursesStatus:'loading', notices:[], officialAnnouncements:[], officialSeenIds:new Set(), officialSeenReady:false, activeLesson:null, availability:new Map(), availabilityStatus:{}, availabilityUnsub:[], teacherAbsences:{}, teacherAbsencesStatus:'loading', teacherWeeklyWork:{}, teacherWeeklyWorkStatus:teacherWorkFeatureEnabled?'loading':'disabled', teacherDateWork:{}, teacherDateWorkStatus:teacherWorkFeatureEnabled?'loading':'disabled', unsub:[] };
 installHelpGuide({getRole:()=>state.profile?.role,getUser:()=>state.user?.uid});
+// QA-only preview; do not show demonstration data on the production site.
+if(document.documentElement.dataset.shiftlyEnvironment==='qa'&&config.firebaseConfig.projectId==='shiftly-t-test'&&databaseId==='shiftly-qa-v1'){
+  import('./ranking-preview.js?v=20261125-a').then(({installRankingPreview})=>{
+    const preview=installRankingPreview({button:$('rankingButton'),dialog:$('rankingDialog'),host:$('rankingHost'),getRole:()=>state.profile?.role,getAvailable:()=>Boolean(state.user&&!$('appPanel').hidden&&!$('notificationButton').hidden)});
+    const observer=new MutationObserver(preview.sync);
+    for(const id of ['appPanel','notificationButton'])observer.observe($(id),{attributes:true,attributeFilter:['hidden']});
+  }).catch(error=>console.warn('QA ranking preview unavailable',error));
+}
 // Derive sticky offsets from the actual bars, including role/device-specific wrapping.
 {
   const header=$('stickySiteHeader'),menu=document.querySelector('#appPanel > .welcome-line');
