@@ -1,6 +1,6 @@
 /* QR print editor: layout preferences only; QR and student data remain in memory. */
 const STORAGE_KEY='shiftly:qr-print-layout:v1';
-const DEFAULTS=Object.freeze({title:'',intro:'下記のQRコードを読み取り、講習の希望日時をご登録ください。',footer:'スマートフォンで読み取り、生徒氏名を入力してください。\\nQRコードは他人に渡さないでください。',size:40,layout:1,showName:true,showDeadline:true});
+const DEFAULTS=Object.freeze({title:'',intro:'下記のQRコードを読み取り、講習の希望日時をご登録ください。',footer:'スマートフォンで読み取り、生徒氏名を入力してください。\nQRコードは他人に渡さないでください。',size:40,layout:1,showName:true,showDeadline:true});
 const LIMITS={1:85,2:65,4:45};
 function normalize(value={}){
   const v=value&&typeof value==='object'?value:{};

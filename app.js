@@ -915,7 +915,7 @@ function openBookingFrame(){
   if(host.firstElementChild)return;
   const frame=document.createElement('iframe');
   frame.title='講習予約管理';
-  frame.src='./course-booking-admin.html?embedded=1&v=prod-ui-20261124-qr-editor';
+  frame.src='./course-booking-admin.html?embedded=1&v=prod-ui-20261124-qr-editor-v2';
   host.append(frame);
 }
 function canLeaveBookingFrame(){

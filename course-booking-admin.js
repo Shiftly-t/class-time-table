@@ -1,4 +1,4 @@
-import {mountQrPrintEditor} from './qr-print-editor.js?v=20261124-editor-v1';
+import {mountQrPrintEditor} from './qr-print-editor.js?v=20261124-editor-v2';
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getFirestore,doc,getDoc} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
