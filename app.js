@@ -805,9 +805,13 @@ $("restoreJobRollback").addEventListener("click",()=>runRestoreUi("rollback"));
 function restoreBlocked(){return isOwner()&&seasonalAuthority.enabled()&&(!restoreGate.known||restoreGate.active);}
 function applyMaintenanceState(){
   $("restoreJobPanel").hidden=!restoreBlocked();
-  if(restoreBlocked()){$("appPanel").hidden=true;$("maintenancePanel").hidden=true;$("notificationButton").hidden=true;return;}
+  if(restoreBlocked()){if($('bookingFrameHost').firstElementChild)resetBookingFrame();$("appPanel").hidden=true;$("maintenancePanel").hidden=true;$("notificationButton").hidden=true;return;}
 
   const blocked=maintenanceState.enabled && !isOwner();
+  if((blocked||!maintenanceState.loaded)&&$('bookingFrameHost').firstElementChild)resetBookingFrame();
+  else if(!blocked&&maintenanceState.loaded&&state.page==='bookingManagement'&&isAdmin()){
+    $('bookingManagementPage').hidden=false;openBookingFrame();
+  }
   $('maintenancePanel').hidden=!blocked;
   $('appPanel').hidden=blocked || !maintenanceState.loaded;
   $('notificationButton').hidden=blocked || !maintenanceState.loaded;
@@ -902,7 +906,31 @@ $('maintenanceEnd').addEventListener('click',()=>changeMaintenance('end'));
 $('maintenanceRecord').addEventListener('click',()=>changeMaintenance('update'));
 $('maintenanceHistoryRefresh').addEventListener('click',loadMaintenanceHistory);
 
+function resetBookingFrame(){
+  $('bookingFrameHost').replaceChildren();
+  $('bookingManagementPage').hidden=true;
+}
+function openBookingFrame(){
+  const host=$('bookingFrameHost');
+  if(host.firstElementChild)return;
+  const frame=document.createElement('iframe');
+  frame.title='講習予約管理';
+  frame.src='./course-booking-admin.html?embedded=1&v=prod-ui-20261124-booking-embed';
+  host.append(frame);
+}
+function canLeaveBookingFrame(){
+  const frame=$('bookingFrameHost').firstElementChild;
+  if(!frame)return true;
+  try{
+    const status=frame.contentWindow?.shiftlyBookingNavigationStatus?.();
+    if(status?.busy){showMessage('講習予約管理の処理・結果確認を完了してから移動してください。');return false;}
+    if(status?.draft&&!confirm('講習予約管理の未保存の入力または印刷準備を破棄して移動しますか？'))return false;
+    return true;
+  }catch(e){showMessage('講習予約管理の状態を確認できません。処理完了後に再読み込みしてください。');return false;}
+}
 function nav(page) {
+  if(page==='bookingManagement'&&!isAdmin())return;
+  if(state.page==='bookingManagement'&&page!=='bookingManagement'&&!canLeaveBookingFrame())return;
   if(regularEditor?.isBusy()){showMessage('保存中です。完了してから画面を移動してください。');return;}
   if(state.page==='adminLessons'&&page!=='adminLessons'&&regularEditor?.hasChanges()){
     if(!confirm('未確定の講師欠席・担当振替があります。破棄して画面を移動しますか？'))return;
@@ -912,7 +940,11 @@ function nav(page) {
   if(state.page==='teacherManagement'&&page!=='teacherManagement'&&teacherWorkPage?.hasChanges() &&
     !confirm('未保存の講師勤務曜日を破棄して移動しますか？'))return;
   if(state.page==='teacherManagement'&&page!=='teacherManagement')teacherWorkPage?.discard();
+  if(state.page==='bookingManagement'&&page!=='bookingManagement')resetBookingFrame();
   state.page=page;
+  $('bookingManagementPage').hidden=page!=='bookingManagement';
+  $('navBookingManagement')?.classList.toggle('active',page==='bookingManagement');
+  $('navBookingManagement')?.setAttribute('aria-pressed',String(page==='bookingManagement'));
   $('teacherManagementPage').hidden=page!=='teacherManagement';
   $('adminCountPage').hidden=page!=='count';
   $('teacherStudentsPage').hidden=page!=='students';
@@ -925,7 +957,7 @@ function nav(page) {
   $('availabilityPage').hidden=page!=='availability';
   $('ownerHistoryPage').hidden=page!=='ownerHistory';
   $('maintenanceOwnerPage').hidden=page!=='maintenanceOwner';
-  $('lessonsPage').hidden=page==='count'||page==='students'||page==='closures'||page==='courses'||page==='courseEditor'||page==='availability'||page==='ownerHistory'||page==='maintenanceOwner'||page==='adminLessons'||page==='teacherManagement';
+  $('lessonsPage').hidden=page==='count'||page==='students'||page==='closures'||page==='courses'||page==='courseEditor'||page==='availability'||page==='ownerHistory'||page==='maintenanceOwner'||page==='adminLessons'||page==='teacherManagement'||page==='bookingManagement';
   for(const [id,p] of [['navCount','count'],['navAdminLessons','adminLessons'],['navTeacherManagement','teacherManagement'],['navClosures','closures'],['navCourses','courses'],['navAvailability','availability'],['navTeacherLessons','teacherLessons'],['navTeacherStudents','students'],['navOwnerHistory','ownerHistory'],['navMaintenanceOwner','maintenanceOwner']]) $(''+id).classList.toggle('active',page===p || (id==='navCourses'&&isAdmin()&&(page==='availability'||page==='courseEditor'))||(id==='navAdminLessons'&&page==='adminSchedule'));
   if(page==='count')renderCount();
   else if(page==='teacherManagement')teacherWorkPage?.open();
@@ -937,6 +969,7 @@ function nav(page) {
   else if(page==='availability')renderAvailabilityPage();
   else if(page==='ownerHistory')loadOwnerTools();
   else if(page==='maintenanceOwner'){renderMaintenanceOwner();loadMaintenanceHistory();}
+  else if(page==='bookingManagement')openBookingFrame();
   else {
     $('scheduleHeading').textContent=isAdmin()?'授業管理':'今日の時間割';
     $('scheduleDescription').textContent=isAdmin()?'全教師の授業を確認・変更できます。':'全教師の時間割と伝達事項を閲覧できます。';
@@ -3210,20 +3243,22 @@ function clientRestoreBlocker(records){
 
 function syncBookingManagementShortcut(){
   let link=$('navBookingManagement');
-  if(!isAdmin()){link?.remove();return;}
+  if(!isAdmin()){link?.remove();resetBookingFrame();return;}
   if(link)return;
-  link=document.createElement('a');
+  link=document.createElement('button');
+  link.type='button';
   link.id='navBookingManagement';
-  link.href='./course-booking-admin.html';
   link.className='nav-tab';
   link.textContent='講習予約管理';
-  link.style.cssText='display:inline-flex;align-items:center;text-decoration:none;min-height:44px';
+  link.setAttribute('aria-pressed','false');
+  link.addEventListener('click',()=>nav('bookingManagement'));
   $('navCourses').after(link);
 }
 const loginFormNode=$('loginForm');
 const loginFormParent=loginFormNode.parentElement;
 
 function loggedOut(){
+  resetBookingFrame();
   resetRestoreGate();
   if(!loginFormNode.isConnected){
     loginFormParent.append(loginFormNode);
@@ -3242,6 +3277,7 @@ function loggedOut(){
   for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();
 }
 async function loggedIn(user){
+  resetBookingFrame();
   resetRestoreGate();
   const epoch=++authGeneration;
   const current=()=>epoch===authGeneration&&auth.currentUser?.uid===user.uid&&state.user?.uid===user.uid;

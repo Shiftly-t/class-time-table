@@ -471,3 +471,21 @@ $('printDiscard').addEventListener('click',()=>{
   clearPrintPreparation();note('印刷準備を閉じました');
 });
 onAuthStateChanged(auth,async user=>{const epoch=++authEpoch;clearPrivateState();$('app').textContent='管理者のログイン状態を確認しています…';if(!user){$('app').innerHTML='<h2>ログインが必要です</h2><p class="muted">管理者アカウントでShiftly-Tへログインしてから、このページを開いてください。</p><a href="./index.html">ログイン画面へ</a>';return;}try{const sn=await getDoc(doc(db,'users',user.uid));if(epoch!==authEpoch)return;if(!sn.exists()||!['owner','admin'].includes(sn.data().role)){$('app').innerHTML='<h2>管理者のみ利用できます</h2><p class="muted">アクセス権限がありません。</p>';return;}authorized=true;await load();}catch(e){if(epoch!==authEpoch)return;clearPrivateState();$('app').innerHTML='<h2>読み込みに失敗しました</h2><p class="muted">Firebaseの設定や権限を確認してください。</p>';note(errorMessage(e),true);}});
+
+/* Embedded tab navigation guard; no reservation or authorization logic changes. */
+if(document.documentElement.classList.contains('booking-embedded')){
+  window.shiftlyBookingNavigationStatus=()=>{
+    const formChanged=[...document.querySelectorAll('#app form input,#app form select,#app form textarea')].some(el=>{
+      if(el.type==='checkbox'||el.type==='radio')return el.checked!==el.defaultChecked;
+      if(el.tagName==='SELECT'){
+        const options=[...el.options];
+        const defaults=options.filter(o=>o.defaultSelected);
+        if(defaults.length)return options.some(o=>o.selected!==o.defaultSelected);
+        return el.selectedIndex!==options.findIndex(o=>!o.disabled);
+      }
+      return el.value!==el.defaultValue;
+    });
+    return {busy:busy||!!cancelConfirmation||(authorized&&transport.hasPending())||!!document.querySelector('dialog[open]'),
+      draft:!!editorMode||!!printItems.length||formChanged};
+  };
+}
