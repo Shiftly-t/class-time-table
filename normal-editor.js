@@ -17,7 +17,7 @@ export function installNormalEditor(ctx){
       <div><p class="eyebrow">REGULAR SCHEDULE EDITOR</p>
         <h2>通常授業エディター</h2>
         <p class="muted">講師の欠席はコマ単位。授業を別講師へドラッグ、または授業をタップして移動先をタップします。毎週の基本設定は変更しません。</p></div>
-      <button id="normalPreview" class="ghost" type="button">時間割をプレビュー</button>
+      <button id="normalPreview" class="ghost" type="button">時間割に戻る</button>
     </div>
     <div class="normal-editor-toolbar">
       <div class="normal-date-nav">
@@ -71,8 +71,9 @@ export function installNormalEditor(ctx){
     selected:'',drag:null,busy:false,external:false,openUid:''};
   const cloneLessons=map=>new Map([...map].map(([id,e])=>[id,{...e}]));
   const cloneAbsences=map=>new Map([...map].map(([uid,periods])=>[uid,new Set(periods)]));
+  const teacherRoleOrder=role=>role==='employee'?0:role==='admin'?1:2;
   const teacherList=()=>state.people.filter(p=>isAssignableTeacher(p.role))
-    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ja'));
+    .sort((a,b)=>teacherRoleOrder(a.role)-teacherRoleOrder(b.role)||String(a.name||'').localeCompare(String(b.name||''),'ja'));
   const periodNumbers=e=>CLASS_PERIODS.filter(p=>e.start<p.end&&e.end>p.start).map(p=>p.number);
   const absentKey=(date,uid)=>`${date}_${uid}`;
   const statusReady=()=>state.entriesStatus==='ready'&&state.coursesStatus==='ready'
