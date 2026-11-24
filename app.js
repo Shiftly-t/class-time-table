@@ -944,6 +944,37 @@ function canLeaveBookingFrame(){
     return true;
   }catch(e){showMessage('講習予約管理の状態を確認できません。処理完了後に再読み込みしてください。');return false;}
 }
+// Keep independent vertical positions for each workspace within this login.
+const workspaceScrollPositions=new Map();
+let workspaceScrollPage='',workspaceScrollPending=null,workspaceScrollTimer=0;
+function cancelWorkspaceScrollRestore(){
+  workspaceScrollPending=null;clearTimeout(workspaceScrollTimer);
+}
+function resetWorkspaceScroll(){
+  cancelWorkspaceScrollRestore();workspaceScrollPositions.clear();workspaceScrollPage='';
+  window.scrollTo(0,0);
+}
+function applyWorkspaceScrollRestore(){
+  const pending=workspaceScrollPending;
+  if(!pending||pending.page!==workspaceScrollPage||$('appPanel').hidden)return;
+  window.scrollTo(0,pending.top);
+  if(Math.abs(window.scrollY-pending.top)<=1)cancelWorkspaceScrollRestore();
+}
+function restoreWorkspaceScroll(page){
+  workspaceScrollPage=page;
+  workspaceScrollPending={page,top:workspaceScrollPositions.get(page)||0};
+  applyWorkspaceScrollRestore();
+  // A page may initially have only its loading skeleton. Retry on content resize,
+  // but never fight a user's own scroll, tap, or keyboard interaction.
+  if(workspaceScrollPending)workspaceScrollTimer=setTimeout(cancelWorkspaceScrollRestore,4000);
+}
+if(typeof ResizeObserver==='function'){
+  const scrollObserver=new ResizeObserver(applyWorkspaceScrollRestore);
+  scrollObserver.observe($('appPanel'));
+}
+for(const type of ['pointerdown','touchstart','wheel','keydown']){
+  window.addEventListener(type,cancelWorkspaceScrollRestore,{capture:true,passive:true});
+}
 function nav(page) {
   if(page==='bookingManagement'&&!isAdmin())return;
   if(state.page==='bookingManagement'&&page!=='bookingManagement'&&!canLeaveBookingFrame())return;
@@ -955,6 +986,11 @@ function nav(page) {
   if(teacherWorkPage?.isBusy()){showMessage('勤務曜日の保存が完了するまで画面を移動できません。');return;}
   if(state.page==='teacherManagement'&&page!=='teacherManagement'&&teacherWorkPage?.hasChanges() &&
     !confirm('未保存の講師勤務曜日を破棄して移動しますか？'))return;
+  const scrollChanged=workspaceScrollPage!==page;
+  if(scrollChanged){
+    if(workspaceScrollPage&&!$('appPanel').hidden)workspaceScrollPositions.set(workspaceScrollPage,Math.max(0,window.scrollY));
+    cancelWorkspaceScrollRestore();
+  }
   if(state.page==='teacherManagement'&&page!=='teacherManagement')teacherWorkPage?.discard();
   if(state.page==='bookingManagement'&&page!=='bookingManagement')resetBookingFrame();
   state.page=page;
@@ -993,6 +1029,7 @@ function nav(page) {
     renderLessons();
   }
   renderAvailabilityHome();
+  if(scrollChanged)restoreWorkspaceScroll(page);
 }
 $('navCount').addEventListener('click',()=>nav('count'));
 $('navAdminLessons').addEventListener('click',()=>nav('adminSchedule'));
@@ -3276,6 +3313,7 @@ const loginFormNode=$('loginForm');
 const loginFormParent=loginFormNode.parentElement;
 
 function loggedOut(){
+  resetWorkspaceScroll();
   resetBookingFrame();
   resetRestoreGate();
   if(!loginFormNode.isConnected){
@@ -3295,6 +3333,7 @@ function loggedOut(){
   for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();
 }
 async function loggedIn(user){
+  resetWorkspaceScroll();
   resetBookingFrame();
   resetRestoreGate();
   const epoch=++authGeneration;
