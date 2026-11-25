@@ -56,3 +56,31 @@
 .ranking-form-status:empty{display:none}
 .ranking-success{margin:0;padding:10px 12px;border:1px solid #9dccb2;border-radius:10px;background:#eaf8ef;color:#225c40;font-size:13px}
 @media(max-width:480px){.ranking-owner-grid{grid-template-columns:1fr}.ranking-achievement{align-items:start}}
+
+/* Owner badge builder and recipient gallery */
+#rankingDialog .ranking-badge-builder{gap:14px}
+.ranking-badge-preview{display:grid;justify-items:center;text-align:center;gap:8px;background:#f6f8fc;border:1px solid #e1e7f2;border-radius:14px;padding:22px 12px;overflow-wrap:anywhere}
+.ranking-medal-preview{--badge-color:#c89c38;position:relative;padding-bottom:21px;isolation:isolate}
+.ranking-medal-preview:before,.ranking-medal-preview:after{content:"";position:absolute;z-index:-1;bottom:3px;width:32px;height:44px;background:var(--badge-color);clip-path:polygon(0 0,100% 0,100% 100%,50% 80%,0 100%)}
+.ranking-medal-preview:before{left:12px;transform:rotate(17deg)}.ranking-medal-preview:after{right:12px;transform:rotate(-17deg)}
+.ranking-badge-mark{--badge-color:#94a3b8;border-radius:50%;border-color:var(--badge-color);background:color-mix(in srgb,var(--badge-color) 25%,white);font-size:22px;width:48px;min-height:48px;max-width:48px;flex:0 0 48px;line-height:1}
+.ranking-medal-preview .ranking-badge-mark{width:86px;max-width:86px;min-height:86px;border:5px solid var(--badge-color);box-shadow:inset 0 0 0 2px white;font-size:36px}
+.ranking-preview-title{font-size:19px}.ranking-badge-description{font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.ranking-field-title{font-size:13px}.ranking-icon-options{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+#rankingDialog .ranking-icon-choice{min-width:0;min-height:44px;padding:5px;border:1px solid #dce3ef;border-radius:8px;background:white;font-size:22px}
+#rankingDialog .ranking-icon-choice[aria-pressed=true]{border:2px solid #4f63e9;background:#edf0ff}
+.ranking-color-options{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px}
+#rankingDialog .ranking-color-choice{width:38px;height:38px;min-width:38px;min-height:38px;padding:0;border:2px solid transparent;border-radius:50%;background:var(--badge-color);color:white;font-weight:bold}
+#rankingDialog .ranking-color-choice[aria-pressed=true]{outline:2px solid var(--badge-color);outline-offset:2px}
+.ranking-custom-options summary{cursor:pointer;font-size:12px;color:#64748b}.ranking-custom-options label{display:grid;gap:5px;margin-top:8px}
+.ranking-recipient-list{display:grid;max-height:300px;overflow:auto;border:1px solid #e1e7f2;border-radius:12px;padding:6px 10px}
+#rankingDialog .ranking-recipient{display:flex;align-items:center;gap:9px;min-height:44px;margin:0;border-bottom:1px solid #edf0f5;font-size:13px}
+#rankingDialog .ranking-recipient:last-child{border-bottom:0}#rankingDialog .ranking-recipient input{width:20px;min-width:20px;min-height:20px;margin:0}
+.ranking-recipient small{margin-left:auto;white-space:nowrap}.ranking-recipient:has(input:disabled){opacity:.55}
+.ranking-grant-preview{display:flex;align-items:center;gap:10px}.ranking-grant-preview:empty{display:none}
+.ranking-badge-overview{display:flex;align-items:center;gap:10px}
+.ranking-badge-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(85px,1fr));gap:10px;padding:12px 0;border-bottom:1px solid #e1e7f2}
+.ranking-badge-tile{display:grid;justify-items:center;align-content:start;text-align:center;gap:7px;font-size:12px;overflow-wrap:anywhere}
+.ranking-badge-tile .ranking-badge-mark{width:62px;max-width:62px;min-height:62px;font-size:28px}
+.ranking-manual-history{display:grid;gap:10px;max-height:360px;overflow:auto}.ranking-history-row{display:grid;gap:4px;padding:10px 0;border-bottom:1px solid #e1e7f2;font-size:13px;overflow-wrap:anywhere}
+@media(max-width:400px){.ranking-icon-options{grid-template-columns:repeat(4,minmax(0,1fr))}.ranking-color-options{justify-content:flex-start}}

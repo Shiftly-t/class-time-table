@@ -69,7 +69,7 @@ export function automaticRule(input) {
 
 export function publicBadge(record) {
   const { badgeId, teacherUid, name, color, icon, source, awardedAt } = record;
-  return { badgeId, teacherUid, name, color, icon, source, awardedAt };
+  return { badgeId, teacherUid, name, color, icon, source, awardedAt, ...(typeof record.description === 'string' ? {description: record.description} : {}) };
 }
 
 export function publicAward(event) {

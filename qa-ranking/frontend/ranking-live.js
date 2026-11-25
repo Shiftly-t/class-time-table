@@ -196,7 +196,7 @@ function renderProfile(data, showBadges) {
 function badgeMark(item) {
   const mark = el('span', 'ranking-badge-mark', item.icon || '★');
   mark.setAttribute('aria-hidden', 'true');
-  if (/^#[a-f0-9]{6}$/i.test(item.color)) mark.style.borderColor = item.color;
+  if (/^#[a-f0-9]{6}$/i.test(item.color)) mark.style.setProperty('--badge-color', item.color);
   return mark;
 }
 
@@ -206,16 +206,23 @@ function renderBadges(data, teacherName) {
     card.append(el('p', 'empty', '獲得したバッジはありません。'));
     return card;
   }
+  const overview = el('div', 'ranking-badge-overview');
+  overview.append(avatar(), el('strong', '', `獲得バッジ：${data.badges.length}個`));
+  const gallery = el('div', 'ranking-badge-gallery');
   const list = el('ul', 'ranking-achievements');
   for (const badge of data.badges) {
+    const tile = el('div', 'ranking-badge-tile');
+    tile.append(badgeMark(badge), el('strong', '', badge.name));
+    gallery.append(tile);
     const item = el('li', 'ranking-achievement');
     const details = el('div', 'ranking-achievement-detail');
     const source = badge.source === 'manual' ? '運営による付与' : '自動付与';
     details.append(el('strong', '', badge.name), el('span', 'ranking-note', [source, formatDate(badge.awardedAt)].filter(Boolean).join(' · ')));
+    if (badge.description) details.append(el('span', 'ranking-badge-description', badge.description));
     item.append(badgeMark(badge), details);
     list.append(item);
   }
-  card.append(list);
+  card.append(overview, gallery, list);
   return card;
 }
 
@@ -333,47 +340,133 @@ function definitionForm({type, definitions, save}) {
   return form;
 }
 
-function grantForm({data, save}) {
-  const form = el('form', 'ranking-owner-form');
-  const fields = el('div', 'ranking-owner-grid');
-  const badge = select([['', '選択してください'], ...data.badges.map(item =>
-    [item.badgeId, item.active ? item.name : `${item.name}（停止中）`])]);
-  const teacher = select([['', '選択してください'], ...data.teachers.map(item => [item.teacherUid,
-    item.canGrant === false ? `${item.name}（履歴）` : item.name])]);
-  badge.required = teacher.required = true;
-  const reason = input('text');
-  reason.required = true;
-  reason.maxLength = 500;
-  const action = submit('付与する');
-  const message = status('', 'ranking-form-status');
+const badgeIcons = ['🏆','🥇','👑','💎','⭐','🤝','🌸','🔥','🎖️','🛡️','🚀','🎓'];
+const badgeColors = ['#c89c38','#98a3b3','#b87947','#4f63e9','#238c74','#9062bd','#ce536b','#344155'];
 
-  function selection() {
-    const definition = data.badges.find(item => item.badgeId === badge.value);
-    const grant = data.grants.find(item => item.badgeId === badge.value && item.teacherUid === teacher.value);
-    const teacherInfo = data.teachers.find(item => item.teacherUid === teacher.value);
-    action.textContent = grant ? '付与を取り消す' : '付与する';
-    action.disabled = !teacherInfo || !definition || (!grant && (!definition.active || teacherInfo.canGrant === false));
-    return grant;
-  }
-
-  for (const control of [badge, teacher]) control.addEventListener('change', selection);
-  selection();
-  form.append(el('h3', '', '講師への付与・取消'), fields, field('理由', reason), action, message);
-  fields.append(field('手動バッジ', badge), field('対象者', teacher));
-  form.addEventListener('submit', event => {
-    event.preventDefault();
-    const revoke = Boolean(selection());
-    if (action.disabled) return;
-    if (!reason.value.trim()) {
-      message.textContent = '理由を入力してください。';
-      reason.focus();
-      return;
-    }
-    save({action: revoke ? 'revokeManualBadge' : 'grantManualBadge', badgeId: badge.value,
-      teacherUid: teacher.value, reason: reason.value.trim()}, form, message,
-    revoke ? '手動バッジの付与を取り消しました。' : '手動バッジを付与しました。');
+function manualBadgeForm({definitions, save}) {
+  const form = el('form', 'ranking-owner-form ranking-badge-builder');
+  const picker = select([['','新しい手動バッジ'],...definitions.map(x=>[x.badgeId,x.name+(x.active?'':'（停止中）')])]);
+  const name = input('text'); name.required=true; name.maxLength=60; name.placeholder='例：特別功労賞';
+  const description = input('text'); description.maxLength=300; description.placeholder='バッジの説明（任意）';
+  const active = input('checkbox');
+  const activeLabel = field('新規付与を許可する',active); activeLabel.className='ranking-checkbox';
+  const preview = el('div','ranking-badge-preview');
+  const medal = el('div','ranking-medal-preview');
+  const mark = badgeMark({icon:badgeIcons[1],color:badgeColors[0]});
+  medal.append(mark);
+  const title = el('strong','ranking-preview-title');
+  const detail = el('p','ranking-badge-description');
+  preview.append(medal,title,detail,el('small','ranking-note','プレビュー'));
+  const icons = el('div','ranking-icon-options');
+  const colors = el('div','ranking-color-options');
+  const custom = input('text'); custom.maxLength=16; custom.setAttribute('aria-label','その他のアイコン');
+  const customColor = input('color','#c89c38'); customColor.setAttribute('aria-label','その他の色');
+  let icon=badgeIcons[1], color=badgeColors[0], newId;
+  const iconButtons=badgeIcons.map(value=>{
+    const b=button(value,()=>{icon=value;custom.value='';refresh()},'ranking-icon-choice');
+    b.setAttribute('aria-label',value); icons.append(b); return b;
   });
+  const colorButtons=badgeColors.map((value,i)=>{
+    const b=button('',()=>{color=value;customColor.value=value;refresh()},'ranking-color-choice');
+    b.style.setProperty('--badge-color',value); b.setAttribute('aria-label',['金','銀','銅','青','緑','紫','赤','濃紺'][i]);
+    colors.append(b); return b;
+  });
+  function refresh(){
+    mark.textContent=icon||'★'; mark.style.setProperty('--badge-color',color);
+    medal.style.setProperty('--badge-color',color);
+    title.textContent=name.value.trim()||'バッジ名';
+    detail.textContent=description.value.trim()||'バッジの説明';
+    iconButtons.forEach((b,i)=>b.setAttribute('aria-pressed',String(icon===badgeIcons[i])));
+    colorButtons.forEach((b,i)=>{const selected=color===badgeColors[i];b.setAttribute('aria-pressed',String(selected));b.textContent=selected?'✓':''});
+  }
+  function populate(){
+    const item=definitions.find(x=>x.badgeId===picker.value);
+    name.value=item?.name||''; description.value=item?.description||'';
+    icon=item?.icon||badgeIcons[1]; color=item?.color||badgeColors[0]; active.checked=item?item.active===true:true;
+    custom.value=badgeIcons.includes(icon)?'':icon;customColor.value=color;
+    newId=undefined;refresh();
+  }
+  picker.addEventListener('change',populate);
+  name.addEventListener('input',refresh);description.addEventListener('input',refresh);
+  custom.addEventListener('input',()=>{icon=custom.value.trim()||badgeIcons[1];refresh()});
+  customColor.addEventListener('input',()=>{color=customColor.value;refresh()});
+  const more=el('details','ranking-custom-options'); more.append(el('summary','','その他のアイコン・色'),field('アイコン文字',custom),field('カスタムカラー',customColor));
+  const message=status('','ranking-form-status');
+  form.append(el('h3','','オリジナルバッジを作成・編集'),field('編集対象',picker),preview,field('バッジ名称',name),
+    el('strong','ranking-field-title','アイコン'),icons,el('strong','ranking-field-title','バッジカラー'),colors,more,
+    field('バッジの説明',description),activeLabel,submit('バッジを保存する'),message);
+  form.addEventListener('submit',event=>{
+    event.preventDefault();
+    if(!name.value.trim()||!icon.trim()){message.textContent='名称とアイコンを入力してください。';return;}
+    save({action:'saveManualBadge',badgeId:picker.value||(newId||=crypto.randomUUID()),name:name.value.trim(),description:description.value.trim(),color,icon,active:active.checked},form,message,'手動バッジを保存しました。');
+  });
+  populate();
   return form;
+}
+
+function grantForm({data, save}) {
+  const form=el('form','ranking-owner-form');
+  const badge=select([['','選択してください'],...data.badges.map(x=>[x.badgeId,x.name+(x.active?'':'（停止中）')])]); badge.required=true;
+  const mode=select([['grant','付与する'],['revoke','取り消す']]);
+  const reason=input('text');reason.required=true;reason.maxLength=500;
+  const list=el('div','ranking-recipient-list');
+  const action=submit('0名にバッジを付与する');
+  const message=status('','ranking-form-status');
+  const selected=new Set();
+  const preview=el('div','ranking-grant-preview');
+  function update(){
+    action.textContent=mode.value==='grant'?`${selected.size}名にバッジを付与する`:`${selected.size}名の付与を取り消す`;
+    action.disabled=!badge.value||!selected.size||selected.size>100;
+  }
+  function populate(){
+    selected.clear();list.replaceChildren();preview.replaceChildren();
+    const def=data.badges.find(x=>x.badgeId===badge.value);
+    if(def)preview.append(badgeMark(def),el('strong','',def.name));
+    for(const teacher of data.teachers){
+      const granted=data.grants.some(x=>x.badgeId===badge.value&&x.teacherUid===teacher.teacherUid);
+      const can=!!def&&(mode.value==='revoke'?granted:def.active&&!granted&&teacher.canGrant!==false);
+      const cb=input('checkbox');cb.disabled=!can;
+      const label=el('label','ranking-recipient');
+      label.append(cb,el('span','',teacher.name),el('small','ranking-note',granted?'付与済み':teacher.canGrant===false?'履歴のみ':'未付与'));
+      cb.addEventListener('change',()=>{if(cb.checked)selected.add(teacher.teacherUid);else selected.delete(teacher.teacherUid);update()});
+      list.append(label);
+    }
+    if(!data.teachers.length)list.append(el('p','empty','対象者がいません。'));
+    update();
+  }
+  badge.addEventListener('change',populate);mode.addEventListener('change',populate);
+  form.append(el('h3','','講師への一括付与・取消'),field('手動バッジ',badge),preview,field('操作',mode),
+    el('strong','ranking-field-title','対象者（複数選択可能）'),list,field('理由',reason),action,message);
+  form.addEventListener('submit',event=>{
+    event.preventDefault();
+    if(action.disabled||!reason.value.trim())return;
+    const count=selected.size;
+    save({action:mode.value==='grant'?'grantManualBadges':'revokeManualBadges',badgeId:badge.value,teacherUids:[...selected].sort(),reason:reason.value.trim()},form,message,
+      mode.value==='grant'?`${count}名にバッジを付与しました。`:`${count}名の付与を取り消しました。`);
+  });
+  populate();return form;
+}
+
+function manualHistory(data){
+  const card=section('手動バッジ操作履歴');
+  card.append(el('p','ranking-note','最新100件の表彰・バッジイベント内の手動操作を表示します。'));
+  const events=data.manualHistory||[];
+  const badge=select([['','すべてのバッジ'],...new Map(events.map(x=>[x.badgeId,x.name]))]);
+  const teacher=select([['','すべての対象者'],...new Map(events.map(x=>[x.teacherUid,x.teacherName]))]);
+  const rows=el('div','ranking-manual-history');
+  function refresh(){
+    rows.replaceChildren();
+    const filtered=events.filter(x=>(!badge.value||x.badgeId===badge.value)&&(!teacher.value||x.teacherUid===teacher.value));
+    for(const x of filtered){
+      const row=el('div','ranking-history-row');
+      row.append(el('strong','',x.name+' · '+(x.action==='granted'?'付与':x.action==='revoked'?'取消':'更新')),
+        el('span','',x.teacherName+' · '+formatDate(x.at)),el('span','ranking-note','操作者：'+x.actorName),el('span','ranking-badge-description',x.reason));
+      rows.append(row);
+    }
+    if(!filtered.length)rows.append(el('p','empty','該当する履歴はありません。'));
+  }
+  badge.addEventListener('change',refresh);teacher.addEventListener('change',refresh);
+  card.append(field('バッジ',badge),field('対象者',teacher),rows);refresh();return card;
 }
 
 export function installRankingLive({trigger, dialog, host, call, callAchievement, getSession, getRole, getAvailable, today}) {
@@ -618,8 +711,8 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
     } else if (result && view === 'history') {
       host.append(renderHistory(result, load));
     } else if (result && view === 'owner') {
-      host.append(definitionForm({type: 'manual', definitions: result.badges, save}),
-        grantForm({data: result, save}), definitionForm({type: 'automatic', definitions: result.rules, save}));
+      host.append(manualBadgeForm({definitions: result.badges, save}),
+        grantForm({data: result, save}), manualHistory(result), definitionForm({type: 'automatic', definitions: result.rules, save}));
     }
 
     if (loading) host.append(status('取得しています…', 'empty'));

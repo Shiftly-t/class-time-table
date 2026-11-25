@@ -14,10 +14,12 @@ const COLLECTIONS = {
 };
 const fields = {
   listBadges: ['teacherUid'], listHistory: ['cursor'], manage: [],
-  saveManualBadge: ['operationId', 'badgeId', 'name', 'color', 'icon', 'active'],
+  saveManualBadge: ['operationId', 'badgeId', 'name', 'color', 'icon', 'active', 'description'],
   saveAutomaticRule: ['operationId', 'ruleId', 'name', 'color', 'icon', 'active', 'category', 'kind', 'metric', 'criterion', 'value'],
   grantManualBadge: ['operationId', 'badgeId', 'teacherUid', 'reason'],
-  revokeManualBadge: ['operationId', 'badgeId', 'teacherUid', 'reason']
+  revokeManualBadge: ['operationId', 'badgeId', 'teacherUid', 'reason'],
+  grantManualBadges: ['operationId', 'badgeId', 'teacherUids', 'reason'],
+  revokeManualBadges: ['operationId', 'badgeId', 'teacherUids', 'reason']
 };
 const snapshot = document => document.exists ? document.data() : null;
 const timestamp = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
@@ -44,7 +46,19 @@ function commandOf(data) {
   if (!isAchievementId(operationId)) throw Error('INVALID_ACHIEVEMENT_INPUT');
   if (action === 'saveAutomaticRule') return { action, operationId, rule: automaticRule(data) };
   if (!isAchievementId(badgeId)) throw Error('INVALID_ACHIEVEMENT_INPUT');
-  if (action === 'saveManualBadge') return { action, operationId, badgeId, badge: badgeDetails(data) };
+  if (action === 'saveManualBadge') {
+    const badge = badgeDetails(data);
+    if (data.description !== undefined) {
+      if (typeof data.description !== 'string' || data.description.length > 300 || /[\p{Cc}]/u.test(data.description)) throw Error('INVALID_ACHIEVEMENT_INPUT');
+      badge.description = data.description.trim();
+    }
+    return { action, operationId, badgeId, badge };
+  }
+  if (action === 'grantManualBadges' || action === 'revokeManualBadges') {
+    const ids = data.teacherUids;
+    if (!Array.isArray(ids) || !ids.length || ids.length > 100 || !ids.every(isTeacherUid) || new Set(ids).size !== ids.length) throw Error('INVALID_ACHIEVEMENT_INPUT');
+    return {action, operationId, badgeId, teacherUids: [...ids].sort(), reason: achievementReason(data.reason)};
+  }
   if (!isTeacherUid(teacherUid)) throw Error('INVALID_ACHIEVEMENT_INPUT');
   return { action, operationId, badgeId, teacherUid, reason: achievementReason(data.reason) };
 }
@@ -122,9 +136,10 @@ export function createRankingAchievements({ db, clock = () => new Date().toISOSt
           nextCursor: docs.length > pageSize ? docs[pageSize - 1].data().publicAwardSortKey : null };
       }
       if (command.action === 'manage') {
-        const [catalog, users, records] = await Promise.all([
+        const [catalog, users, records, recent] = await Promise.all([
           documents(tx, collection('catalog'), 60), documents(tx, db.collection('users'), 300),
-          documents(tx, collection('records').where('scope', '==', 'manual'), 2000)
+          documents(tx, collection('records').where('scope', '==', 'manual'), 2000),
+          tx.get(collection('history').orderBy('at', 'desc').limit(100))
         ]);
         const definitions = catalog.map(doc => doc.data());
         const grants = records.map(doc => doc.data()).filter(x => x.active);
@@ -136,10 +151,11 @@ export function createRankingAchievements({ db, clock = () => new Date().toISOSt
           }
         }
         return {
-          badges: definitions.filter(x => x.type === 'manual').map(({ badgeId, name, color, icon, active }) => ({ badgeId, name, color, icon, active })),
+          badges: definitions.filter(x => x.type === 'manual').map(({ badgeId, name, color, icon, active, description }) => ({ badgeId, name, color, icon, active, description: description ?? '' })),
           rules: definitions.filter(x => x.type === 'rule').map(automaticRule),
           teachers: [...teachers.values()],
-          grants: grants.map(x => publicBadge({ ...x.content, awardedAt: x.awardedAt }))
+          grants: grants.map(x => publicBadge({ ...x.content, awardedAt: x.awardedAt })),
+          manualHistory: recent.docs.map(doc => doc.data()).filter(x => x.scope === 'manual').map(({eventId, badgeId, teacherUid, teacherName, name, action, at, reason, actor}) => ({eventId, badgeId, teacherUid, teacherName, name, action, at, reason, actorName: users.find(u => u.id === actor)?.get('name') || '不明'}))
         };
       }
       const operation = achievementKey('achievement', actor, command.operationId);
@@ -166,25 +182,34 @@ export function createRankingAchievements({ db, clock = () => new Date().toISOSt
           const id = `manual_${command.badgeId}`;
           const before = catalog.find(doc => doc.id === id);
           if (!before && catalog.filter(doc => doc.get('type') === 'manual').length >= 30) throw Error('RANKING_ACHIEVEMENT_LIMIT');
-          tx.set(ref('catalog', id), { ...command.badge, badgeId: command.badgeId, type: 'manual', updatedAt: now });
+          tx.set(ref('catalog', id), { ...(before?.get('description') !== undefined ? {description: before.get('description')} : {}), ...command.badge, badgeId: command.badgeId, type: 'manual', updatedAt: now });
         }
       } else {
-        const { badgeId, teacherUid, reason } = command;
-        const id = achievementKey('manual', badgeId, teacherUid);
-        const [badge, previous, teacher] = await Promise.all([
-          tx.get(ref('catalog', `manual_${badgeId}`)).then(snapshot), tx.get(ref('records', id)).then(snapshot),
-          read(tx, `users/${teacherUid}`)
+        const {badgeId, reason} = command;
+        const ids = command.teacherUids ?? [command.teacherUid];
+        const granting = command.action === 'grantManualBadge' || command.action === 'grantManualBadges';
+        const [badge, ...targets] = await Promise.all([
+          tx.get(ref('catalog', `manual_${badgeId}`)).then(snapshot),
+          ...ids.map(async teacherUid => {
+            const id = achievementKey('manual', badgeId, teacherUid);
+            const [previous, teacher] = await Promise.all([
+              tx.get(ref('records', id)).then(snapshot), read(tx, `users/${teacherUid}`)
+            ]);
+            return {id, teacherUid, previous, teacher};
+          })
         ]);
-        if (command.action === 'grantManualBadge') {
-          if (!badge?.active || !TEACHING_ROLES.includes(teacher?.role) || !teacherName(teacher)) throw Error('RANKING_GRANT_TARGET_UNAVAILABLE');
-          if (previous?.active) throw Error('RANKING_ALREADY_GRANTED');
-          const { name, color, icon } = badge;
-          const next = { source: 'manual', scope: 'manual', category: 'badge', badgeId, teacherUid,
-            teacherName: teacher.name.trim(), name, color, icon, kind: 'all', key: '' };
-          transition(tx, { id, previous, next, actor, reason, now, config, trigger: operation });
-        } else {
-          if (!previous?.active) throw Error('RANKING_NOT_GRANTED');
-          transition(tx, { id, previous, next: null, actor, reason, now, config, trigger: operation });
+        // Validate every target before any write: all selected teachers succeed or none do.
+        for (const {previous, teacher} of targets) {
+          if (granting) {
+            if (!badge?.active || !TEACHING_ROLES.includes(teacher?.role) || !teacherName(teacher)) throw Error('RANKING_GRANT_TARGET_UNAVAILABLE');
+            if (previous?.active) throw Error('RANKING_ALREADY_GRANTED');
+          } else if (!previous?.active) throw Error('RANKING_NOT_GRANTED');
+        }
+        for (const {id, teacherUid, previous, teacher} of targets) {
+          const next = granting ? {source: 'manual', scope: 'manual', category: 'badge', badgeId, teacherUid,
+            teacherName: teacher.name.trim(), name: badge.name, color: badge.color, icon: badge.icon,
+            ...(typeof badge.description === 'string' ? {description: badge.description} : {}), kind: 'all', key: ''} : null;
+          transition(tx, {id, previous, next, actor, reason, now, config, trigger: operation});
         }
       }
       tx.create(operationRef, { signature, actor, command, at: now });
