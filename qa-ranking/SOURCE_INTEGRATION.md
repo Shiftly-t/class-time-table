@@ -24,3 +24,8 @@ ranking-callable.cjs は既存read handler用の認証・App Check必須ラッ�
 
 ## 自動実行候補
 ranking-automation.mjs: JST 23:55取得、翌日00:10確定。予定された時刻と対象日を使用し、日付をまたいだ遅延取得は拒否。QA限定。実行トランザクション内でメンテナンス・復元・有効化フラグを確認する。実行には enabled, automationEnabled, correctionIntegrationVerified がすべて true 必須。フラグはまだ設定しない。既存編集との訂正連携、23:55以降の変更の処理、復元後の整合性・障害対応、実際のスケジュール実行検証は未完了。候補の模擬試験は node tests/ranking-automation.test.mjs。自動処理は未デプロイ。
+
+## 事後訂正接続調査
+- ユーザー提供 stage2-bridge.cjs / coordination.cjs を照合。beforeCommit は全業務の書込みを遅延バッファに保持したまま呼ばれ、flush 前に既存検証を行う。新しい setHooks 呼び出しで既存のフックを置換しないこと。既存 beforeCommit に追加する必要がある。復元計画・復元バッチは通常の訂正と分離する。
+- booking-graph.cjs は done の移動・削除を拒否し、公開予約と時間割の整合を要求する。seasonal-operations.cjs にも過去日配置制約がある。制限の一括解除は禁止。専用の検証済み訂正経路が必要。
+- ranking-correction.mjs は日付指定編集の検証済み前後実績から差分を算出し、変更対象のみ台帳へ適用する候補。変更前が台帳と矛盾する場合は停止。無関係な過去実績や週間設定変更からの再生成は行わない。現行日付別編集の前後投影・履歴由来の仮想授業、取得後未確定日の扱い、予約側の過去訂正・復元整合・同一トランザクション接続は未完了。自動化フラグは有効にしない。
