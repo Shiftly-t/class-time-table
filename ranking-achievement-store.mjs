@@ -15,7 +15,8 @@ const COLLECTIONS = {
 const fields = {
   listBadges: ['teacherUid'], listHistory: ['cursor'], manage: [],
   saveManualBadge: ['operationId', 'badgeId', 'name', 'color', 'icon', 'active', 'description'],
-  saveAutomaticRule: ['operationId', 'ruleId', 'name', 'color', 'icon', 'active', 'category', 'kind', 'metric', 'criterion', 'value'],
+  saveAutomaticRule: ['operationId', 'ruleId', 'name', 'color', 'icon', 'active', 'category', 'kind', 'metric', 'criterion', 'value', 'description'],
+  archiveDefinition: ['operationId', 'definitionId', 'definitionType'],
   grantManualBadge: ['operationId', 'badgeId', 'teacherUid', 'reason'],
   revokeManualBadge: ['operationId', 'badgeId', 'teacherUid', 'reason'],
   grantManualBadges: ['operationId', 'badgeId', 'teacherUids', 'reason'],
@@ -44,6 +45,11 @@ function commandOf(data) {
   }
   if (action === 'manage') return { action };
   if (!isAchievementId(operationId)) throw Error('INVALID_ACHIEVEMENT_INPUT');
+  if (action === 'archiveDefinition') {
+    const {definitionId, definitionType} = data;
+    if (!isAchievementId(definitionId) || !['manual', 'rule'].includes(definitionType)) throw Error('INVALID_ACHIEVEMENT_INPUT');
+    return {action, operationId, definitionId, definitionType};
+  }
   if (action === 'saveAutomaticRule') return { action, operationId, rule: automaticRule(data) };
   if (!isAchievementId(badgeId)) throw Error('INVALID_ACHIEVEMENT_INPUT');
   if (action === 'saveManualBadge') {
@@ -151,8 +157,8 @@ export function createRankingAchievements({ db, clock = () => new Date().toISOSt
           }
         }
         return {
-          badges: definitions.filter(x => x.type === 'manual').map(({ badgeId, name, color, icon, active, description }) => ({ badgeId, name, color, icon, active, description: description ?? '' })),
-          rules: definitions.filter(x => x.type === 'rule').map(automaticRule),
+          badges: definitions.filter(x => x.type === 'manual').map(({ badgeId, name, color, icon, active, description, archived }) => ({ badgeId, name, color, icon, active, description: description ?? '', ...(archived === true ? {archived: true} : {}) })),
+          rules: definitions.filter(x => x.type === 'rule').map(x => ({...automaticRule(x), ...(x.archived === true ? {archived: true} : {})})),
           teachers: [...teachers.values()],
           grants: grants.map(x => publicBadge({ ...x.content, awardedAt: x.awardedAt })),
           manualHistory: recent.docs.map(doc => doc.data()).filter(x => x.scope === 'manual').map(({eventId, badgeId, teacherUid, teacherName, name, action, at, reason, actor}) => ({eventId, badgeId, teacherUid, teacherName, name, action, at, reason, actorName: users.find(u => u.id === actor)?.get('name') || '不明'}))
@@ -166,21 +172,28 @@ export function createRankingAchievements({ db, clock = () => new Date().toISOSt
         if (previousOperation.signature !== signature) throw Error('RANKING_OPERATION_ID_REUSED');
         return { state: 'replayed' };
       }
-      if (command.action === 'saveAutomaticRule' || command.action === 'saveManualBadge') {
+      if (command.action === 'archiveDefinition') {
+        const target = ref('catalog', `${command.definitionType}_${command.definitionId}`);
+        const before = snapshot(await tx.get(target));
+        if (!before || before.type !== command.definitionType) throw Error('INVALID_ACHIEVEMENT_INPUT');
+        if (!before.archived) tx.set(target, {...before, active: false, archived: true, archivedAt: now, archivedBy: actor, updatedAt: now});
+      } else if (command.action === 'saveAutomaticRule' || command.action === 'saveManualBadge') {
         // The transaction query also protects the catalog size against concurrent additions.
         const catalog = await documents(tx, collection('catalog'), 60);
         if (command.action === 'saveAutomaticRule') {
           const id = `rule_${command.rule.ruleId}`;
           const before = catalog.find(doc => doc.id === id)?.data();
+          if (before?.archived) throw Error('INVALID_ACHIEVEMENT_INPUT');
           if (!before && catalog.filter(doc => doc.get('type') === 'rule').length >= 30) throw Error('RANKING_ACHIEVEMENT_LIMIT');
           const kinds = [...new Set([before?.kind, command.rule.kind].filter(Boolean))];
-          tx.set(ref('catalog', id), { ...command.rule, type: 'rule', updatedAt: now });
+          tx.set(ref('catalog', id), { ...(typeof before?.description === 'string' ? {description: before.description} : {}), ...command.rule, type: 'rule', updatedAt: now });
           tx.create(ref('refresh', `achievement_${operation}`), {
             type: 'achievementRule', kinds, index: 0, status: 'pending', createdAt: now
           });
         } else {
           const id = `manual_${command.badgeId}`;
           const before = catalog.find(doc => doc.id === id);
+          if (before?.get('archived') === true) throw Error('INVALID_ACHIEVEMENT_INPUT');
           if (!before && catalog.filter(doc => doc.get('type') === 'manual').length >= 30) throw Error('RANKING_ACHIEVEMENT_LIMIT');
           tx.set(ref('catalog', id), { ...(before?.get('description') !== undefined ? {description: before.get('description')} : {}), ...command.badge, badgeId: command.badgeId, type: 'manual', updatedAt: now });
         }
@@ -201,7 +214,7 @@ export function createRankingAchievements({ db, clock = () => new Date().toISOSt
         // Validate every target before any write: all selected teachers succeed or none do.
         for (const {previous, teacher} of targets) {
           if (granting) {
-            if (!badge?.active || !TEACHING_ROLES.includes(teacher?.role) || !teacherName(teacher)) throw Error('RANKING_GRANT_TARGET_UNAVAILABLE');
+            if (!badge?.active || badge.archived === true || !TEACHING_ROLES.includes(teacher?.role) || !teacherName(teacher)) throw Error('RANKING_GRANT_TARGET_UNAVAILABLE');
             if (previous?.active) throw Error('RANKING_ALREADY_GRANTED');
           } else if (!previous?.active) throw Error('RANKING_NOT_GRANTED');
         }
@@ -244,7 +257,9 @@ export function createRankingAchievements({ db, clock = () => new Date().toISOSt
       const [catalog, records] = await Promise.all([
         documents(tx, collection('catalog'), 60), documents(tx, collection('records').where('scope', '==', scope.id), 4000)
       ]);
-      const rules = catalog.filter(doc => doc.get('type') === 'rule').map(doc => automaticRule(doc.data()));
+      const ruleDocs = catalog.filter(doc => doc.get('type') === 'rule');
+      const archivedRules = new Set(ruleDocs.filter(doc => doc.get('archived') === true).map(doc => doc.get('ruleId')));
+      const rules = ruleDocs.filter(doc => doc.get('archived') !== true).map(doc => automaticRule(doc.data()));
       const desired = scope.from <= scope.to && (records.length || rules.some(rule => rule.active && rule.kind === kind))
         ? planAutomaticAchievements({ scope, rules, ledger: await loadLedger({ tx, db, from: scope.from, to: scope.to, now }), now })
         : new Map();
@@ -255,6 +270,7 @@ export function createRankingAchievements({ db, clock = () => new Date().toISOSt
         const changes = [];
         for (const id of ids) {
           const previous = existing.get(id);
+          if (previous?.content?.source === 'automatic' && archivedRules.has(previous.content.ruleId)) continue;
           const next = desired.get(id);
           if (next ? previous?.active && isDeepStrictEqual(previous.content, next) : !previous?.active) continue;
           changes.push({ id, previous, next });

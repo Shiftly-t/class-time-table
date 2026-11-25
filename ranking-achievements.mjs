@@ -53,7 +53,12 @@ export function badgeDetails(input) {
   if (typeof input.color !== 'string' || !/^#[a-f\d]{6}$/i.test(input.color) || typeof input.active !== 'boolean') {
     throw Error('INVALID_ACHIEVEMENT_INPUT');
   }
-  return { name: text(input.name, 60), color: input.color.toLowerCase(), icon: text(input.icon, 16), active: input.active };
+  const result = { name: text(input.name, 60), color: input.color.toLowerCase(), icon: text(input.icon, 16), active: input.active };
+  if (input.description !== undefined) {
+    if (typeof input.description !== 'string' || input.description.length > 300 || /[\p{Cc}]/u.test(input.description)) throw Error('INVALID_ACHIEVEMENT_INPUT');
+    result.description = input.description.trim();
+  }
+  return result;
 }
 
 export function automaticRule(input) {
@@ -74,7 +79,7 @@ export function publicBadge(record) {
 
 export function publicAward(event) {
   const { ruleId, teacherUid, name, teacherName, color, icon, rank, metric, kind, key, at, action } = event;
-  return { ruleId, teacherUid, name, teacherName, color, icon, rank, metric, kind, key, at, action };
+  return { ruleId, teacherUid, name, teacherName, color, icon, rank, metric, kind, key, at, action, ...(typeof event.description === 'string' ? {description: event.description} : {}) };
 }
 
 export function planAutomaticAchievements({ scope, rules, ledger, now }) {
@@ -93,7 +98,8 @@ export function planAutomaticAchievements({ scope, rules, ledger, now }) {
       const fields = {
         source: 'automatic', scope: scope.id, category: rule.category, ruleId: rule.ruleId,
         kind: scope.kind, key: scope.key, teacherUid: row.teacherUid,
-        name: rule.name, color: rule.color, icon: rule.icon
+        name: rule.name, color: rule.color, icon: rule.icon,
+        ...(typeof rule.description === 'string' ? {description: rule.description} : {})
       };
       desired.set(id, rule.category === 'award'
         ? { ...fields, teacherName: names.get(row.teacherUid), rank: row.rank, metric: rule.metric }

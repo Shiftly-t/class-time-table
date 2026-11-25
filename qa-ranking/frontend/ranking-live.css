@@ -84,3 +84,6 @@
 .ranking-badge-tile .ranking-badge-mark{width:62px;max-width:62px;min-height:62px;font-size:28px}
 .ranking-manual-history{display:grid;gap:10px;max-height:360px;overflow:auto}.ranking-history-row{display:grid;gap:4px;padding:10px 0;border-bottom:1px solid #e1e7f2;font-size:13px;overflow-wrap:anywhere}
 @media(max-width:400px){.ranking-icon-options{grid-template-columns:repeat(4,minmax(0,1fr))}.ranking-color-options{justify-content:flex-start}}
+
+/* Unified owner catalog */
+.ranking-catalog-list{display:grid;gap:8px;min-width:0}.ranking-catalog-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e1e7f2;border-radius:12px;padding:10px;min-width:0}.ranking-catalog-info{flex:1 1 150px;min-width:0;display:grid;gap:4px;overflow-wrap:anywhere}.ranking-catalog-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-left:auto}.ranking-catalog-actions button{min-width:60px}.ranking-owner-form{scroll-margin-top:12px}

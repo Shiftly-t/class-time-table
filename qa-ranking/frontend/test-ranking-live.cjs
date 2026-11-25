@@ -155,14 +155,20 @@ async function browserTest() {
             }
             return {data: {state: 'replayed'}};
           case 'saveAutomaticRule':
-            rules.push(input);
+            { const old=rules.findIndex(x=>x.ruleId===input.ruleId); if(old<0)rules.push(input);else rules[old]=input; }
             break;
-          case 'grantManualBadge':
-            grants.push(input);
+          case 'grantManualBadges':
+            grants.push(...input.teacherUids.map(teacherUid=>({...input,teacherUid})));
             break;
-          case 'revokeManualBadge':
-            grants.splice(0, 1);
+          case 'revokeManualBadges':
+            for(const teacherUid of input.teacherUids){const i=grants.findIndex(x=>x.teacherUid===teacherUid&&x.badgeId===input.badgeId);if(i>=0)grants.splice(i,1);}
             break;
+          case 'archiveDefinition': {
+            const items=input.definitionType==='manual'?badges:rules;
+            const key=input.definitionType==='manual'?'badgeId':'ruleId';
+            const item=items.find(x=>x[key]===input.definitionId);item.archived=true;item.active=false;
+            break;
+          }
           default:
             throw Error('unexpected achievement action');
         }
@@ -215,36 +221,60 @@ async function browserTest() {
     await setRole('owner');
     await trigger.click();
     await tab('バッジ管理').click();
-    const manual = dialog.locator('form').filter({hasText: '手動バッジの作成・編集'});
-    await manual.getByLabel('名称').fill('応援バッジ');
-    await manual.getByLabel('アイコン文字').fill('★');
+    const manual = dialog.locator('form').filter({hasText: 'オリジナルバッジを作成・編集'});
+    await manual.getByLabel('バッジ名称').fill('応援バッジ');
+    await manual.getByRole('button',{name:'🏆',exact:true}).click();
+    await manual.getByLabel('バッジの説明').fill('運営からの感謝');
     await manual.getByLabel('新規付与を許可する').check();
-    await manual.getByRole('button', {name: '保存する'}).click();
-    await manual.getByText(/時間をおいて再試行/).waitFor();
-    assert.equal(await manual.getByLabel('名称').inputValue(), '応援バッジ');
-    await manual.getByRole('button', {name: '保存する'}).click();
+    await manual.getByRole('button', {name: 'バッジを保存する'}).click();
+    await manual.locator('.ranking-form-status').getByText(/時間をおいて再試行|保存を確認できません/).waitFor();
+    assert.equal(await manual.getByLabel('バッジ名称').inputValue(), '応援バッジ');
+    await manual.getByRole('button', {name: 'バッジを保存する'}).click();
     await dialog.getByText('手動バッジを保存しました。').waitFor();
 
-    const grant = dialog.locator('form').filter({hasText: '講師への付与・取消'});
-    await grant.getByLabel('手動バッジ').selectOption({label: '応援バッジ'});
-    await grant.getByLabel('対象者').selectOption({label: '講師A'});
+    const grant=dialog.locator('form').filter({hasText:'講師への一括付与・取消'});
+    await grant.getByLabel('手動バッジ').selectOption({label:'応援バッジ'});
+    await grant.getByLabel(/講師A/).check();await grant.getByLabel(/講師B/).check();
     await grant.getByLabel('理由').fill('QA試験のため');
-    await grant.getByRole('button', {name: '付与する', exact: true}).click();
-    await dialog.getByText('手動バッジを付与しました。').waitFor();
-    await grant.getByLabel('手動バッジ').selectOption({label: '応援バッジ'});
-    await grant.getByLabel('対象者').selectOption({label: '講師A'});
+    await grant.getByRole('button',{name:'2名にバッジを付与する'}).click();
+    await dialog.getByText('2名にバッジを付与しました。').waitFor();
+    await grant.getByLabel('手動バッジ').selectOption({label:'応援バッジ'});
+    await grant.getByLabel('操作').selectOption('revoke');
+    await grant.getByLabel(/講師A/).check();await grant.getByLabel(/講師B/).check();
     await grant.getByLabel('理由').fill('QA試験の後片付け');
-    await grant.getByRole('button', {name: '付与を取り消す'}).click();
-    await dialog.getByText('手動バッジの付与を取り消しました。').waitFor();
+    await grant.getByRole('button',{name:'2名の付与を取り消す'}).click();
+    await dialog.getByText('2名の付与を取り消しました。').waitFor();
 
-    const automatic = dialog.locator('form').filter({hasText: '自動バッジ・表彰ルール'});
+    const automatic=dialog.locator('form').filter({hasText:'自動バッジ・表彰ルール'});
     await automatic.getByLabel('種類').selectOption('award');
-    assert.equal(await automatic.getByLabel('付与条件').inputValue(), 'rank');
-    await automatic.getByLabel('名称').fill('月間表彰');
-    await automatic.getByLabel('アイコン文字').fill('◎');
+    assert.equal(await automatic.getByLabel('付与条件').inputValue(),'rank');
+    await automatic.getByLabel('バッジ名称').fill('月間表彰');
+    await automatic.getByRole('button',{name:'👑',exact:true}).click();
+    await automatic.getByRole('button',{name:'紫',exact:true}).click();
+    await automatic.getByLabel('バッジ・表彰の説明').fill('月間実績');
     await automatic.getByLabel('基準値').fill('2');
-    await automatic.getByRole('button', {name: '保存する'}).click();
+    assert.equal(await automatic.locator('.ranking-preview-title').textContent(),'月間表彰');
+    await automatic.getByRole('button',{name:'自動ルールを保存する'}).click();
     await dialog.getByText('自動ルールを保存しました。').waitFor();
+
+    const row=name=>dialog.locator('.ranking-catalog-row').filter({hasText:name});
+    await row('応援バッジ').getByText(/運営付与/).waitFor();
+    await row('月間表彰').getByText(/自動付与/).waitFor();
+    await dialog.getByLabel('付与方法').selectOption('rule');
+    assert.equal(await row('応援バッジ').count(),0);
+    await row('月間表彰').getByRole('button',{name:'編集'}).click();
+    assert.equal(await automatic.getByLabel('バッジ名称').inputValue(),'月間表彰');
+    assert.equal(await automatic.getByLabel('バッジ・表彰の説明').inputValue(),'月間実績');
+    await automatic.getByLabel('バッジ名称').fill('月間表彰・改');
+    await automatic.getByRole('button',{name:'自動ルールを保存する'}).click();
+    await row('月間表彰・改').waitFor();
+    page.once('dialog',d=>d.accept());
+    await row('月間表彰・改').getByRole('button',{name:'削除'}).click();
+    await dialog.getByText('バッジ・表彰を削除しました。').waitFor();
+    assert.equal(await row('月間表彰・改').count(),0);
+    await dialog.getByLabel('削除済みも表示').check();
+    await row('月間表彰・改').getByText(/削除済み/).waitFor();
+    assert.equal(await row('月間表彰・改').getByRole('button',{name:'編集'}).count(),0);
 
     const calls = await page.evaluate(() => callLog);
     assert(calls.some(call => call.kind === 'cumulative' && call.key === ''));

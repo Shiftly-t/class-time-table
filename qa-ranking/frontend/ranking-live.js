@@ -250,106 +250,35 @@ function renderHistory(data, loadMore) {
 }
 
 // The callable rechecks the session and owner role. The form only submits explicit actions.
-function definitionForm({type, definitions, save}) {
-  const auto = type === 'automatic';
-  const idKey = auto ? 'ruleId' : 'badgeId';
-  const form = el('form', 'ranking-owner-form');
-  const picker = select([['', auto ? '新しい自動ルール' : '新しい手動バッジ'],
-    ...definitions.map(item => [item[idKey], item.name])]);
-  const name = input('text');
-  name.required = true;
-  name.maxLength = 60;
-  const color = input('color', '#4f63e9');
-  const icon = input('text');
-  icon.required = true;
-  icon.maxLength = 16;
-  const active = input('checkbox');
-  const activeLabel = field(auto ? 'ルールを有効にする' : '新規付与を許可する', active);
-  activeLabel.className = 'ranking-checkbox';
-  const heading = el('h3', '', auto ? '自動バッジ・表彰ルール' : '手動バッジの作成・編集');
-  const fields = el('div', 'ranking-owner-grid');
-  fields.append(field('編集対象', picker), field('名称', name), field('色', color), field('アイコン文字', icon));
-
-  const category = select([['badge', 'バッジ'], ['award', '表彰']]);
-  const kind = select([['month', '月間'], ['year', '年度'], ['all', '累計']]);
-  const metric = select(metrics.map(([key, label]) => [key, label]));
-  const criterion = select([['minimum', '実績が指定値以上'], ['rank', '指定順位以内']]);
-  const value = input('number');
-  value.min = '1';
-  value.step = '1';
-  value.required = auto;
-
-  function constrainAward() {
-    const award = category.value === 'award';
-    kind.querySelector('[value="all"]').disabled = award;
-    criterion.querySelector('[value="minimum"]').disabled = award;
-    if (award && kind.value === 'all') kind.value = 'month';
-    if (award) criterion.value = 'rank';
-    value.max = criterion.value === 'rank' ? '300' : '1000000';
-  }
-
-  function populate() {
-    const item = definitions.find(entry => entry[idKey] === picker.value);
-    name.value = item?.name || '';
-    color.value = item?.color || '#4f63e9';
-    icon.value = item?.icon || '';
-    active.checked = item?.active === true;
-    if (auto) {
-      category.value = item?.category || 'badge';
-      kind.value = item?.kind || 'month';
-      metric.value = item?.metric || 'slots';
-      criterion.value = item?.criterion || 'minimum';
-      value.value = item?.value ?? '';
-      constrainAward();
-    }
-  }
-
-  if (auto) {
-    category.addEventListener('change', constrainAward);
-    criterion.addEventListener('change', constrainAward);
-    fields.append(field('種類', category), field('対象期間', kind), field('集計部門', metric),
-      field('付与条件', criterion), field('基準値', value));
-    form.append(heading, el('p', 'ranking-note', '表彰は締め済みの月間・年度実績を対象にします。'));
-  } else {
-    form.append(heading);
-  }
-
-  const saveButton = submit('保存する');
-  const message = status('', 'ranking-form-status');
-  let newId;
-  picker.addEventListener('change', () => {
-    newId = undefined;
-    populate();
-  });
-  populate();
-  form.append(fields, activeLabel, saveButton, message);
-  form.addEventListener('submit', event => {
-    event.preventDefault();
-    if (!name.value.trim() || !icon.value.trim()) {
-      message.textContent = '名称とアイコン文字を入力してください。';
-      (name.value.trim() ? icon : name).focus();
-      return;
-    }
-    const badgeId = picker.value || (newId ||= crypto.randomUUID());
-    const data = {action: auto ? 'saveAutomaticRule' : 'saveManualBadge', [idKey]: badgeId,
-      name: name.value.trim(), color: color.value, icon: icon.value.trim(), active: active.checked};
-    if (auto) Object.assign(data, {category: category.value, kind: kind.value, metric: metric.value,
-      criterion: criterion.value, value: Number(value.value)});
-    save(data, form, message, auto ? '自動ルールを保存しました。' : '手動バッジを保存しました。');
-  });
-  return form;
-}
-
 const badgeIcons = ['🏆','🥇','👑','💎','⭐','🤝','🌸','🔥','🎖️','🛡️','🚀','🎓'];
 const badgeColors = ['#c89c38','#98a3b3','#b87947','#4f63e9','#238c74','#9062bd','#ce536b','#344155'];
 
-function manualBadgeForm({definitions, save}) {
+function badgeDefinitionForm({definitions, save, auto = false}) {
+  const idKey = auto ? 'ruleId' : 'badgeId';
   const form = el('form', 'ranking-owner-form ranking-badge-builder');
-  const picker = select([['','新しい手動バッジ'],...definitions.map(x=>[x.badgeId,x.name+(x.active?'':'（停止中）')])]);
+  definitions = definitions.filter(x=>!x.archived);
+  const picker = select([['',auto?'新しい自動ルール':'新しい手動バッジ'],...definitions.map(x=>[x[idKey],x.name+(x.active?'':'（停止中）')])]);
+  picker.dataset.catalogPicker = auto ? 'rule' : 'manual';
   const name = input('text'); name.required=true; name.maxLength=60; name.placeholder='例：特別功労賞';
   const description = el('textarea'); description.rows=3; description.maxLength=300; description.placeholder='バッジの説明（任意）';
   const active = input('checkbox');
-  const activeLabel = field('新規付与を許可する',active); activeLabel.className='ranking-checkbox';
+  const activeLabel = field(auto?'ルールを有効にする':'新規付与を許可する',active); activeLabel.className='ranking-checkbox';
+  const category=select([['badge','バッジ'],['award','表彰']]);
+  const kind=select([['month','月間'],['year','年度'],['all','累計']]);
+  const metric=select(metrics.map(([key,label])=>[key,label]));
+  const criterion=select([['minimum','実績が指定値以上'],['rank','指定順位以内']]);
+  const value=input('number');value.min='1';value.step='1';value.required=auto;
+  function constrain(){
+    const award=category.value==='award';
+    kind.querySelector('[value="all"]').disabled=award;
+    criterion.querySelector('[value="minimum"]').disabled=award;
+    if(award&&kind.value==='all')kind.value='month';
+    if(award)criterion.value='rank';
+    value.max=criterion.value==='rank'?'300':'1000000';
+  }
+  category.addEventListener('change',constrain);criterion.addEventListener('change',constrain);
+  const ruleFields=el('div','ranking-owner-grid');
+  ruleFields.append(field('種類',category),field('対象期間',kind),field('集計部門',metric),field('付与条件',criterion),field('基準値',value));
   const preview = el('div','ranking-badge-preview');
   const medal = el('div','ranking-medal-preview');
   const mark = badgeMark({icon:badgeIcons[1],color:badgeColors[0]});
@@ -380,10 +309,12 @@ function manualBadgeForm({definitions, save}) {
     colorButtons.forEach((b,i)=>{const selected=color===badgeColors[i];b.setAttribute('aria-pressed',String(selected));b.textContent=selected?'✓':''});
   }
   function populate(){
-    const item=definitions.find(x=>x.badgeId===picker.value);
+    const item=definitions.find(x=>x[idKey]===picker.value);
     name.value=item?.name||''; description.value=item?.description||'';
     icon=item?.icon||badgeIcons[1]; color=item?.color||badgeColors[0]; active.checked=item?item.active===true:true;
     custom.value=badgeIcons.includes(icon)?'':icon;customColor.value=color;
+    category.value=item?.category||'badge';kind.value=item?.kind||'month';metric.value=item?.metric||'slots';criterion.value=item?.criterion||'minimum';value.value=item?.value??'';constrain();
+    if(auto&&!item)active.checked=false;
     newId=undefined;refresh();
   }
   picker.addEventListener('change',populate);
@@ -392,21 +323,65 @@ function manualBadgeForm({definitions, save}) {
   customColor.addEventListener('input',()=>{color=customColor.value;refresh()});
   const more=el('details','ranking-custom-options'); more.append(el('summary','','その他のアイコン・色'),field('アイコン文字',custom),field('カスタムカラー',customColor));
   const message=status('','ranking-form-status');
-  form.append(el('h3','','オリジナルバッジを作成・編集'),field('編集対象',picker),preview,field('バッジ名称',name),
+  form.append(el('h3','',auto?'自動バッジ・表彰ルール':'オリジナルバッジを作成・編集'),field('編集対象',picker),preview,field('バッジ名称',name),
     el('strong','ranking-field-title','アイコン'),icons,el('strong','ranking-field-title','バッジカラー'),colors,more,
-    field('バッジの説明',description),activeLabel,submit('バッジを保存する'),message);
+    field(auto?'バッジ・表彰の説明':'バッジの説明',description));
+  if(auto)form.append(el('p','ranking-note','表彰は締め済みの月間・年度実績を対象にします。'),ruleFields);
+  form.append(activeLabel,submit(auto?'自動ルールを保存する':'バッジを保存する'),message);
   form.addEventListener('submit',event=>{
     event.preventDefault();
     if(!name.value.trim()||!icon.trim()){message.textContent='名称とアイコンを入力してください。';return;}
-    save({action:'saveManualBadge',badgeId:picker.value||(newId||=crypto.randomUUID()),name:name.value.trim(),description:description.value.trim().replace(/\s*\n\s*/g,' '),color,icon,active:active.checked},form,message,'手動バッジを保存しました。');
+    const data={action:auto?'saveAutomaticRule':'saveManualBadge',[idKey]:picker.value||(newId||=crypto.randomUUID()),name:name.value.trim(),description:description.value.trim().replace(/\s*\n\s*/g,' '),color,icon,active:active.checked};
+    if(auto)Object.assign(data,{category:category.value,kind:kind.value,metric:metric.value,criterion:criterion.value,value:Number(value.value)});
+    save(data,form,message,auto?'自動ルールを保存しました。':'手動バッジを保存しました。');
   });
   populate();
   return form;
 }
 
+function definitionCatalog({data, save, manual, automatic}) {
+  const card=section('登録済みバッジ・表彰一覧');
+  card.classList.add('ranking-owner-form');
+  const filter=select([['all','すべて'],['manual','運営付与'],['rule','自動付与']]);
+  const archived=input('checkbox');
+  const list=el('div','ranking-catalog-list');
+  const message=status('','ranking-form-status');
+  const definitions=[...data.badges.map(x=>({...x,type:'manual',id:x.badgeId})),...data.rules.map(x=>({...x,type:'rule',id:x.ruleId}))];
+  function refresh(){
+    list.replaceChildren();
+    const visible=definitions.filter(x=>(filter.value==='all'||filter.value===x.type)&&(archived.checked||!x.archived));
+    for(const x of visible){
+      const row=el('div','ranking-catalog-row');
+      const info=el('div','ranking-catalog-info');
+      info.append(el('strong','',x.name),el('span','ranking-note',(x.type==='manual'?'運営付与':'自動付与 · '+(x.category==='award'?'表彰':'バッジ'))+' · '+(x.archived?'削除済み':x.active?'有効':'停止中')));
+      if(x.description)info.append(el('p','ranking-badge-description',x.description));
+      if(x.type==='rule')info.append(el('small','ranking-note',({month:'月間',year:'年度',all:'累計'}[x.kind]||x.kind)+' · '+metricLabel(x.metric)+' · '+(x.criterion==='rank'?x.value+'位以内':x.value+'以上')));
+      row.append(badgeMark(x),info);
+      if(!x.archived){
+        const actions=el('div','ranking-catalog-actions');
+        actions.append(button('編集',()=>{
+          const form=x.type==='manual'?manual:automatic;
+          const picker=form.querySelector('[data-catalog-picker]');
+          picker.value=x.id;picker.dispatchEvent(new Event('change'));form.scrollIntoView({block:'start'});picker.focus({preventScroll:true});
+        }),button('削除',()=>{
+          if(!window.confirm('「'+x.name+'」を削除しますか？ 過去の付与記録を保持し、新規付与を停止します。'))return;
+          save({action:'archiveDefinition',definitionType:x.type,definitionId:x.id},card,message,'バッジ・表彰を削除しました。');
+        },'ghost'));
+        row.append(actions);
+      }
+      list.append(row);
+    }
+    if(!visible.length)list.append(el('p','empty','登録済みのバッジ・表彰はありません。'));
+  }
+  filter.addEventListener('change',refresh);archived.addEventListener('change',refresh);
+  const archiveLabel=field('削除済みも表示',archived);archiveLabel.className='ranking-checkbox';
+  card.append(field('付与方法',filter),archiveLabel,list,message);
+  refresh();return card;
+}
+
 function grantForm({data, save}) {
   const form=el('form','ranking-owner-form');
-  const badge=select([['','選択してください'],...data.badges.map(x=>[x.badgeId,x.name+(x.active?'':'（停止中）')])]); badge.required=true;
+  const badge=select([['','選択してください'],...data.badges.map(x=>[x.badgeId,x.name+(x.archived?'（削除済み）':x.active?'':'（停止中）')])]); badge.required=true;
   const mode=select([['grant','付与する'],['revoke','取り消す']]);
   const reason=input('text');reason.required=true;reason.maxLength=500;
   const list=el('div','ranking-recipient-list');
@@ -712,8 +687,10 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
     } else if (result && view === 'history') {
       host.append(renderHistory(result, load));
     } else if (result && view === 'owner') {
-      host.append(manualBadgeForm({definitions: result.badges, save}),
-        grantForm({data: result, save}), manualHistory(result), definitionForm({type: 'automatic', definitions: result.rules, save}));
+      const manual=badgeDefinitionForm({definitions: result.badges, save});
+      const automatic=badgeDefinitionForm({definitions: result.rules, save, auto:true});
+      host.append(definitionCatalog({data:result,save,manual,automatic}),manual,automatic,
+        grantForm({data:result,save}),manualHistory(result));
     }
 
     if (loading) host.append(status('取得しています…', 'empty'));
