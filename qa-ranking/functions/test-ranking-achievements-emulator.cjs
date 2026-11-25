@@ -37,8 +37,8 @@ async function exercise() {
       seed.create(db.doc(`rankingInternalRefresh/${day}_1`), { date: day, revision: 1, status: 'pending' });
       await seed.commit();
 
-      const badge = { action: 'saveManualBadge', operationId: 'badge-1', badgeId: 'manual', name: '特別賞', icon: '★', color: '#413245', active: true };
-      const rule = { action: 'saveAutomaticRule', operationId: 'rule-1', ruleId: 'monthly', name: '月間表彰', icon: '★', color: '#413245', active: true,
+      const badge = { action: 'saveManualBadge', operationId: 'badge-1', badgeId: 'manual', name: '特別賞', description: '運営からの感謝', icon: '★', color: '#413245', active: true };
+      const rule = { action: 'saveAutomaticRule', operationId: 'rule-1', ruleId: 'monthly', name: '月間表彰', description: '月間実績の表彰', icon: '★', color: '#413245', active: true,
         category: 'award', kind: 'month', metric: 'slots', criterion: 'rank', value: 1 };
       const grant = { action: 'grantManualBadge', operationId: 'grant-1', badgeId: badge.badgeId, teacherUid: 'e', reason: 'private-reason' };
       await assert.rejects(() => actor('a', badge), /FORBIDDEN/);
@@ -76,6 +76,35 @@ async function exercise() {
       assert((await inbox.get()).docs.some(notice => notice.get('target') === 'history' && notice.get('message').includes('取り消')));
       assert.equal((await inbox.get()).size, 3);
       assert.deepEqual(await instance.runPending(), []);
+      const catalog = await actor('o', {action:'manage'});
+      assert.equal(catalog.badges[0].description,'運営からの感謝');
+      assert.equal(catalog.rules[0].description,'月間実績の表彰');
+      assert.equal(history.history[0].description,'月間実績の表彰');
+      const archive = {action:'archiveDefinition',operationId:'archive-rule',definitionType:'rule',definitionId:'monthly'};
+      await assert.rejects(()=>actor('a',archive),/FORBIDDEN/);
+      await actor('o',archive);
+      assert.equal((await actor('o',archive)).state,'replayed');
+      await actor('o',{...archive,operationId:'archive-manual',definitionType:'manual',definitionId:'manual'});
+      const archived=await actor('o',{action:'manage'});
+      assert.equal(archived.rules[0].archived,true);
+      assert.equal(archived.badges[0].archived,true);
+      assert.equal(archived.rules[0].active,false);
+      assert.equal(archived.badges[0].active,false);
+      await assert.rejects(()=>actor('o',{...grant,operationId:'archived-grant',teacherUid:'a'}),/UNAVAILABLE/);
+      const historyBefore=await actor('a',{action:'listHistory'});
+      const nextCorrection=db.batch();
+      nextCorrection.update(db.doc(`rankingInternalDays/${day}`),{revision:3,facts:[fact('private-s2','e')]});
+      nextCorrection.create(db.doc(`rankingInternalRefresh/${day}_3`),{date:day,revision:3,status:'pending'});
+      await nextCorrection.commit();
+      for(let pass=0;pass<8;pass++){
+        const outcomes=await instance.runPending({limit:1});
+        assert(!outcomes.some(item=>item.state==='failed'),JSON.stringify(outcomes));
+      }
+      assert.equal((await db.doc(`rankingInternalRefresh/${day}_3`).get()).get('status'),'complete');
+      assert.deepEqual(await actor('a',{action:'listHistory'}),historyBefore);
+      assert.equal((await actor('e',{action:'listBadges'})).badges[0].description,'運営からの感謝');
+      assert.equal((await inbox.get()).size,3);
+      console.log('SUCCESS FIRESTORE ARCHIVE HISTORY PRESERVED');
     } finally {
       for (const collection of await db.listCollections()) await db.recursiveDelete(collection);
       assert.equal((await db.listCollections()).length, 0);
