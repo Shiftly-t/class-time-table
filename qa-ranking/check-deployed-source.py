@@ -25,7 +25,7 @@ def source_map(archive):
             path = PurePosixPath(metadata.filename)
             if metadata.is_dir() or path.is_absolute() or ".." in path.parts:
                 continue
-            if any(part.startswith(".") or part == "node_modules" for part in path.parts):
+            if any(part.startswith(".") or part in {"node_modules", "test", "tests", "backup", "backups"} for part in path.parts):
                 continue
             if path.suffix not in {".cjs", ".mjs", ".js", ".json"} or metadata.file_size > 2_000_000:
                 continue
@@ -74,8 +74,14 @@ def main():
             if baseline is None:
                 results[function] = {"state": "RANKING_BASELINE_REQUIRED", "sourceFiles": len(deployed)}
             else:
-                changed = sorted(path for path, digest in baseline.items() if deployed.get(path) != digest)
-                results[function] = {"state": "MATCH" if not changed else "SOURCE_DIFFERS", "changedPaths": changed}
+                missing = sorted(baseline.keys() - deployed.keys())
+                extra = sorted(deployed.keys() - baseline.keys())
+                changed = sorted(path for path in baseline.keys() & deployed.keys() if baseline[path] != deployed[path])
+                results[function] = {
+                    "state": "MATCH" if not (missing or extra or changed) else "SOURCE_DIFFERS",
+                    "baselineFiles": len(baseline), "deployedFiles": len(deployed),
+                    "missingPaths": missing, "extraPaths": extra, "changedPaths": changed
+                }
 
     print(json.dumps(results, indent=2, ensure_ascii=False))
     if all(result["state"] == "MATCH" for result in results.values()):
