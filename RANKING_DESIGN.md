@@ -1,4 +1,4 @@
-# Shiftly-T 講師ランキング — 開発仕様 v0.4
+# Shiftly-T 講師ランキング — 開発仕様 v0.5
 
 ## 状態
 開発用ブランチのみ。Firebase接続・本番反映なし。既存の公開設定は変更しない。
@@ -42,7 +42,15 @@ app.js の lessonsOnDate は schoolStudents.regularSlots の現在の設定か�
 - 表彰台、全員表示、月間・年度、部門、プロフィール、推移グラフを試作。バッジ・履歴・運営管理は未接続。
 - 本番用公開設定は未変更。QAデプロイ前に、既存のQA生成手順と .mjs ファイルの配信を確認する。
 
+## サーバー集計準備
+- ranking-normalize.mjs: 保存済み timetableEntries の done のみを正規化する純粋関数。通常授業の連続コマ分割、講習の保存期間とコマ照合、担当者照合、終了時刻判定、重複・矛盾の検出。
+- 重複・不明データは警告とし、確定公開を停止する。警告を公開APIに渡さない。休校・履歴変更・異なる時間範囲の重複など追加検証は未実装。現在の講師名簿・講習設定から過去を完全には復元できない。
+- 実施済み入力の運用率は未確認。過去の自動生成予定は補完しない。実際のデータ・権限の確認後に移行方針を決定する。
+- GitHubにはFunctionsのソースがないため、実際のQA Functions接続・認証・データ読み出し・保存・監査・ルール・デプロイは未実施。
+
 ## テスト
+node tests/ranking-normalize.test.mjs
+
 node tests/ranking-view-model.test.mjs
 
 node tests/ranking-core.test.mjs
