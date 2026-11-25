@@ -10,12 +10,13 @@ const {createRankingResolver} = require('./ranking-resolver.cjs');
 const {buildRankingRead} = require('./ranking-read.mjs');
 const {createRankingAchievements} = require('./ranking-achievement-store.mjs');
 const {createQaRankingScheduler} = require('./ranking-scheduler.mjs');
+const {withRankingSourceLock} = require('./ranking-authority-lock.cjs');
 const {periodFromSlot} = require('./booking-core.cjs');
 
 const projectId = 'shiftly-t-test';
 const runtimeProjects = [process.env.GCLOUD_PROJECT,process.env.GOOGLE_CLOUD_PROJECT,process.env.GCP_PROJECT].filter(Boolean);
 if (!runtimeProjects.length || runtimeProjects.some(project => project !== projectId)) throw Error('QA_RANKING_TARGET_MISMATCH');
-const db = getFirestore(initializeApp({projectId}),'shiftly-qa-v1');
+const db = withRankingSourceLock(getFirestore(initializeApp({projectId}),'shiftly-qa-v1'));
 const serviceAccount = 'qa-shiftly-runtime@shiftly-t-test.iam.gserviceaccount.com';
 const qaCallable = (options,handler) => onCall({...options,serviceAccount},handler);
 const resolve = createRankingResolver(db,{enableSeasonal:true,periodFromSlot,archiveDateSource:true});

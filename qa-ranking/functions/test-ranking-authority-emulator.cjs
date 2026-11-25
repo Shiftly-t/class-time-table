@@ -22,7 +22,7 @@ async function main() {
     weekly:{id:'weekly',weekday:2,teacherUid:'teacher_a',start:'17:30',end:'19:25',activeFrom:date}
   }};
   const fixture = {
-    'systemConfig/coordination':{enabled:true,protocolVersion:2},
+    'systemConfig/coordination':{enabled:true,protocolVersion:2,enforceDirectWriteDeny:true},
     'systemConfig/normalAuthority':{enabled:true,schemaVersion:1},
     'normalAuthorityState/global':{version:1},
     'rankingInternalConfig/runtime':{enabled:true,trackingStart:date,correctionIntegrationVerified:true,automationEnabled:true},

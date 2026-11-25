@@ -1,6 +1,7 @@
 'use strict';
 const {isDeepStrictEqual} = require('node:util');
 const {createHash} = require('node:crypto');
+const {hasRankingSourceLock} = require('./ranking-authority-lock.cjs');
 const {lessonValue, datedValue, projectDateSource} = require('./ranking-date-source.cjs');
 
 const datedRoots = new Set(['teacherDayAbsences','teacherDateWork','schoolClosures','schoolOpenDays','schoolEvents']);
@@ -89,6 +90,10 @@ function createRankingAuthority({coor}) {
         if (date < runtime.trackingStart) continue;
       }
       if (restorePlanning) invalid('RANKING_RESTORE_CHANGES_TRACKED_DATE');
+      const [coordination,normalAuthority] = await Promise.all([
+        coor.get('systemConfig/coordination'),coor.get('systemConfig/normalAuthority')
+      ]);
+      if (!hasRankingSourceLock(coordination.data(),normalAuthority.data())) invalid('RANKING_SOURCE_NOT_LOCKED');
       if (!captured || captured.source?.schema !== 1 || captured.source.date !== date) invalid('RANKING_MISSING_DATE_SOURCE');
       if (current) {
         const sortFacts = facts => Array.isArray(facts) ? [...facts].sort((a,b)=>a.slotId.localeCompare(b.slotId)) : null;

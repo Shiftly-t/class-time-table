@@ -31,7 +31,7 @@ async function main() {
   const read = buildRankingRead({db,clock});
   try {
     const fixture = {
-      'systemConfig/coordination':{enabled:true,protocolVersion:2},
+      'systemConfig/coordination':{enabled:true,protocolVersion:2,enforceDirectWriteDeny:true},
       'systemConfig/normalAuthority':{enabled:true,schemaVersion:1},
       'normalAuthorityState/global':{version:1},
       'rankingInternalConfig/runtime':{enabled:true,trackingStart:date,correctionIntegrationVerified:true,automationEnabled:true,publicationEnabled:false},
