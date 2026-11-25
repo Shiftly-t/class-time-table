@@ -347,7 +347,7 @@ function manualBadgeForm({definitions, save}) {
   const form = el('form', 'ranking-owner-form ranking-badge-builder');
   const picker = select([['','新しい手動バッジ'],...definitions.map(x=>[x.badgeId,x.name+(x.active?'':'（停止中）')])]);
   const name = input('text'); name.required=true; name.maxLength=60; name.placeholder='例：特別功労賞';
-  const description = input('text'); description.maxLength=300; description.placeholder='バッジの説明（任意）';
+  const description = el('textarea'); description.rows=3; description.maxLength=300; description.placeholder='バッジの説明（任意）';
   const active = input('checkbox');
   const activeLabel = field('新規付与を許可する',active); activeLabel.className='ranking-checkbox';
   const preview = el('div','ranking-badge-preview');
@@ -398,7 +398,7 @@ function manualBadgeForm({definitions, save}) {
   form.addEventListener('submit',event=>{
     event.preventDefault();
     if(!name.value.trim()||!icon.trim()){message.textContent='名称とアイコンを入力してください。';return;}
-    save({action:'saveManualBadge',badgeId:picker.value||(newId||=crypto.randomUUID()),name:name.value.trim(),description:description.value.trim(),color,icon,active:active.checked},form,message,'手動バッジを保存しました。');
+    save({action:'saveManualBadge',badgeId:picker.value||(newId||=crypto.randomUUID()),name:name.value.trim(),description:description.value.trim().replace(/\s*\n\s*/g,' '),color,icon,active:active.checked},form,message,'手動バッジを保存しました。');
   });
   populate();
   return form;
@@ -453,10 +453,11 @@ function manualHistory(data){
   const events=data.manualHistory||[];
   const badge=select([['','すべてのバッジ'],...new Map(events.map(x=>[x.badgeId,x.name]))]);
   const teacher=select([['','すべての対象者'],...new Map(events.map(x=>[x.teacherUid,x.teacherName]))]);
+  const month=input('month');
   const rows=el('div','ranking-manual-history');
   function refresh(){
     rows.replaceChildren();
-    const filtered=events.filter(x=>(!badge.value||x.badgeId===badge.value)&&(!teacher.value||x.teacherUid===teacher.value));
+    const filtered=events.filter(x=>(!badge.value||x.badgeId===badge.value)&&(!teacher.value||x.teacherUid===teacher.value)&&(!month.value||(Number.isFinite(Date.parse(x.at))&&new Date(Date.parse(x.at)+9*3600000).toISOString().slice(0,7)===month.value)));
     for(const x of filtered){
       const row=el('div','ranking-history-row');
       row.append(el('strong','',x.name+' · '+(x.action==='granted'?'付与':x.action==='revoked'?'取消':'更新')),
@@ -465,8 +466,8 @@ function manualHistory(data){
     }
     if(!filtered.length)rows.append(el('p','empty','該当する履歴はありません。'));
   }
-  badge.addEventListener('change',refresh);teacher.addEventListener('change',refresh);
-  card.append(field('バッジ',badge),field('対象者',teacher),rows);refresh();return card;
+  badge.addEventListener('change',refresh);teacher.addEventListener('change',refresh);month.addEventListener('change',refresh);
+  card.append(field('バッジ',badge),field('対象者',teacher),field('対象月（任意）',month),rows);refresh();return card;
 }
 
 export function installRankingLive({trigger, dialog, host, call, callAchievement, getSession, getRole, getAvailable, today}) {
