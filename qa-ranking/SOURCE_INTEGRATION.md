@@ -21,3 +21,6 @@
 
 ## Callable候補
 ranking-callable.cjs は既存read handler用の認証・App Check必須ラッパー。エラーを安全なメッセージへ変換し、リージョン東京・最大3インスタンスで構成する候補。テストは模擬onCallで実施する。実際のトークン検証、QAサイトのApp Check登録、現行SDKへの接続、稼働環境の認証・デプロイは未実施。既存Functionsの書き換えなし。
+
+## 自動実行候補
+ranking-automation.mjs: JST 23:55取得、翌日00:10確定。予定された時刻と対象日を使用し、日付をまたいだ遅延取得は拒否。QA限定。実行トランザクション内でメンテナンス・復元・有効化フラグを確認する。実行には enabled, automationEnabled, correctionIntegrationVerified がすべて true 必須。フラグはまだ設定しない。既存編集との訂正連携、23:55以降の変更の処理、復元後の整合性・障害対応、実際のスケジュール実行検証は未完了。候補の模擬試験は node tests/ranking-automation.test.mjs。自動処理は未デプロイ。
