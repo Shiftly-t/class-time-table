@@ -1,4 +1,4 @@
-# Shiftly-T 講師ランキング — 開発仕様 v0.7
+# Shiftly-T 講師ランキング — 開発仕様 v0.8
 
 ## 状態
 開発用ブランチのみ。Firebase接続・本番反映なし。既存の公開設定は変更しない。
@@ -73,3 +73,6 @@ node tests/ranking-view-model.test.mjs
 
 node tests/ranking-core.test.mjs
 試作は正規化済みの架空実績を入力とする。実際のFirestoreデータ変換やFunctions、認証の試験ではない。
+
+## QA接続候補
+ranking-qa-store.mjs と RANKING_QA_CONNECTION.md を追加。実デプロイなし。現行Functionsソース照合が必要。
