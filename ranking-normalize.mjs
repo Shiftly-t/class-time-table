@@ -25,8 +25,7 @@ export function normalizeRankingEntries({entries,courses,teachers,from,to,cutoff
   }else{
    if(courses.some(c=>c.startDate<=e.date&&e.date<=c.endDate)){issue(e,'REGULAR_DURING_COURSE');continue;}
    const first=regular.findIndex(p=>p.start===e.start),last=regular.findIndex(p=>p.end===e.end);
-   if(first<0||last<first){issue(e,'NONSTANDARD_REGULAR_PERIOD');continue;}
-   parts=regular.slice(first,last+1);
+   parts=first>=0&&last>=first?regular.slice(first,last+1):[e];
   }
   for(const p of parts){
    const slotId=JSON.stringify([e.studentId,e.date,p.start,p.end]);

@@ -2,8 +2,9 @@
 const policy=require('./normal-authority/policy.cjs');
 const {automaticClosure}=require('./normal-authority/calendar.cjs');
 const {resolveSeasonalDay}=require('./ranking-seasonal.cjs');
+const {datedValue,lessonValue,projectDateSource}=require('./ranking-date-source.cjs');
 // Internal server resolver. Seasonal path is opt-in until QA verification.
-function createRankingResolver(db,{enableSeasonal=false,periodFromSlot}={}){
+function createRankingResolver(db,{enableSeasonal=false,periodFromSlot,archiveDateSource=false}={}){
  return async function resolve({tx,date,capturedAt}){
   policy.date(date);
   const jst=new Date(Date.parse(capturedAt)+9*3600000).toISOString().slice(0,10);
@@ -18,10 +19,13 @@ function createRankingResolver(db,{enableSeasonal=false,periodFromSlot}={}){
   if(active.length&&!enableSeasonal)throw Error('RANKING_SEASONAL_RESOLVER_NOT_READY');
   const isClosed=!(open||exam?.type==='exam')&&Boolean(closed||automaticClosure(date));
   const snapshot={date,capturedAt,complete:true,closed:isClosed,entries:[],courses:[],unavailableSlots:[]};
-  if(isClosed&&!active.length)return {snapshot,teachers:[]};
+  if(isClosed&&!active.length&&!archiveDateSource)return {snapshot,teachers:[]};
   const [students,stored,users]=await Promise.all([query('schoolStudents',null,1000),query('timetableEntries',['date','==',date],400),query('users',null,300)]);
-  const teachers=users.filter(t=>['admin','employee'].includes(t.role)).map(t=>({uid:t.id,role:t.role}));
+  const teachers=users.filter(t=>['admin','employee'].includes(t.role)).map(t=>({uid:t.id,role:t.role,name:typeof t.name==='string'?t.name.slice(0,100):''}));
   const teacherIds=new Set(teachers.map(t=>t.uid));
+  const source=archiveDateSource?{schema:1,date,stored:[],recurring:[],course:null,courseClosed:false,
+   calendar:{schoolClosures:datedValue('schoolClosures',closed),schoolOpenDays:datedValue('schoolOpenDays',open),schoolEvents:datedValue('schoolEvents',exam)},
+   work:{},availability:{},teachers}:null;
   if(active.length){
    if(typeof periodFromSlot!=='function')throw Error('RANKING_BOOKING_CORE_REQUIRED');
    const course=active[0],settings=await read('bookingSettings/'+course.id);
@@ -38,10 +42,37 @@ function createRankingResolver(db,{enableSeasonal=false,periodFromSlot}={}){
    const s=resolveSeasonalDay({date,course,lessons:stored,bookings,teachers,students,availability,periodFromSlot,allows:require('./enrollment.cjs').allows,closed:snapshot.closed});
    snapshot.courses=[{id:course.id,startDate:course.startDate,endDate:course.endDate,periods:course.periods.map(p=>({start:p.start,end:p.end}))}];
    snapshot.entries=s.entries;snapshot.unavailableSlots=s.unavailableSlots;
+   if(source){
+    const learners=new Map(students.map(student=>[student.id,student]));
+    const allows=require('./enrollment.cjs').allows;
+    source.course=snapshot.courses[0];
+    source.courseClosed=Boolean(settings?.excludedDates?.includes(date));
+    source.stored=stored.filter(e=>e.courseId===course.id&&learners.has(e.studentId)&&allows(learners.get(e.studentId),date)).map(e=>lessonValue(e,e.id));
+    const roster=await query('specialCourses/'+course.id+'/teacherAvailability',null,300);
+    source.availability=Object.fromEntries(roster.map(row=>[row.id,course.periods.flatMap((_,i)=>row.slots?.includes(date+'_'+i)?[i]:[])]));
+    return {...projectDateSource(source,capturedAt),source};
+   }
    return {snapshot,teachers};
   }
   const rows=policy.effectiveDay(date,stored,students,date);
   if(rows.length>400)throw Error('RANKING_EFFECTIVE_DAY_LIMIT');
+  if(source){
+   source.recurring=policy.effectiveDay(date,[],students,date).map(e=>lessonValue(e,e.id));
+   source.stored=stored.filter(e=>!e.courseId).filter(e=>{
+    if(!e.regularId)return true;
+    const parent=students.find(student=>student.id===e.studentId)?.regularSlots?.[e.regularId];
+    return parent&&Number(parent.weekday)===policy.date(date).getUTCDay()&&(!parent.activeFrom||date>=parent.activeFrom)&&(!parent.activeUntil||date<=parent.activeUntil);
+   }).map(e=>lessonValue(e,e.id));
+   const records=await Promise.all(teachers.map(async({uid})=>{
+    const key=date+'_'+uid;
+    const [weekly,daily,absence]=await Promise.all([read('teacherWeeklyWork/'+uid),read('teacherDateWork/'+key),read('teacherDayAbsences/'+key)]);
+    return [uid,{weekly:policy.PERIODS.flatMap(([start,end],i)=>policy.canAssign({date,start,end},{weekly})?[i+1]:[]),
+     weeklyOutside:policy.canAssign({date,start:'00:00',end:'00:01'},{weekly}),
+     daily:datedValue('teacherDateWork',daily),absence:datedValue('teacherDayAbsences',absence)}];
+   }));
+   source.work=Object.fromEntries(records);
+   return {...projectDateSource(source,capturedAt),source};
+  }
   const work=new Map();
   for(const e of rows){
    if(e.status==='cancelled')continue;

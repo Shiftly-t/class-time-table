@@ -29,11 +29,22 @@ export function deriveDailyRanking({snapshot,trackingStart,cutoff,teachers,norma
   if((courses.length&&e.courseId!==courses[0].id)||(!courses.length&&e.courseId)){issues.push({code:'COURSE_MISMATCH',entryId:e.id});continue;}
   let parts;
   if(e.courseId){parts=courses[0].periods?.filter(p=>p.start===e.start&&p.end===e.end);if(parts?.length!==1){issues.push({code:'UNKNOWN_COURSE_PERIOD',entryId:e.id});continue;}}
-  else {const first=slots.findIndex(p=>p.start===e.start),last=slots.findIndex(p=>p.end===e.end);if(first<0||last<first){issues.push({code:'NONSTANDARD_REGULAR_PERIOD',entryId:e.id});continue;}parts=slots.slice(first,last+1);}
+  else {
+   if(typeof e.start!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(e.start)||e.start>=e.end){issues.push({code:'INVALID_TIME',entryId:e.id});continue;}
+   const first=slots.findIndex(p=>p.start===e.start),last=slots.findIndex(p=>p.end===e.end);
+   if(first>=0&&last>=first)parts=slots.slice(first,last+1);
+   else {
+    // The existing timetable displays a non-standard lesson as one card.
+    if(snapshot.unavailableSlots.some(slot=>slot.teacherUid===e.teacherUid&&slot.start<e.end&&e.start<slot.end)||
+       snapshot.unavailableEntries?.includes(e.id))continue;
+    parts=[e];
+   }
+  }
   for(const p of parts){
    if(unavailable.has(JSON.stringify([e.teacherUid,p.start,p.end])))continue;
-   const key=JSON.stringify([e.studentId,p.start,p.end]);
-   if(occupied.has(key)){issues.push({code:'DUPLICATE_OR_CONFLICTING_SLOT',entryId:e.id});continue;}occupied.set(key,e.teacherUid);
+   const studentSlots=occupied.get(e.studentId)||[];
+   if(studentSlots.some(slot=>slot.start<p.end&&p.start<slot.end)){issues.push({code:'DUPLICATE_OR_CONFLICTING_SLOT',entryId:e.id});continue;}
+   studentSlots.push({start:p.start,end:p.end});occupied.set(e.studentId,studentSlots);
    entries.push({...e,id:e.id,start:p.start,end:p.end,virtual:false,status:'done'});
   }
  }

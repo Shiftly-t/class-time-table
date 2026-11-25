@@ -3,25 +3,41 @@ const {chromium,webkit}=require('playwright');
 const fs=require('node:fs');const http=require('node:http');const assert=require('node:assert/strict');
 const root=require('node:path').resolve(__dirname,'..');
 const stub=`
-const initializeApp=()=>({}), getAuth=()=>({}),getFirestore=()=>({}),getFunctions=()=>({}),httpsCallable=()=>()=>{},initializeAppCheck=()=>{},ReCaptchaEnterpriseProvider=class{},onAuthStateChanged=()=>{},signInWithEmailAndPassword=()=>{},signOut=()=>{},firebaseConfig={},bookingAppCheckSiteKey='';
+const initializeApp=()=>({}), getAuth=()=>({}),getFirestore=()=>({}),getFunctions=()=>({}),httpsCallable=()=>()=>{},initializeAppCheck=()=>{},ReCaptchaEnterpriseProvider=class{},onAuthStateChanged=()=>{},signInWithEmailAndPassword=()=>{},signOut=()=>{};
 const collection=(...a)=>({path:a.filter(x=>typeof x==='string').join('/')}), doc=(...a)=>({path:a.map(x=>typeof x==='string'?x:x.path||'').filter(Boolean).join('/'),id: 'auto-'+(++window.seq)}),query=(c,...q)=>c,where=()=>{},serverTimestamp=()=>({timestamp:true}),onSnapshot=()=>()=>{},getDoc=async()=>({exists:()=>false}),setDoc=()=>{},deleteDoc=()=>{},updateDoc=()=>{},runTransaction=()=>{},increment=()=>{},arrayUnion=()=>{},Timestamp=class{},orderBy=()=>{},limit=()=>{};
 const getDocs=async ref=>{if(window.pauseReads)await new Promise(r=>window.resumeRead=r);return {docs:(ref.path==='timetableEntries'?state.entries:Object.values(state.teacherAbsences)).map(e=>({id:e.id,data:()=>{const {id,...data}=e;return data}}))}};
+const getDocsFromServer=getDocs;
 const writeBatch=()=>{const ops=[];return {set:(r,d)=>ops.push(['set',r.path,d]),update:(r,d)=>ops.push(['update',r.path,d]),delete:r=>ops.push(['delete',r.path]),commit:async()=>{window.writes.push(...ops);for(const [op,path,data]of ops){const id=path.split('/').at(-1);if(path.startsWith('timetableEntries/')){let old=state.entries.find(e=>e.id===id);if(old)Object.assign(old,data);else state.entries.push({id,...data});}if(path.startsWith('teacherDayAbsences/')){if(op==='delete')delete state.teacherAbsences[id];else state.teacherAbsences[id]={id,...data};}if(path.startsWith('specialCourses/'))Object.assign(state.courses.find(e=>e.id===id),data);}}}};
 window.seq=0;window.writes=[];
 `;
-let app=fs.readFileSync(root+'/app.js','utf8').replace(/^import .*;\n/gm,'');
-app=`import {installNormalEditor} from '/normal-editor.js';\n`+stub+app+`\nwindow.test={state,nav,regularEditor,visibleLessonsOnDate,lessonsOnDate,renderCourses,renderAvailabilityPage,renderCourseEditor,setCourseArchived,courseDisplayName};`;
-const server=http.createServer((req,res)=>{const path=req.url.split('?')[0];res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');try{res.end(path==='/app.js'?app:fs.readFileSync(root+(path==='/'?'/index.html':path)))}catch{res.statusCode=404;res.end('')}});
+const app=stub+fs.readFileSync(root+'/app.js','utf8').replace(/^import .* from 'https:\/\/www\.gstatic\.com\/firebasejs\/.*';\n/gm,'')+
+  `\nwindow.test={state,nav,regularEditor,visibleLessonsOnDate,lessonsOnDate,renderCourses,renderAvailabilityPage,renderCourseEditor,setCourseArchived,courseDisplayName};`;
+const testAssets=new Map([
+  ['/app.js',app],
+  ['/config.js',"export const firebaseConfig = {projectId:'demo-shiftly-regression'}; export const teacherWorkFeatureEnabled = false; export const normalAuthorityApiEnabled = false;"],
+  ['/booking-config.js',"export const bookingAppCheckSiteKey = '';"],
+  ['/index.html',fs.readFileSync(root+'/index.html','utf8').replace('data-shiftly-environment="production"','data-shiftly-environment="test"')]
+]);
+const server=http.createServer((req,res)=>{const path=req.url.split('?')[0]==='/'?'/index.html':req.url.split('?')[0];res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');try{res.end(testAssets.get(path)??fs.readFileSync(root+path))}catch{res.statusCode=404;res.end('')}});
 (async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));
+let completedBrowsers=0;
 for(const [name,type]of Object.entries({chromium,webkit})){
 console.log('starting '+name);let browser;try{browser=await type.launch({headless:true,...(name==='chromium'?{executablePath:'/usr/bin/chromium',args:['--no-sandbox']}: {})});}catch(e){console.log(name+' unavailable: '+e.message);continue;}
 console.log('launched '+name);const context=await browser.newContext({viewport:{width:1024,height:1366},hasTouch:true,isMobile:true});
 const page=await context.newPage();const errors=[];page.on('console',m=>{if(m.type()==='error')console.log('browser:',m.text())});page.setDefaultTimeout(10000);page.on('pageerror',e=>{errors.push(e.message);console.log('pageerror',e.message)});
 await page.route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:')?route.continue():route.abort());
+await page.clock.setFixedTime(new Date('2026-11-12T05:00:00Z'));
 page.on('dialog',d=>d.accept());
 console.log('opening app');await page.goto(`http://127.0.0.1:${server.address().port}/`);await page.waitForFunction(()=>window.test);
 await page.evaluate(()=>{const {state:s,nav}=test;Object.assign(s,{user:{uid:'mgr'},profile:{role:'admin'},date:'2026-11-12',people:[{id:'a',name:'講師A',role:'employee'},{id:'b',name:'講師B',role:'employee'},{id:'mgr',name:'管理者',role:'owner'}],students:[{id:'s',name:'生徒S',regularSlots:{r:{id:'r',weekday:4,start:'19:30',end:'21:25',teacherUid:'a',subject:'数学'}}}],entriesStatus:'ready',coursesStatus:'ready',closuresStatus:'ready',openDaysStatus:'ready',teacherAbsencesStatus:'ready'});document.getElementById('appPanel').hidden=false;document.getElementById('loginPanel').hidden=true;nav('adminLessons');});
 const cell=(uid,p)=>page.locator(`.normal-cell[data-uid="${uid}"][data-period="${p}"]`);
+async function acknowledgeNotice(expected){
+  assert.match(await page.locator('#shiftlyNotice[open] #shiftlyNoticeText').innerText(),expected);
+  await page.locator('#shiftlyNoticeClose').click();
+}
+async function assertSuccess(expected){
+  assert.match(await page.locator('#message').textContent(),expected);
+}
 // Stage only period 3 as absent; period 4 stays available.
 await page.getByRole('button',{name:'講師A',exact:true}).click();await page.locator('#normalAbsenceOptions input[value="3"]').check();await page.locator('#normalAbsenceForm button[type=submit]').click();
 assert.equal(await cell('a',3).getAttribute('class'),'normal-cell is-absent');assert.equal(await cell('a',4).getAttribute('class'),'normal-cell');
@@ -29,6 +45,7 @@ assert.equal(await page.evaluate(()=>writes.length),0);
 // Continuous booking must refuse destination if either constituent period absent.
 await page.getByRole('button',{name:'講師B',exact:true}).click();await page.locator('#normalAbsenceOptions input[value="4"]').check();await page.locator('#normalAbsenceForm button[type=submit]').click();
 await cell('a',3).locator('.normal-entry').click();await cell('b',3).click();assert.equal(await cell('a',3).locator('.normal-entry').count(),1);
+await acknowledgeNotice(/欠席（黒いコマ）/);
 await page.locator('#normalUndo').click(); // Undo B absence.
 // Touch pointer drag from black source to available B (real browser hit testing).
 if(name==='chromium'){
@@ -47,11 +64,14 @@ await cell('b',3).locator('.normal-entry').click();assert.equal(await cell('b',3
 await page.locator('#normalUndo').click();assert.equal(await cell('a',3).locator('.normal-entry').count(),1);
 // Save absence alone; warning must be specific to the split period.
 await page.locator('#normalPublish').click();await page.waitForFunction(()=>writes.some(x=>x[1].startsWith('teacherDayAbsences/')));
+await assertSuccess(/担当振替0件、講師欠席設定1件を保存しました/);
 assert.deepEqual(await page.evaluate(()=>test.visibleLessonsOnDate('2026-11-12').map(x=>x.teacherAbsent)),[true,false]);
 // Tap reassignment; block date and navigation during async save.
 await cell('a',3).locator('.normal-entry').click();await cell('b',3).click();await page.evaluate(()=>pauseReads=true);await page.locator('#normalPublish').click();assert.equal(await page.locator('#normalNext').isDisabled(),true);
 await page.evaluate(()=>test.nav('adminSchedule'));assert.equal(await page.evaluate(()=>test.state.page),'adminLessons');
+await acknowledgeNotice(/保存中です/);
 await page.evaluate(()=>{pauseReads=false;resumeRead()});await page.waitForFunction(()=>!test.regularEditor.isBusy());
+await assertSuccess(/担当振替1件、講師欠席設定0件を保存しました/);
 assert.deepEqual(await page.evaluate(()=>test.lessonsOnDate('2026-11-12').map(e=>e.teacherUid)),['b']);
 assert.deepEqual(await page.evaluate(()=>test.lessonsOnDate('2026-11-19').map(e=>e.teacherUid)),['a']);
 assert.equal(await page.evaluate(()=>test.state.students[0].regularSlots.r.teacherUid),'a');
@@ -59,13 +79,15 @@ assert.equal(await page.evaluate(()=>writes.some(x=>x[1].startsWith('schoolStude
 assert.equal(await page.evaluate(()=>writes.filter(x=>x[1].startsWith('notifications/')).length),2);
 // Capacity and concurrent changes while the preflight read is pending.
 await page.evaluate(()=>{const s=test.state;s.entries.push(...['p','q'].map(id=>({id,studentId:id,studentName:id,date:s.date,start:'19:30',end:'20:25',teacherUid:'a',teacherName:'講師A',status:'scheduled'})));s.teacherAbsences={};test.regularEditor.onData();});
-await cell('b',3).locator('.normal-entry').click();await cell('a',3).click();assert.equal(await cell('b',3).locator('.normal-entry').count(),1);
+await cell('b',3).locator('.normal-entry').click();await cell('a',3).press('Enter');assert.equal(await cell('b',3).locator('.normal-entry').count(),1);
+await acknowledgeNotice(/担当上限/);
 await page.evaluate(()=>{test.state.entries=test.state.entries.filter(e=>!['p','q'].includes(e.id));test.regularEditor.onData();});
 await cell('b',3).locator('.normal-entry').click();await cell('a',3).click();
 const beforeConflict=await page.evaluate(()=>writes.length);
 await page.evaluate(()=>pauseReads=true);await page.locator('#normalPublish').click();
 await page.evaluate(()=>{test.state.entries[0].teacherName='別端末の変更';pauseReads=false;resumeRead()});
 await page.waitForFunction(()=>!test.regularEditor.isBusy());assert.equal(await page.evaluate(()=>writes.length),beforeConflict);
+await acknowledgeNotice(/通常授業エディターを保存できません/);
 await page.locator('#normalDiscard').click();
 // Instructor view only shows that instructor's assigned day override.
 await page.evaluate(()=>{test.state.profile={role:'employee'};test.state.user={uid:'b'};document.getElementById('teacherFilter').value='mine';});
@@ -76,11 +98,15 @@ await page.evaluate(()=>{const s=test.state;s.courses=[{id:'old',name:'冬季講
 assert.match(await page.locator('#availabilityPeriodOverview').innerText(),/受付中/);assert.match(await page.locator('#availabilityPeriodOverview').innerText(),/提出済み/);assert.equal(await page.locator('#availabilityHomePanel').isHidden(),true);
 await page.evaluate(()=>test.nav('courses'));
 await page.getByRole('button',{name:'非表示にする',exact:true}).click();await page.waitForFunction(()=>test.state.courses[0].archived===true);
+await assertSuccess(/非表示にしました/);
 await page.evaluate(()=>test.nav('availability'));assert.equal(await page.locator('#availabilityCourse option').count(),0);assert.equal(await page.locator('#availabilityPeriodOverview').innerText(),'');
 await page.evaluate(()=>test.nav('courseEditor'));assert.equal(await page.locator('#editorCourse option').count(),0);
 await page.evaluate(()=>test.nav('courses'));await page.getByRole('button',{name:/非表示一覧/}).click();await page.getByRole('button',{name:'↩ 再表示する'}).click();await page.waitForFunction(()=>test.state.courses[0].archived===false);
+await assertSuccess(/再表示にしました/);
 assert.equal(await page.evaluate(()=>test.state.availability.has('old/a')),true);
 assert.equal(await page.evaluate(()=>test.courseDisplayName(test.state.courses[0])),'2025年度 冬期講習');
 assert.deepEqual(errors,[]);console.log(name+': PASS absence staging, blocked destination, touch drag, next tap, undo, split warnings, save guard, daily override, weekly preservation, notifications, archive/restore');
+completedBrowsers++;
 await browser.close();}
+assert(completedBrowsers>0,'No browser could run the regression suite');
 server.close();})().catch(e=>{console.error(e);server.close();process.exit(1)});

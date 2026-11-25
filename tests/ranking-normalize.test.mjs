@@ -8,7 +8,8 @@ function verify(){
  x=run([base,{...base,id:'2',teacherUid:'b'}]);eq(x.facts.length,0);eq(x.canPublish,false);eq(x.issues[0].code,'CONFLICTING_ASSIGNMENT');
  x=run([base,{...base,id:'2'}]);eq(x.facts.length,2);eq(x.canPublish,false);
  x=run([{...base,date:'2026-12-22',courseId:'winter',start:'13:00',end:'13:55',teacherUid:'b'}]);eq(x.facts.length,1);eq(x.facts[0].kind,'seasonal');
- x=run([{...base,start:'17:40'}]);eq(x.canPublish,false);eq(x.facts.length,0);
+ x=run([{...base,start:'17:40'}]);eq(x.canPublish,true);eq(x.facts.length,1);
+ x=run([{...base,start:'19:40'}]);eq(x.canPublish,false);eq(x.facts.length,0);
  x=run([{...base,virtual:true}]);eq(x.facts.length,0);eq(x.canPublish,true);
  x=normalizeRankingEntries({entries:[base],courses,teachers,from:'2026-11-01',to:'2026-12-31',cutoff:'2026-11-25T18:00:00+09:00'});eq(x.facts.length,0);
  return 'SUCCESS RANKING NORMALIZATION FIXTURE TESTS';

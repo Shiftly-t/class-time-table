@@ -29,3 +29,53 @@ ranking-automation.mjs: JST 23:55取得、翌日00:10確定。予定された時
 - ユーザー提供 stage2-bridge.cjs / coordination.cjs を照合。beforeCommit は全業務の書込みを遅延バッファに保持したまま呼ばれ、flush 前に既存検証を行う。新しい setHooks 呼び出しで既存のフックを置換しないこと。既存 beforeCommit に追加する必要がある。復元計画・復元バッチは通常の訂正と分離する。
 - booking-graph.cjs は done の移動・削除を拒否し、公開予約と時間割の整合を要求する。seasonal-operations.cjs にも過去日配置制約がある。制限の一括解除は禁止。専用の検証済み訂正経路が必要。
 - ranking-correction.mjs は日付指定編集の検証済み前後実績から差分を算出し、変更対象のみ台帳へ適用する候補。変更前が台帳と矛盾する場合は停止。無関係な過去実績や週間設定変更からの再生成は行わない。現行日付別編集の前後投影・履歴由来の仮想授業、取得後未確定日の扱い、予約側の過去訂正・復元整合・同一トランザクション接続は未完了。自動化フラグは有効にしない。
+
+## 操作38以降のQA候補
+
+上記の「未デプロイ」は各試作時点の記録。2026-11-25の操作37時点で
+`qaRankingReadApi` はQAで稼働済み。操作38以降のこの候補はローカルの
+FirestoreエミュレーターとChromiumで検証した。
+
+- 対象は `shiftly-t-test` の `shiftly-qa-v1` と東京リージョン。提供された
+  公開ファイル・設定・ルール・関数情報のSHA256照合は41件成功。
+- 非公開の既存Functionsソースには検証済み日付変更を取り込むフックを追加。
+  通常と講習の編集、台帳、監査、再集計要求は既存コーディネーターで一括保存。
+  集計済みの日付を変更する旧バックアップは復元計画で拒否する。
+  日付実績を保持したままの業務データ復元は従来の計画を使う。
+- 取得済みの当日データに有効な編集が入った場合は日次確定前でも更新する。
+  スナップショットが欠けた過去日は、現在の週設定で補完しない。
+  通常の非標準時刻の授業は既存時間割と同じく1コマとして扱う。
+- 累計、プロフィール、退職者の表示名、同順位、運営によるバッジ設定、
+  付与、取消、表彰履歴、同一イベントの通知1件を検証。
+  自動表彰は全日分が確定した月または年度だけを扱う。自動ルールは初期状態で空。
+- `qaRankingCaptureDaily` はJST 23:55、`qaRankingFinalizeDaily` は翌00:10。
+  `qaRankingProcessAchievements` は10分間隔で再集計と通知を処理する。
+  Firestoreルールは10個の内部コレクションを全クライアントから保護している。
+  通知は既存の `notifications/{uid}/items` を使う。
+- 機能フラグ `automationEnabled`、`publicationEnabled`、
+  `achievementsEnabled`、`achievementNotificationsEnabled` は、
+  QA側の順序に従って個別に検証する。今回の作業では実QAの設定更新なし。
+
+### 実QAへの移行ゲート
+
+1. Cloud Shellで `qa-ranking/check-deployed-source.py` を実行し、
+   提供されたソースとデプロイ済み世代を照合する。関数ごとに異なる
+   リビジョンとソース世代なので、差分があればその世代を基準に再統合する。
+2. QAの復元ジョブが停止中であることとバックアップを確認する。
+   運用画面経由のバックアップと、ランキング内部台帳を含むDBバックアップは
+   対象が異なる。前者の復元では既存のランキング台帳を保持する。
+3. 更新対象は既存コードベース `shiftly-test-qa-v1` の
+   `qaNormalAuthorityApi`、`qaSeasonalAuthorityApi`、`qaBookingAdminApi`。
+   ランキング用コードベース `shiftly-ranking-qa-v1` では
+   `qaRankingReadApi`、`qaRankingAchievementApi` と3個のジョブを照合する。
+   実QAでは既存5関数の残存、IAM、App Check、全権限、既存機能を確認する。
+4. QAテスト用の合成データで取得・確定・欠損・後処理と通知を検証してから
+   公開可否を判断する。実機Safari、実QAの負荷と長期累計の読取上限も確認する。
+5. 実QAの結果と対象・復旧手順を提示し、本番反映は別承認とする。
+
+ローカルの確認表示は `SUCCESS RANKING AUTHORITY COORDINATOR EMULATOR TESTS`、
+`SUCCESS RANKING SEASONAL COORDINATOR EMULATOR TESTS`、
+`SUCCESS RANKING FIREBASE SCHEDULER SDK TESTS`、
+`SUCCESS NAMED FIRESTORE EMULATOR RANKING ACHIEVEMENT AND NOTIFICATION TESTS`、
+`SUCCESS RANKING UI PATCH AND BROWSER TESTS`、
+`SUCCESS RANKING EMULATOR RULES (250 client denials on shiftly-qa-v1)`。

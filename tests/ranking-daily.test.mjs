@@ -11,6 +11,10 @@ function testDaily(){
  eq(run({complete:false}).canPublish,false);eq(run({capturedAt:date+'T18:00:00+09:00'}).canPublish,false);
  eq(run({}, {trackingStart:'2026-11-26'}).canPublish,false);eq(run({}, {cutoff:date+'T23:59:00+09:00'}).canPublish,false);
  eq(run({entries:[base,{...base,id:'duplicate'}]}).canPublish,false);
+ const custom={...base,start:'17:40'};
+ eq(run({entries:[custom]}).facts.length,1);
+ eq(run({entries:[custom],unavailableSlots:[{teacherUid:'a',start:'18:30',end:'19:25'}]}).facts.length,0);
+ eq(run({entries:[base,{...custom,id:'overlap'}]}).canPublish,false);
  return 'SUCCESS RANKING AUTO DAILY FIXTURE TESTS';
 }
 console.log(testDaily());

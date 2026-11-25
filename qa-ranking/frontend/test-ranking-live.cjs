@@ -1,0 +1,297 @@
+// Offline integration of the QA overlay on the operation 32 UI baseline.
+const assert = require('node:assert/strict');
+const {execFileSync, spawnSync} = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const {chromium} = require('playwright');
+
+const repo = path.resolve(__dirname, '../..');
+const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'shiftly-ranking-ui-'));
+const qaOrigin = 'https://shiftly-t-test.web.app';
+const baseline = '7820726eff314ed693e0c76d331093ea1f4e049b';
+const source = process.argv[2];
+const patch = (...args) => spawnSync('python3', [path.join(__dirname, 'apply-qa-ui.py'), staging, ...args], {
+  encoding: 'utf8',
+});
+const save = (name, contents) => fs.writeFileSync(path.join(staging, name), contents);
+const load = name => fs.readFileSync(path.join(staging, name), 'utf8');
+
+const firebase = `
+const initializeApp = () => ({}), getAuth = () => ({}), getFirestore = () => ({});
+const getFunctions = (_, region) => ({region});
+const initializeAppCheck = () => {}, ReCaptchaEnterpriseProvider = class {};
+const onAuthStateChanged = () => {}, signInWithEmailAndPassword = () => {}, signOut = () => {};
+const doc = () => ({}), collection = () => ({}), getDoc = () => {}, getDocs = () => {}, getDocsFromServer = () => {};
+const query = () => {}, where = () => {}, setDoc = () => {}, deleteDoc = () => {}, updateDoc = () => {};
+const onSnapshot = () => {}, serverTimestamp = () => {}, runTransaction = () => {}, increment = () => {};
+const arrayUnion = () => {}, Timestamp = class {}, orderBy = () => {}, limit = () => {};
+const writeBatch = () => ({update(){}, commit:async()=>{}});
+const httpsCallable = (functions, name) => fields => window.mockCallable(functions, name, fields);
+`;
+
+const testHook = `
+window.rankingFixture = {
+  role(role) {
+    state.user = role ? {uid: 'teacher-a'} : null;
+    state.profile = role ? {role} : null;
+    maintenanceState.loaded = Boolean(role);
+    for (const id of ['appPanel', 'notificationButton', 'helpGuideButton', 'logout']) $(id).hidden = !role;
+    $('identity').textContent = 'テスト講師 / 運営';
+  },
+  maintenance(active) {
+    maintenanceState.enabled = active;
+    $('maintenanceModeLabel').textContent = active ? 'メンテナンス中' : '通常運用中';
+  },
+  notices() {
+    state.notices = [
+      {id:'r', kind:'rankingAchievement', target:'history', message:'表彰通知の試験', read:true},
+      {id:'s', kind:'lesson', message:'既存通知の試験', read:true},
+    ];
+  }
+};
+`;
+
+function fixture() {
+  if (source) {
+    fs.cpSync(source, staging, {recursive: true});
+  } else {
+    for (const name of ['index.html', 'app.js', 'style.css']) {
+      save(name, execFileSync('git', ['show', `${baseline}:${name}`], {cwd: repo, encoding: 'utf8'}));
+    }
+    save('index.html', load('index.html').replace('data-shiftly-environment="production"', 'data-shiftly-environment="qa"'));
+    save('app.js', load('app.js').replace("from './config.js'", "from './config-qa-ui-test.js'"));
+    save('config-qa-ui-test.js', `
+    export const firebaseConfig = {projectId:'shiftly-t-test', authDomain:'shiftly-t-test.firebaseapp.com',
+      apiKey:'fixture', appId:'1:123:web:abc', messagingSenderId:'123'};
+    export const qaFirestoreDatabaseId = 'shiftly-qa-v1';
+    export const normalAuthorityApiEnabled = true, teacherWorkFeatureEnabled = false;
+    `);
+    save('booking-config.js', "export const bookingAppCheckSiteKey = 'fixture';");
+  }
+  const qaIndex = load('index.html');
+  save('index.html', qaIndex.replace('data-shiftly-environment="qa"', 'data-shiftly-environment="production"'));
+  const refused = patch('--check');
+  assert.equal(refused.status, 1, refused.stderr);
+  assert.match(refused.stderr, /QA RANKING UI TARGET MISMATCH/);
+  save('index.html', qaIndex);
+  const first = patch('--check');
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /SUCCESS RANKING UI QA SOURCE CHECK/);
+  assert.equal(load('index.html'), qaIndex);
+  const applied = patch();
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.match(applied.stdout, /SUCCESS RANKING UI PATCH APPLIED/);
+  assert.match(load('index.html'), /id="rankingButton".*id="helpGuideButton"/);
+  const patchedApp = load('app.js');
+  const upgrade = patch();
+  assert.equal(upgrade.status, 0, upgrade.stderr);
+  assert.equal(load('app.js'), patchedApp);
+  save('app.js', firebase + patchedApp.replace(/^import .* from 'https:\/\/www\.gstatic\.com\/firebasejs\/.*';\n/gm, '') + testHook);
+}
+
+async function browserTest() {
+  const browser = await chromium.launch({executablePath: '/usr/bin/chromium', args: ['--no-sandbox']});
+  try {
+    const page = await browser.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.setDefaultTimeout(6000);
+    await page.route('**/*', async route => {
+      const url = new URL(route.request().url());
+      if (url.origin !== qaOrigin) return route.abort();
+      const name = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
+      const file = fs.existsSync(path.join(staging, name)) ? path.join(staging, name) : path.join(repo, name);
+      if (!fs.existsSync(file)) return route.abort();
+      const mediaType = name.endsWith('.css') ? 'text/css' : name.endsWith('.js') ? 'text/javascript' : 'text/html';
+      await route.fulfill({path: file, contentType: mediaType});
+    });
+    await page.clock.setFixedTime(new Date('2026-11-25T01:00:00.000Z'));
+    await page.addInitScript(() => {
+      const stats = {slots: 12, regular: 8, seasonal: 4, days: 5, students: 7};
+      const coverage = {complete: true, expected: 3, recorded: 3, from: '2026-11-22', to: '2026-11-24'};
+      const rows = [
+        {teacherUid: 'teacher-a', name: '講師A', rank: 1},
+        {teacherUid: 'teacher-b', name: '講師B', rank: 1},
+        {teacherUid: 'teacher-c', name: '講師C', rank: 3},
+        {teacherUid: 'teacher-d', name: '講師D', rank: 3},
+        {teacherUid: 'teacher-e', name: '講師E', rank: 5},
+      ].map(row => ({...row, ...stats}));
+      const baselineBadge = {badgeId: 'existing', teacherUid: 'teacher-a', name: '自動バッジ', color: '#3344ff',
+        icon: '★', source: 'automatic', awardedAt: '2026-11-25T01:00:00.000Z'};
+      const award = {name: '年度表彰', teacherName: '講師B', color: '#5566ff', icon: '◎', rank: 1,
+        metric: 'slots', kind: 'year', key: '2025', at: '2026-11-01T16:01:00.000Z'};
+      const badges = [];
+      const rules = [];
+      const grants = [];
+      window.callLog = [];
+      window.mockCallable = async ({region}, name, input) => {
+        callLog.push({region, name, ...input});
+        if (region !== 'asia-northeast1') throw Error('unexpected callable region');
+        if (window.failRead && name === 'qaRankingReadApi') {
+          throw Object.assign(Error('denied'), {code: window.failRead});
+        }
+        if (name === 'qaRankingReadApi') {
+          if (input.kind === 'profile') {
+            const who = rows.find(row => row.teacherUid === (input.teacherUid || 'teacher-a'));
+            return {data: {profile: {...who, totals: stats, monthly: [{key: '2026-11', ...stats}]}, coverage}};
+          }
+          return {data: {period: input.kind === 'cumulative' ? '累計' : '2026年11月', rows, coverage}};
+        }
+        if (name !== 'qaRankingAchievementApi') throw Error('unexpected callable');
+        const teacherUid = input.teacherUid || 'teacher-a';
+        switch (input.action) {
+          case 'listBadges':
+            return {data: {badges: [{...baselineBadge, teacherUid}]}};
+          case 'listHistory':
+            return {data: {history: [{...award, action: input.cursor ? 'revised' : 'granted'}], nextCursor: input.cursor ? null : 'p2'}};
+          case 'manage':
+            return {data: {badges, grants, rules, teachers: rows.map(({name, teacherUid}) => ({name, teacherUid, canGrant: true}))}};
+          case 'saveManualBadge':
+            if (!badges.length) badges.push(input);
+            if (!window.manualSaveRetried) {
+              window.manualSaveRetried = true;
+              throw Object.assign(Error('response lost'), {code: 'functions/unavailable'});
+            }
+            return {data: {state: 'replayed'}};
+          case 'saveAutomaticRule':
+            rules.push(input);
+            break;
+          case 'grantManualBadge':
+            grants.push(input);
+            break;
+          case 'revokeManualBadge':
+            grants.splice(0, 1);
+            break;
+          default:
+            throw Error('unexpected achievement action');
+        }
+        return {data: {state: 'committed'}};
+      };
+    });
+    await page.goto(qaOrigin);
+    await page.waitForFunction(() => window.rankingFixture);
+    const trigger = page.locator('#rankingButton');
+    const dialog = page.locator('#rankingDialog');
+    const tab = label => dialog.locator('.ranking-tabs').getByRole('button', {name: label, exact: true});
+    const setRole = role => page.evaluate(value => rankingFixture.role(value), role);
+    assert.equal(await trigger.isHidden(), true);
+
+    await setRole('employee');
+    await trigger.click();
+    await dialog.locator('.ranking-podium-person').first().waitFor();
+    assert.equal(await dialog.locator('.ranking-podium-person').count(), 4);
+    assert.equal(await tab('バッジ管理').count(), 0);
+    await dialog.getByRole('button', {name: /全員を表示/}).click();
+    assert.equal(await dialog.locator('.ranking-person-row').count(), 1);
+    await dialog.getByRole('button', {name: '累計', exact: true}).click();
+    await dialog.locator('.ranking-podium-person').first().waitFor();
+    assert.equal(await dialog.locator('.ranking-person-row').count(), 0);
+    await dialog.locator('.ranking-podium-person').filter({hasText: '講師B'}).click();
+    await dialog.getByText('月別の担当授業コマ数（延べ）').waitFor();
+    await dialog.getByRole('button', {name: '獲得バッジを見る'}).click();
+    await dialog.getByText('講師Bの獲得バッジ').waitFor();
+    await dialog.getByText('自動付与', {exact: false}).waitFor();
+
+    await dialog.getByRole('button', {name: '閉じる'}).click();
+    await page.evaluate(() => rankingFixture.notices());
+    await page.locator('#notificationButton').click();
+    const notification = page.locator('#notificationDialog');
+    assert.equal(await notification.getByRole('button', {name: '既存通知の試験'}).isDisabled(), true);
+    await notification.getByRole('button', {name: '表彰通知の試験'}).click();
+    await dialog.getByText('年度表彰', {exact: true}).waitFor();
+    assert.equal(await notification.isHidden(), true);
+    await dialog.getByRole('button', {name: '過去の表彰をさらに表示'}).click();
+    await dialog.getByText(/更新/).waitFor();
+    assert.equal(await dialog.getByText('年度表彰', {exact: true}).count(), 2);
+
+    await setRole(null);
+    await trigger.waitFor({state: 'hidden'});
+    await dialog.waitFor({state: 'hidden'});
+    await setRole('admin');
+    await trigger.click();
+    assert.equal(await tab('バッジ管理').count(), 0);
+    await dialog.getByRole('button', {name: '閉じる'}).click();
+    await setRole('owner');
+    await trigger.click();
+    await tab('バッジ管理').click();
+    const manual = dialog.locator('form').filter({hasText: '手動バッジの作成・編集'});
+    await manual.getByLabel('名称').fill('応援バッジ');
+    await manual.getByLabel('アイコン文字').fill('★');
+    await manual.getByLabel('新規付与を許可する').check();
+    await manual.getByRole('button', {name: '保存する'}).click();
+    await manual.getByText(/時間をおいて再試行/).waitFor();
+    assert.equal(await manual.getByLabel('名称').inputValue(), '応援バッジ');
+    await manual.getByRole('button', {name: '保存する'}).click();
+    await dialog.getByText('手動バッジを保存しました。').waitFor();
+
+    const grant = dialog.locator('form').filter({hasText: '講師への付与・取消'});
+    await grant.getByLabel('手動バッジ').selectOption({label: '応援バッジ'});
+    await grant.getByLabel('対象者').selectOption({label: '講師A'});
+    await grant.getByLabel('理由').fill('QA試験のため');
+    await grant.getByRole('button', {name: '付与する', exact: true}).click();
+    await dialog.getByText('手動バッジを付与しました。').waitFor();
+    await grant.getByLabel('手動バッジ').selectOption({label: '応援バッジ'});
+    await grant.getByLabel('対象者').selectOption({label: '講師A'});
+    await grant.getByLabel('理由').fill('QA試験の後片付け');
+    await grant.getByRole('button', {name: '付与を取り消す'}).click();
+    await dialog.getByText('手動バッジの付与を取り消しました。').waitFor();
+
+    const automatic = dialog.locator('form').filter({hasText: '自動バッジ・表彰ルール'});
+    await automatic.getByLabel('種類').selectOption('award');
+    assert.equal(await automatic.getByLabel('付与条件').inputValue(), 'rank');
+    await automatic.getByLabel('名称').fill('月間表彰');
+    await automatic.getByLabel('アイコン文字').fill('◎');
+    await automatic.getByLabel('基準値').fill('2');
+    await automatic.getByRole('button', {name: '保存する'}).click();
+    await dialog.getByText('自動ルールを保存しました。').waitFor();
+
+    const calls = await page.evaluate(() => callLog);
+    assert(calls.some(call => call.kind === 'cumulative' && call.key === ''));
+    assert(calls.some(call => call.kind === 'profile' && call.teacherUid === 'teacher-b'));
+    assert(calls.some(call => call.action === 'listBadges' && call.teacherUid === 'teacher-b'));
+    const attempts = calls.filter(call => call.action === 'saveManualBadge');
+    assert.equal(attempts.length, 2);
+    assert.equal(attempts[0].operationId, attempts[1].operationId);
+    assert.equal(attempts[0].badgeId, attempts[1].badgeId);
+
+    for (const [width, height] of [[320, 700], [768, 1024], [1280, 900]]) {
+      await page.setViewportSize({width, height});
+      assert.equal(await trigger.locator('span').isVisible(), width > 600);
+      const bounds = await dialog.boundingBox();
+      assert(bounds.x >= 0 && bounds.x + bounds.width <= width);
+      assert.equal(await dialog.evaluate(node => node.scrollWidth <= node.clientWidth), true);
+      assert.equal(await page.locator('.topbar').evaluate(node => node.scrollWidth <= node.clientWidth), true);
+    }
+
+    await page.evaluate(() => rankingFixture.maintenance(true));
+    await trigger.waitFor({state: 'hidden'});
+    await dialog.waitFor({state: 'hidden'});
+    await page.evaluate(() => {
+      rankingFixture.maintenance(false);
+      window.failRead = 'functions/failed-precondition';
+    });
+    await trigger.click();
+    await dialog.getByText('ランキングはまだ公開されていません。').waitFor();
+    await page.evaluate(() => { window.failRead = 'functions/permission-denied'; });
+    await dialog.getByRole('button', {name: '再取得'}).click();
+    await dialog.getByText('認証・アクセス権限・アプリの確認に失敗しました。').waitFor();
+    assert.equal(await dialog.locator('.ranking-podium-person').count(), 0);
+    assert.deepEqual(errors, []);
+    console.log('SUCCESS RANKING UI PATCH AND BROWSER TESTS');
+  } finally {
+    await browser.close();
+  }
+}
+
+(async () => {
+  try {
+    fixture();
+    await browserTest();
+  } finally {
+    fs.rmSync(staging, {recursive: true, force: true});
+  }
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
