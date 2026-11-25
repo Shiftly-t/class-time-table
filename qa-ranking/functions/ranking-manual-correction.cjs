@@ -11,8 +11,8 @@ function createManualCorrection({coor,core}){
    coor.get('rankingInternalConfig/runtime'),coor.get('systemConfig/coordination'),coor.get('systemConfig/normalAuthority'),coor.get('rankingInternalSnapshots/'+c.date)
   ]);
   if(runtime.get('enabled')!==true||runtime.get('correctionIntegrationVerified')!==true||
-     !hasRankingSourceLock(coordination.data(),authority.data())||captured.get('source.schema')!==1||
-     captured.get('source.course.id')!==courseId||captured.get('date')!==c.date)fail('failed-precondition','RANKING_CORRECTION_NOT_READY');
+     !hasRankingSourceLock(coordination.data(),authority.data())||captured.data()?.source?.schema!==1||
+     captured.data()?.source?.course?.id!==courseId||captured.get('date')!==c.date)fail('failed-precondition','RANKING_CORRECTION_NOT_READY');
   ctx.rankingCorrection={date:c.date,reason:c.reason.trim()};
  }
  function checkRow(ctx,before,after){
