@@ -105,6 +105,35 @@ async function exercise() {
       assert.equal((await actor('e',{action:'listBadges'})).badges[0].description,'運営からの感謝');
       assert.equal((await inbox.get()).size,3);
       console.log('SUCCESS FIRESTORE ARCHIVE HISTORY PRESERVED');
+      // The preference is personal, persistent, and independent of achievement records.
+      await db.doc('rankingInternalConfig/runtime').update({achievementNotificationsEnabled:false});
+      for (const id of ['order-extra','order-new']) {
+        await actor('o',{...badge,badgeId:id,operationId:'create-'+id});
+      }
+      await actor('o',{...grant,badgeId:'order-extra',operationId:'grant-extra'});
+      const own=(await actor('e',{action:'listBadges'})).badges.map(b=>b.recordId);
+      assert.equal(own.length,2);
+      const reversed=[...own].reverse();
+      const order={action:'saveBadgeOrder',operationId:'order-save',recordIds:reversed};
+      const readState=async()=>Promise.all(['rankingInternalAchievements','rankingInternalAchievementHistory','rankingInternalAchievementOutbox','notifications/e/items'].map(async path=>(await db.collection(path).get()).docs.map(d=>[d.id,d.data()])));
+      const unchanged=await readState();
+      await assert.rejects(()=>actor('a',order),/INVALID/);
+      await assert.rejects(()=>actor('e',{...order,teacherUid:'a'}),/INVALID/);
+      await assert.rejects(()=>actor('e',{...order,recordIds:[own[0],own[0]]}),/INVALID/);
+      await assert.rejects(()=>actor('e',{...order,recordIds:own.slice(0,1)}),/INVALID/);
+      assert.equal((await actor('e',order)).state,'committed');
+      assert.equal((await actor('e',order)).state,'replayed');
+      assert.deepEqual((await db.doc('rankingInternalConfig/badgeOrder_e').get()).get('recordIds'),reversed);
+      const fresh=createRankingAchievements({db,clock:()=>now,notificationTimestamp:FieldValue.serverTimestamp});
+      assert.deepEqual((await fresh.handle({auth:{uid:'a'},app:{appId:'emulator-test'},data:{action:'listBadges',teacherUid:'e'}})).badges.map(b=>b.recordId),reversed);
+      assert.deepEqual(await readState(),unchanged);
+      assert.equal((await db.doc('rankingInternalConfig/badgeOrder_a').get()).exists,false);
+      now='2026-06-01T10:12:00+09:00';
+      await actor('o',{...grant,badgeId:'order-new',operationId:'grant-new'});
+      assert.deepEqual((await actor('e',{action:'listBadges'})).badges.slice(0,2).map(b=>b.recordId),reversed);
+      await actor('o',{...grant,badgeId:'order-extra',action:'revokeManualBadge',operationId:'revoke-extra'});
+      assert(!(await actor('e',{action:'listBadges'})).badges.some(b=>b.badgeId==='order-extra'));
+      console.log('SUCCESS FIRESTORE PERSONAL BADGE ORDER TESTS');
     } finally {
       for (const collection of await db.listCollections()) await db.recursiveDelete(collection);
       assert.equal((await db.listCollections()).length, 0);
