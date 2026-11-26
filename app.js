@@ -3638,7 +3638,7 @@ let authRecovery=null;
 
 // Isolated production ranking UI. Existing authentication and App Check are reused.
 if(location.origin==='https://shiftly-t.web.app'&&firebaseConfig.projectId==='shiftly-d02f6'&&document.documentElement.dataset.shiftlyEnvironment==='production'&&!databaseId){
-  import('./ranking-live.js?v=prod-ui-20261126-inline-period').then(({installRankingLive})=>{
+  import('./ranking-live.js?v=prod-ui-20261126-inline-metric').then(({installRankingLive})=>{
     const rankingFunctions=getFunctions(fbApp,'asia-northeast1');
     const ranking=installRankingLive({trigger:$('rankingButton'),dialog:$('rankingDialog'),host:$('rankingHost'),
       call:httpsCallable(rankingFunctions,'rankingReadApi'),

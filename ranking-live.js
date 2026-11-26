@@ -140,6 +140,42 @@ function rankingPeriodPicker(kind, key, today, onChange) {
   return fieldset;
 }
 
+// Use ordinary buttons rather than a native select that may reopen when Safari restores focus.
+function rankingMetricPicker(metric, onChange) {
+  const fieldset=el('div','ranking-period-field');
+  const title=el('span','ranking-period-label','ランキング部門');
+  const trigger=button(metricLabel(metric),()=>setOpen(panel.hidden),'ranking-period-trigger ranking-metric-trigger');
+  trigger.dataset.rankingFocus='metric';
+  trigger.setAttribute('aria-label','ランキング部門：'+metricLabel(metric));
+  trigger.setAttribute('aria-expanded','false');
+  trigger.setAttribute('aria-controls','rankingMetricPickerPanel');
+  const panel=el('div','ranking-period-picker ranking-metric-picker');
+  panel.id='rankingMetricPickerPanel';panel.hidden=true;
+  function setOpen(open){
+    panel.hidden=!open;
+    trigger.setAttribute('aria-expanded',String(open));
+  }
+  for(const [id,label] of metrics){
+    const selected=id===metric;
+    const choice=button(label,()=>{
+      setOpen(false);
+      trigger.focus({preventScroll:true});
+      if(id!==metric)onChange(id);
+    },'ranking-picker-choice'+(selected?' active':''));
+    choice.setAttribute('aria-pressed',String(selected));
+    panel.append(choice);
+  }
+  panel.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){
+      event.preventDefault();event.stopPropagation();
+      setOpen(false);trigger.focus({preventScroll:true});
+    }
+  });
+  panel.append(button('閉じる',()=>{setOpen(false);trigger.focus({preventScroll:true});},'ranking-picker-close ghost'));
+  fieldset.append(title,trigger,panel);
+  return fieldset;
+}
+
 function formatDate(value) {
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? japaneseDate.format(timestamp) : '';
@@ -824,13 +860,9 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
         if (next !== key) {key = next; load();}
       }));
     }
-    const department = select(metrics.map(([id, label]) => [id, label]), metric);
-    department.dataset.rankingFocus = 'metric';
-    department.addEventListener('change', () => {
-      metric = department.value;
-      load();
-    });
-    filters.append(field('ランキング部門', department));
+    filters.append(rankingMetricPicker(metric, next => {
+      if (next !== metric) {metric = next; load();}
+    }));
     host.append(filters);
 
     if (result) {

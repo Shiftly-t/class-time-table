@@ -157,3 +157,7 @@
 #rankingDialog .ranking-picker-choice.active{background:#4f63e9;color:white;border-color:#4f63e9}
 #rankingDialog .ranking-picker-arrow:disabled,#rankingDialog .ranking-picker-choice:disabled{opacity:.35;cursor:default}
 #rankingDialog .ranking-filters > label > select{font-size:16px}
+
+/* In-page metric choices stay closed when the ranking is redrawn. */
+#rankingDialog .ranking-metric-trigger{font-size:14px;justify-content:flex-start;text-align:left;height:auto;min-height:44px;padding:8px 34px 8px 12px;white-space:normal;overflow-wrap:anywhere}
+#rankingDialog .ranking-metric-picker .ranking-picker-choice{width:100%;justify-content:flex-start;text-align:left;padding:10px 12px;overflow-wrap:anywhere}
