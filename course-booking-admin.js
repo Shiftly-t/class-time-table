@@ -1,3 +1,4 @@
+import {askCorrectionReason,lessonEnded} from './ranking-correction-ui.js?v=prod-ranking-20261126-a';
 import {mountQrPrintEditor} from './qr-print-editor.js?v=20261124-editor-v2';
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
@@ -294,9 +295,28 @@ function capacity(){return `<section class="panel"><h2>日時別の定員・残�
 function teacherLimits(){return `<section class="panel"><h2>講師の勤務希望と担当上限</h2><p class="muted">講師1人最大2人。人数はここでは変更できません。既存の制限がある場合は管理担当者へ確認してください。</p>${teachers.map(t=>`<div class="noticebox"><strong>${esc(t.name)}</strong><p>勤務希望 ${esc(t.slots.length)}コマ</p></div>`).join('')}</section>`;}
 
 function teacherOptions(slotId,selected=''){const m=/__(\d{4}-\d{2}-\d{2})__(\d+)$/.exec(slotId),need=m?m[1]+'_'+m[2]:'';const possible=teachers.filter(t=>t.slots.includes(need));return `<option value="">講師を選択</option>`+possible.map(t=>`<option value="${esc(t.id)}" ${selected===t.id?'selected':''}>${esc(t.name)}</option>`).join('');}
-function studentDetail(){const s=detail?.student,e=detail?.booking||{},r=roster.find(x=>x.id===studentId);if(!s)return '';const wishes=e.wishes||[],confirmed=e.confirmed||[];const cMap=new Map(confirmed.map(x=>[x.slotId,x]));const open=!!settings?.enabled;return `<section class="panel" id="studentDetail"><div class="row"><div><h2>${esc(s.name)} さんの希望詳細</h2><p class="muted">${esc(s.grade)} ${esc(s.school)}　${badge(status(r||{status:'unanswered',wishes:0,confirmed:0}))}</p></div>${b('closeDetail','詳細を閉じる','secondary')}</div><div class="actions">${b('getQr','現在のQRを印刷')}${b('issue','初回QR発行')}${b('reissue','QRを再発行','danger')}</div><div class="divider"></div><h3>提出された希望日時（${wishes.length}コマ）</h3>${wishes.length?`<ul class="entrylist">${wishes.map(k=>{const p=cMap.get(k);return `<li><strong>${esc(slotLabel(k))}</strong> ${p?p.published?badge('公開済み'):badge('確定済み'):badge('未確定')}${p?`<p class="muted" style="margin:5px 0">${esc(p.teacherName)}／${esc(p.subject)}</p>`:''}${!p?`<div class="grid2"><label class="field">担当講師<select data-teacher="${esc(k)}">${teacherOptions(k)}</select></label><label class="field">教科（任意）<input data-subject="${esc(k)}" placeholder="未入力でも確定できます" maxlength="80"></label></div><div class="actions">${b('confirm:'+k,'このコマを確定','primary')}${b('releaseWish:'+k,'この未確定希望枠を解除','danger')}</div>`:p.published?`<div class="actions">${b('editPublished:'+k,'公開授業の日時・担当変更','secondary')}${b('cancelConfirmed:'+k,'授業を取り消す','danger')}</div>`:`<div class="grid2"><label class="field">担当講師<select data-teacher="${esc(k)}">${teacherOptions(k,p.teacherUid)}</select></label><label class="field">教科（任意）<input data-subject="${esc(k)}" value="${esc(p.subject)}" maxlength="80"></label></div><div class="actions">${b('reassign:'+k,'未公開授業の担当を変更')}${b('moveUnpublished:'+k,'未公開授業の日時を変更')}${b('publish:'+k,'この授業を公開','primary')}${b('cancelConfirmed:'+k,'授業を取り消す','danger')}</div>`}</li>`}).join('')}</ul>`:'<p class="muted">希望日時はまだ提出されていません。</p>'}${confirmed.some(x=>!x.published)?`<div class="actions">${b('publishAll','未公開の確定授業をまとめて公開','primary')}</div>`:''}<label class="field">保護者から伝えたいこと<textarea id="adminRemarks" maxlength="1000" rows="2">${esc(e.remarks||'')}</textarea></label><div class="actions">${b('setRemarks','備考を保存')}</div><div class="divider"></div><h3>管理者による対応</h3><p class="muted">提出前・未確定の生徒について、締切後も希望日時を代理入力できます。</p>${b('adminEdit','希望日時を代理入力・修正','secondary',confirmed.length?'disabled':'')}
+function bookingCorrectionSlot(key){
+  const attendance=detail?.correctionAttendance?.[key];
+  const slot=detail?.slots?.find(row=>row.id===key);
+  return attendance&&slot&&Number.isSafeInteger(detail.revision)?{slot,attendance}:null;
+}
+function attendanceButtons(key){
+  const item=bookingCorrectionSlot(key);
+  if(!item)return '';
+  if(item.attendance==='cancelled')return badge('欠席')+b('setAttendance:scheduled:'+key,'欠席を解除')+b('setAttendance:done:'+key,'実施済みに戻す');
+  return b('setAttendance:cancelled:'+key,'欠席に訂正');
+}
+async function bookingCorrectionPayload(key){
+  const item=bookingCorrectionSlot(key);
+  if(!item)return {};
+  const selection=detail,epoch=authEpoch;
+  const reason=await askCorrectionReason(item.slot.date);
+  if(!reason||selection!==detail||epoch!==authEpoch||!canInteract())return null;
+  return {expectedRevision:selection.revision,correction:{date:item.slot.date,reason}};
+}
+function studentDetail(){const s=detail?.student,e=detail?.booking||{},r=roster.find(x=>x.id===studentId);if(!s)return '';const wishes=e.wishes||[],confirmed=e.confirmed||[];const cMap=new Map(confirmed.map(x=>[x.slotId,x]));const open=!!settings?.enabled;return `<section class="panel" id="studentDetail"><div class="row"><div><h2>${esc(s.name)} さんの希望詳細</h2><p class="muted">${esc(s.grade)} ${esc(s.school)}　${badge(status(r||{status:'unanswered',wishes:0,confirmed:0}))}</p></div>${b('closeDetail','詳細を閉じる','secondary')}</div><div class="actions">${b('getQr','現在のQRを印刷')}${b('issue','初回QR発行')}${b('reissue','QRを再発行','danger')}</div><div class="divider"></div><h3>提出された希望日時（${wishes.length}コマ）</h3>${wishes.length?`<ul class="entrylist">${wishes.map(k=>{const p=cMap.get(k);return `<li><strong>${esc(slotLabel(k))}</strong> ${p?p.published?badge('公開済み'):badge('確定済み'):badge('未確定')}${p?`<p class="muted" style="margin:5px 0">${esc(p.teacherName)}／${esc(p.subject)}</p>`:''}${!p?`<div class="grid2"><label class="field">担当講師<select data-teacher="${esc(k)}">${teacherOptions(k)}</select></label><label class="field">教科（任意）<input data-subject="${esc(k)}" placeholder="未入力でも確定できます" maxlength="80"></label></div><div class="actions">${b('confirm:'+k,'このコマを確定','primary')}${b('releaseWish:'+k,'この未確定希望枠を解除','danger')}</div>`:p.published?`<div class="actions">${attendanceButtons(k)}${b('editPublished:'+k,'公開授業の日時・担当変更','secondary')}${b('cancelConfirmed:'+k,'授業を取り消す','danger')}</div>`:`<div class="grid2"><label class="field">担当講師<select data-teacher="${esc(k)}">${teacherOptions(k,p.teacherUid)}</select></label><label class="field">教科（任意）<input data-subject="${esc(k)}" value="${esc(p.subject)}" maxlength="80"></label></div><div class="actions">${b('reassign:'+k,'未公開授業の担当を変更')}${b('moveUnpublished:'+k,'未公開授業の日時を変更')}${b('publish:'+k,'この授業を公開','primary')}${b('cancelConfirmed:'+k,'授業を取り消す','danger')}</div>`}</li>`}).join('')}</ul>`:'<p class="muted">希望日時はまだ提出されていません。</p>'}${confirmed.some(x=>!x.published)?`<div class="actions">${b('publishAll','未公開の確定授業をまとめて公開','primary')}</div>`:''}<label class="field">保護者から伝えたいこと<textarea id="adminRemarks" maxlength="1000" rows="2">${esc(e.remarks||'')}</textarea></label><div class="actions">${b('setRemarks','備考を保存')}</div><div class="divider"></div><h3>管理者による対応</h3><p class="muted">提出前・未確定の生徒について、締切後も希望日時を代理入力できます。</p>${b('adminEdit','希望日時を代理入力・修正','secondary',confirmed.length?'disabled':'')}
  <div class="admin-detail-grid"><label class="field">個別受付期限（日本時間）<input type="datetime-local" id="extendDate" value="${esc(fmtTime(e.extensionUntil||''))}"></label><div class="admin-grid-button">${b('extend','個別の締切を延長','secondary')}</div><div class="admin-grid-button">${b('removeUnconfirmed','未確定の希望枠を解除','secondary')}</div><div class="admin-grid-button">${b('adminDecline','不参加に設定','danger',confirmed.length?'disabled':'')}</div></div>${e.publishedChanges?.length?`<div class="divider"></div><h3>公開済み授業の変更・確認状況</h3><ul class="entrylist">${e.publishedChanges.map(x=>`<li>${esc(slotLabel(x.from))} → ${esc(slotLabel(x.to))}<br>${x.ack?badge('保護者確認済み'):badge('未確認')}</li>`).join('')}</ul>`:''}${detail?.history?.length?`<details><summary style="cursor:pointer;padding:10px 0;font-weight:750">予約変更・管理操作の履歴</summary><ul class="entrylist">${detail.history.map(x=>`<li>${esc(x.action)}　${esc(x.actor)}<br><span class="muted">${esc(x.createdAt||'')}</span></li>`).join('')}</ul></details>`:''}</section>`;}
-function editPublished(key){const isPublished=editorMode==='published';const c=(detail?.booking?.confirmed||[]).find(x=>x.slotId===key);if(!c)return '';return `<section class="panel"><h2>${isPublished?'公開済み':'未公開'}授業の変更</h2><p class="notice">${isPublished?'日時変更後は保護者のQR画面に変更内容と「確認しました」ボタンが表示されます。':'未公開の授業日時を変更します。保護者には公開後に日時を表示します。'}</p><form id="changePublishedForm" data-from="${esc(key)}"><label class="field">移動先の日時<select name="to">${demand.filter(x=>!x.disabled&&(x.remaining>0||x.id===key)).map(x=>`<option value="${esc(x.id)}" ${x.id===key?'selected':''}>${esc(slotLabel(x.id))}（残り${x.remaining}枠）</option>`).join('')}</select></label><label class="field">担当講師<select name="teacherUid">${teacherOptions(key,c.teacherUid)}</select></label><label class="field">教科（任意）<input name="subject" maxlength="80" value="${esc(c.subject)}"></label><div class="actions">${b('closePublishedEditor','戻る')}<button type="submit" class="primary">変更内容を公開する</button></div></form></section>`;}
+function editPublished(key){const isPublished=editorMode==='published';const c=(detail?.booking?.confirmed||[]).find(x=>x.slotId===key);if(!c)return '';return `<section class="panel"><h2>${isPublished?'公開済み':'未公開'}授業の変更</h2><p class="notice">${isPublished?'日時変更後は保護者のQR画面に変更内容と「確認しました」ボタンが表示されます。':'未公開の授業日時を変更します。保護者には公開後に日時を表示します。'}</p><form id="changePublishedForm" data-from="${esc(key)}"><label class="field">移動先の日時<select name="to">${demand.filter(x=>!x.disabled&&(x.remaining>0||x.id===key)&&(!bookingCorrectionSlot(key)||(x.date===bookingCorrectionSlot(key).slot.date&&lessonEnded(x.date,x.end)))).map(x=>`<option value="${esc(x.id)}" ${x.id===key?'selected':''}>${esc(slotLabel(x.id))}（残り${x.remaining}枠）</option>`).join('')}</select></label><label class="field">担当講師<select name="teacherUid">${teacherOptions(key,c.teacherUid)}</select></label><label class="field">教科（任意）<input name="subject" maxlength="80" value="${esc(c.subject)}"></label><div class="actions">${b('closePublishedEditor','戻る')}<button type="submit" class="primary">変更内容を公開する</button></div></form></section>`;}
 function adminEdit(){const current=detail?.booking?.wishes||[];const selected=new Set(draft.length?draft:current);const grouped=new Map();for(const x of demand){if(!grouped.has(x.date))grouped.set(x.date,[]);grouped.get(x.date).push(x);}return `<section class="panel"><h2>希望日時の代理入力</h2><p class="muted">保護者の希望を確認してから入力してください。未確定の枠だけを変更できます。</p><form id="adminEditForm">${[...grouped].map(([date,arr])=>`<div class="slotday"><div class="daytitle">${dateText(date)}</div><div class="slotgrid">${arr.map(x=>`<label class="slot"><input type="checkbox" name="slots" value="${esc(x.id)}" style="width:18px;min-height:18px;flex:none" ${selected.has(x.id)?'checked':''} ${x.disabled||(x.remaining===0&&!selected.has(x.id))?'disabled':''}><strong>${esc(x.start)}〜${esc(x.end)}</strong><small>残り${x.remaining}</small></label>`).join('')}</div></div>`).join('')}<label class="field">保護者から伝えたいこと（任意）<textarea name="remarks" maxlength="1000">${esc(detail?.booking?.remarks||'')}</textarea></label><div class="actions">${b('closeAdminEdit','戻る')}<button class="primary" type="submit">希望日時を保存する</button></div></form></section>`;}
 function render(){if(!authorized)return;if(!courses.length){$('app').innerHTML='<h2>講習が登録されていません</h2><p class="muted">先に講習期間管理で講習を登録してください。</p>';return;}$('app').outerHTML='<div id="app">'+controls()+((tab==='students')?listStudents():tab==='dates'?listDates():tab==='capacity'?capacity():tab==='teachers'?teacherLimits():setup())+(tab==='students'&&studentId&&['published','unpublished'].includes(editorMode)?editPublished(editorKey):tab==='students'&&studentId&&editorMode==='admin'?adminEdit():'')+'</div>';wire();}
 let editorMode='',editorKey='';
@@ -403,12 +423,26 @@ async function runAction(a){
      await reloadCourse();
    }));
  }
+ if(a.startsWith('setAttendance:')){
+   const [,status,key]=a.split(':');
+   if(!bookingCorrectionSlot(key))return;
+   const correction=await bookingCorrectionPayload(key);
+   if(!correction)return;
+   return guarded('公開授業の出欠訂正',async()=>{
+     await api('setPublishedAttendance',{studentId,slotId:key,status,...correction});
+     await reloadCourse();
+   });
+ }
  if(a.startsWith('cancelConfirmed:')){
    const key=a.slice(16);
-   return confirmAction('確定授業を取り消しますか？',`${slotLabel(key)}を取消して確保枠を解放します。公開済みなら時間割からも削除されます。`,()=>guarded('授業取消',async()=>{
-     await api('cancelConfirmed',{studentId,slotId:key});
-     await reloadCourse();
-   }));
+   return confirmAction('確定授業を取り消しますか？',`${slotLabel(key)}を取消して確保枠を解放します。公開済みなら時間割からも削除されます。`,async()=>{
+     const correction=await bookingCorrectionPayload(key);
+     if(!correction)return;
+     return guarded('授業取消',async()=>{
+       await api('cancelConfirmed',{studentId,slotId:key,...correction});
+       await reloadCourse();
+     });
+   });
  }
  if(a.startsWith('editPublished:')){editorMode='published';editorKey=a.slice(14);render();return;}if(a.startsWith('moveUnpublished:')){editorMode='unpublished';editorKey=a.slice(16);render();return;}if(a==='closePublishedEditor'||a==='closeAdminEdit'){editorMode='';render();return;}
  if(a==='adminEdit'){if((detail?.booking?.confirmed||[]).length){note('確定済み授業があるため先に個別調整してください',true);return;}editorMode='admin';draft=(detail?.booking?.wishes||[]).slice();render();return;}
@@ -448,10 +482,14 @@ function wire(){
    if(!canInteract()||!changed.isConnected)return;
    const form=new FormData(changed),from=changed.dataset.from,to=form.get('to'),teacherUid=form.get('teacherUid'),subject=form.get('subject');
    const published=editorMode==='published';
-   void confirmAction('公開済み授業を変更しますか？',published?'保護者画面に変更履歴が表示され、確認ボタンが追加されます。':'未公開の授業日時を変更します。保護者には公開後に日時を表示します。',()=>guarded('公開授業変更',async()=>{
-     await api(published?'changePublished':'moveUnpublished',{studentId,from,to,teacherUid,subject});
-     editorMode='';await reloadCourse();
-   }));
+   void confirmAction('公開済み授業を変更しますか？',published?'保護者画面に変更履歴が表示され、確認ボタンが追加されます。':'未公開の授業日時を変更します。保護者には公開後に日時を表示します。',async()=>{
+     const correction=published?await bookingCorrectionPayload(from):{};
+     if(!correction)return;
+     return guarded('公開授業変更',async()=>{
+       await api(published?'changePublished':'moveUnpublished',{studentId,from,to,teacherUid,subject,...correction});
+       editorMode='';await reloadCourse();
+     });
+   });
  });
  document.querySelectorAll('[data-act]').forEach(x=>x.addEventListener('click',()=>{if(x.isConnected)void runAction(x.dataset.act);}));
 }

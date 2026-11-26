@@ -1,3 +1,4 @@
+import {askCorrectionReason,lessonEnded} from './ranking-correction-ui.js?v=prod-ranking-20261126-a';
 // Opt-in seasonal/lifecycle adapter. Unsupported server contracts never fall back to writes.
 import {createBookingTransport} from './booking-transport.js';
 import {authorityValue} from './normal-authority-client.js';
@@ -75,8 +76,8 @@ export function createSeasonalAuthorityClient({enabled=false,call,getSession,new
    throw error;
   }
  }
- async function requireOperation(action,who){const c=await request('capabilities',{},who);if(!Array.isArray(c.operations)||!c.operations.includes(action))throw blocked('講習APIがこの操作への対応を報告していません。','capabilities');}
- async function inspectCourse(courseId,before,who){const s=await request('inspectCourse',{courseId},who);if(!s.course||!s.entries||!s.meta)throw blocked('講習の確認情報が不正です。');if(before!==undefined&&!same(clean(before),s.course.value))throw blocked('講習が別の端末で変更されました。再読み込みしてください。');return s;}
+ async function requireOperation(action,who){const c=await request('capabilities',{},who);if(!Array.isArray(c.operations)||!c.operations.includes(action))throw blocked('講習APIがこの操作への対応を報告していません。','capabilities');return c;}
+ async function inspectCourse(courseId,before,who,dates=[]){const s=await request('inspectCourse',{courseId,...(dates.length?{correctionDates:dates}:{})},who);if(!s.course||!s.entries||!s.meta)throw blocked('講習の確認情報が不正です。');if(before!==undefined&&!same(clean(before),s.course.value))throw blocked('講習が別の端末で変更されました。再読み込みしてください。');return s;}
  const client={
   async inspectRestoreJob(){const r=await request("inspectRestoreJob");if(r.ok!==true||typeof r.active!=="boolean")throw blocked("復元状態を確認できません。");return r;},
   async planBatchedRestore(archiveId){const p=await request("planBatchedRestore",{archiveId});if(p.canApply!==true||!Number.isSafeInteger(p.revision)||!Number.isSafeInteger(p.operationCount)||p.operationCount<1||p.requiresQrReissue!==true)throw blocked("分割復元計画を確認できません。");return p;},
@@ -90,7 +91,20 @@ export function createSeasonalAuthorityClient({enabled=false,call,getSession,new
   async saveCourse({courseId,before,value}){const who=identity();await requireOperation('saveCourse',who);const s=await inspectCourse(courseId,before,who);return request('saveCourse',{courseId,expected:s.course.token,value:authorityValue(value)},who);},
   async patchCourse({courseId,before,patch}){const who=identity();await requireOperation('patchCourse',who);const s=await inspectCourse(courseId,before,who);return request('patchCourse',{courseId,expected:s.course.token,patch:authorityValue(patch)},who);},
   async deleteCourse({courseId,before}){const who=identity();await requireOperation('deleteCourse',who);const s=await inspectCourse(courseId,before,who);return request('deleteCourse',{courseId,expected:s.course.token},who);},
-  async publish({courseId,beforeCourse,changes}){const who=identity();await requireOperation('publishManualCourse',who);if(!changes.length||changes.length>60)throw blocked('講習APIでは一度に60変更まで保存できます。');const s=await inspectCourse(courseId,beforeCourse,who);const mapped=changes.map(x=>{const old=s.entries[x.id];if(!same(clean(x.before),old?.value??null))throw blocked('授業が別の端末で変更されました。再読み込みしてください。');return {id:x.id,expected:old?.token??null,...(x.remove?{remove:true}:{value:clean(x.value)})};});return request('publishManualCourse',{courseId,expectedCourse:s.course.token,expectedMeta:s.meta.token,changes:mapped},who);},
+  async publish({courseId,beforeCourse,changes}){const who=identity(),capabilities=await requireOperation('publishManualCourse',who);if(!changes.length||changes.length>60)throw blocked('講習APIでは一度に60変更まで保存できます。');const records=changes.flatMap(change=>[change.before,change.remove?null:change.value].filter(Boolean));
+   const dates=capabilities.rankingDateCorrections===true
+     ? [...new Set(records.filter(row=>lessonEnded(row.date,row.end)).map(row=>row.date))]
+     : [];
+   const s=await inspectCourse(courseId,beforeCourse,who,dates);
+   const mapped=changes.map(x=>{const old=s.entries[x.id];if(!same(clean(x.before),old?.value??null))throw blocked('授業が別の端末で変更されました。再読み込みしてください。');return {id:x.id,expected:old?.token??null,...(x.remove?{remove:true}:{value:clean(x.value)})};});let correction;
+   if(s.correctionDates?.length){
+    const [date]=s.correctionDates;
+    if(s.correctionDates.length!==1||records.some(row=>row.date!==date||!lessonEnded(row.date,row.end)))throw blocked('事後訂正は終了済みの同じ日付の授業ごとに保存してください。');
+    const reason=await askCorrectionReason(date);
+    if(!reason)return {cancelled:true};
+    correction={date,reason};
+   }
+   return request('publishManualCourse',{courseId,expectedCourse:s.course.token,expectedMeta:s.meta.token,changes:mapped,...(correction?{correction}:{})},who);},
   async saveMemo({before,memo}){const who=identity();await requireOperation('saveCourseMemo',who);const s=await inspectCourse(before.courseId,undefined,who);if(!same(clean(before),s.entries[before.id]?.value))throw blocked('授業が別の端末で変更されました。再読み込みしてください。');return request('saveCourseMemo',{courseId:before.courseId,lessonId:before.id,expected:s.entries[before.id].token,memo},who);},
   async saveCalendar({collection,date,before,value,remove=false}){const who=identity();await requireOperation('saveCalendar',who);return request('saveCalendar',{collection,date,expectedValue:clean(before),value:remove?null:{...clean(value),date,...(collection==='schoolEvents'?{type:'exam'}:{})},remove},who);},
   async setMaintenance({before,value}){

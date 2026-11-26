@@ -3,7 +3,7 @@ import {installHelpGuide} from './help-guide.js?v=20261125-all-timetable-label';
 import {createAuthorityCommands} from './authority-commands.js';
 import {isWithdrawn,canReceiveLesson} from './student-enrollment.js';
 import {gradeInfo,academicYearForDate,academicYearJST,displayStudentGrade} from './student-grade.js';
-import {createSeasonalAuthorityClient,describeSeasonalOperationFailure} from './seasonal-authority-client.js?v=ops-diagnostics-20261123-a';
+import {createSeasonalAuthorityClient,describeSeasonalOperationFailure} from './seasonal-authority-client.js?v=prod-ranking-20261126-a';
 import {createBookingTransport} from './booking-transport.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
@@ -1988,6 +1988,7 @@ function renderNoticeButton(){
   $('noticeCount').textContent=String(unread);
   $('notificationButton').setAttribute('aria-label',unread?`通知・未読${unread}件`:'通知を表示');
 }
+let rankingNoticeOpen;
 function renderNotifications(){
   renderOfficialAnnouncements();renderOwnerAnnouncementManagement();
   const parent=$('notificationList');parent.replaceChildren();
@@ -2000,7 +2001,11 @@ function renderNotifications(){
     const header=make('div','notification-row');
     const label=make('button','notification-open',notificationText(n));
     label.type='button';
-    if(n.kind==='availability'&&isAdmin() || n.kind==='student'&&n.studentId || n.date&&/^\d{4}-\d{2}-\d{2}$/.test(n.date)){
+    const rankingTarget=n.kind==='rankingAchievement'&&['badges','history'].includes(n.target)&&rankingNoticeOpen;
+    if(rankingTarget){
+      label.title=n.target==='badges'?'獲得バッジを表示':'表彰履歴を表示';
+      label.addEventListener('click',()=>rankingNoticeOpen(n.target));
+    }else if(n.kind==='availability'&&isAdmin() || n.kind==='student'&&n.studentId || n.date&&/^\d{4}-\d{2}-\d{2}$/.test(n.date)){
       label.title=n.kind==='availability'?'タップして勤務希望を表示':n.kind==='student'?'タップして生徒情報を表示':n.kind==='lesson'?'タップして授業の詳細へ移動':'タップして対象日の時間割へ移動';
       label.addEventListener('click',()=>openNotificationTarget(n));
     }else label.disabled=true;
@@ -2015,7 +2020,7 @@ function renderNotifications(){
     header.append(del);node.append(header);
     const time=n.createdAt?.toDate?.();
     node.append(make('small','',time?time.toLocaleString('ja-JP'):'日時情報なし'));
-    if(!label.disabled)node.append(make('small','notification-jump-hint',n.kind==='availability'?'タップすると講師の勤務希望に移動します':n.kind==='student'?'タップすると生徒情報に移動します':'タップすると該当の時間割に移動します'));
+    if(!label.disabled&&!rankingTarget)node.append(make('small','notification-jump-hint',n.kind==='availability'?'タップすると講師の勤務希望に移動します':n.kind==='student'?'タップすると生徒情報に移動します':'タップすると該当の時間割に移動します'));
     parent.append(node);
   }
 }
@@ -2418,7 +2423,7 @@ $('lessonForm').addEventListener('submit',async event=>{
   }
   const btn=event.submitter;btn.disabled=true;
   try{
-    if(seasonalAuthority.enabled()&&course){if(!$('lessonId').value)$('lessonId').value=id;await commands.publishCourse({courseId:course.id,beforeCourse:course,changes:[{id,before:old||null,value:data}]});}
+    if(seasonalAuthority.enabled()&&course){if(!$('lessonId').value)$('lessonId').value=id;if((await commands.publishCourse({courseId:course.id,beforeCourse:course,changes:[{id,before:old||null,value:data}]})).cancelled)return;}
     else if(normalAuthority.enabled()&&!course){
       if(recordFingerprint(old?.virtual?null:cleanRecord(old))!==expectedLesson)throw Error('授業が変更されました。画面を閉じて読み直してください。');
       if(!$('lessonId').value)$('lessonId').value=id; // stable id if response is lost
@@ -2444,7 +2449,7 @@ $('deleteLesson').addEventListener('click',async()=>{
   if(!(seasonalAuthority.enabled()&&old.courseId)&&!await canDirectlyWriteLessons([old]))return;
   if(!confirm(old.regularId?'この日の変更を取り消し、毎週の通常授業設定に戻しますか？勤務条件・人数上限を満たす場合のみ戻せます。':'この授業を削除しますか？'))return;
   try{
-    if(seasonalAuthority.enabled()&&old.courseId){await commands.publishCourse({courseId:old.courseId,beforeCourse:state.courses.find(c=>c.id===old.courseId),changes:[{id:old.id,before:old,remove:true}]});closeDialog('lessonFormDialog');showMessage.success('講習授業をAPIで削除しました。');return;}
+    if(seasonalAuthority.enabled()&&old.courseId){if((await commands.publishCourse({courseId:old.courseId,beforeCourse:state.courses.find(c=>c.id===old.courseId),changes:[{id:old.id,before:old,remove:true}]})).cancelled)return;closeDialog('lessonFormDialog');showMessage.success('講習授業をAPIで削除しました。');return;}
     if(normalAuthority.enabled()&&!old.courseId){
       await commands.saveDay({date:old.date,changes:[{id:old.id,before:old,remove:true}]});
       closeDialog('lessonFormDialog');showMessage.success('授業を削除しました。');return;
@@ -3241,7 +3246,7 @@ async function publishCourseEditor(){
   courseEditor.busy=true;renderCourseEditor();
   try{
     if(seasonalAuthority.enabled()){
-      await commands.publishCourse({
+      const result=await commands.publishCourse({
         courseId:course.id,
         beforeCourse:course,
         changes:changes.map(c=>({
@@ -3251,6 +3256,7 @@ async function publishCourseEditor(){
           remove:c._delete===true
         }))
       });
+      if(result.cancelled)return;
       if(await refreshPublishedCourseEditor(course,editor,current)){
         showMessage.success('講習配置を確定して反映しました。');
       }
@@ -3619,6 +3625,23 @@ regularEditor=installNormalEditor({
 });
 let authRecovery=null;
 
+// Isolated production ranking UI. Existing authentication and App Check are reused.
+if(location.origin==='https://shiftly-t.web.app'&&firebaseConfig.projectId==='shiftly-d02f6'&&document.documentElement.dataset.shiftlyEnvironment==='production'&&!databaseId){
+  import('./ranking-live.js?v=prod-ranking-20261126-a').then(({installRankingLive})=>{
+    const rankingFunctions=getFunctions(fbApp,'asia-northeast1');
+    const ranking=installRankingLive({trigger:$('rankingButton'),dialog:$('rankingDialog'),host:$('rankingHost'),
+      call:httpsCallable(rankingFunctions,'rankingReadApi'),
+      callAchievement:httpsCallable(rankingFunctions,'rankingAchievementApi'),
+      getSession:()=>state.user?.uid,getRole:()=>state.profile?.role,
+      getAvailable:()=>maintenanceState.loaded&&!maintenanceState.enabled&&!$('appPanel').hidden&&!$('notificationButton').hidden,
+      today:todayKey});
+    rankingNoticeOpen=target=>ranking.openAchievement(target,()=>closeDialog('notificationDialog'));
+    const observer=new MutationObserver(ranking.sync);
+    for(const id of ['appPanel','notificationButton'])observer.observe($(id),{attributes:true,attributeFilter:['hidden']});
+    const maintenanceLabel=$('maintenanceModeLabel');
+    if(maintenanceLabel)observer.observe(maintenanceLabel,{childList:true});
+  }).catch(()=>console.warn('Ranking UI unavailable'));
+}
 onAuthStateChanged(auth,user=>{
   if(!user){
     const recovery=authRecovery;
