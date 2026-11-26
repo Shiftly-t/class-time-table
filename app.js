@@ -3633,7 +3633,7 @@ if(location.origin==='https://shiftly-t.web.app'&&firebaseConfig.projectId==='sh
       call:httpsCallable(rankingFunctions,'rankingReadApi'),
       callAchievement:httpsCallable(rankingFunctions,'rankingAchievementApi'),
       getSession:()=>state.user?.uid,getRole:()=>state.profile?.role,
-      getAvailable:()=>maintenanceState.loaded&&!maintenanceState.enabled&&!$('appPanel').hidden&&!$('notificationButton').hidden,
+      getAvailable:()=>maintenanceState.loaded&&(!maintenanceState.enabled||state.profile?.role==='owner')&&!$('appPanel').hidden&&!$('notificationButton').hidden,
       today:todayKey});
     rankingNoticeOpen=target=>ranking.openAchievement(target,()=>closeDialog('notificationDialog'));
     const observer=new MutationObserver(ranking.sync);
