@@ -149,7 +149,7 @@ function coverageNotice(coverage) {
   return status(`未確定の日付があります。確定済み ${coverage.recorded} / ${coverage.expected} 日`);
 }
 
-function renderProfile(data, showBadges) {
+function renderProfile(data, showBadges, retry) {
   const card = el('section', 'ranking-profile');
   const profile = data.profile;
   if (!profile) {
@@ -161,15 +161,14 @@ function renderProfile(data, showBadges) {
   who.append(avatar(), el('h3', '', profile.name));
   card.append(who);
   if (data.coverage.complete) {
-    const totals = el('div', 'ranking-summary');
-    for (const [key, label, unit] of metrics) {
-      const cell = el('div', 'ranking-stat');
-      cell.append(el('span', '', label), el('strong', '', String(profile.totals[key])), el('small', '', unit));
-      totals.append(cell);
-    }
     const {from, to} = data.coverage;
     const range = from && to ? `累計 · ${from} ～ ${to}` : '累計';
-    card.append(el('p', 'ranking-note', range), totals);
+    card.append(el('p', 'ranking-note', range));
+  } else {
+    card.append(coverageNotice(data.coverage));
+  }
+  card.append(renderProfileBadges(data, retry));
+  if (data.coverage.complete) {
     if (profile.monthly.length) {
       const heading = el('h4', '', '月別の担当授業コマ数（延べ）');
       const chart = el('div', 'ranking-chart');
@@ -186,10 +185,8 @@ function renderProfile(data, showBadges) {
       }
       card.append(heading, chart);
     }
-  } else {
-    card.append(coverageNotice(data.coverage));
   }
-  card.append(button('獲得バッジを見る', () => showBadges(profile.teacherUid, profile.name)));
+  card.append(button('獲得バッジの詳細を見る', () => showBadges(profile.teacherUid, profile.name)));
   return card;
 }
 
@@ -198,6 +195,43 @@ function badgeMark(item) {
   mark.setAttribute('aria-hidden', 'true');
   if (/^#[a-f0-9]{6}$/i.test(item.color)) mark.style.setProperty('--badge-color', item.color);
   return mark;
+}
+
+function renderProfileBadges(data, retry) {
+  const area = el('div', 'ranking-profile-badges');
+  const head = el('div', 'ranking-profile-badges-head');
+  head.append(el('h4', '', '獲得バッジ'));
+  area.append(head);
+  if (data.badgeError) {
+    area.append(status(data.badgeError, 'ranking-note'), button('バッジを再取得', retry));
+    return area;
+  }
+  const badges = data.profileBadges || [];
+  head.append(el('span', 'ranking-note', badges.length + '個'));
+  if (!badges.length) {
+    area.append(el('p', 'empty', '獲得したバッジはありません。'));
+    return area;
+  }
+  const gallery = el('div', 'ranking-badge-gallery');
+  gallery.id = 'rankingProfileBadgeGallery';
+  area.append(gallery);
+  let expanded = false;
+  const more = button('', () => { expanded = !expanded; refresh(); }, 'ghost ranking-catalog-more');
+  more.setAttribute('aria-controls', gallery.id);
+  function refresh() {
+    gallery.replaceChildren();
+    for (const badge of expanded ? badges : badges.slice(0, 5)) {
+      const tile = el('div', 'ranking-badge-tile');
+      tile.append(badgeMark(badge), el('strong', '', badge.name));
+      gallery.append(tile);
+    }
+    more.hidden = badges.length <= 5;
+    more.textContent = expanded ? '↑ 閉じる' : '↓ すべて表示（' + badges.length + '個）';
+    more.setAttribute('aria-expanded', String(expanded && !more.hidden));
+  }
+  area.append(more);
+  refresh();
+  return area;
 }
 
 function renderBadges(data, teacherName) {
@@ -544,7 +578,23 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
       const {data} = await fetchView(cursor);
       if (!current(seq, uid, currentRole)) return;
       if (!validResponse(view, data)) throw Error('INVALID_RESPONSE');
-      result = previous ? {...data, history: [...previous.history, ...data.history]} : data;
+      if (view === 'profile' && data.profile) {
+        const teacherUid = data.profile.teacherUid;
+        let badgeData;
+        try {
+          const response = await callAchievement({action: 'listBadges', teacherUid});
+          if (!current(seq, uid, currentRole)) return;
+          if (!validResponse('badges', response.data) ||
+              response.data.badges.some(b => !b || b.teacherUid !== teacherUid || typeof b.name !== 'string')) throw Error('INVALID_RESPONSE');
+          badgeData = {profileBadges: response.data.badges};
+        } catch (failure) {
+          if (!current(seq, uid, currentRole)) return;
+          badgeData = {badgeError: failureMessage(failure, '獲得バッジを取得できませんでした。', '獲得バッジは現在表示できません。')};
+        }
+        result = {...data, ...badgeData};
+      } else {
+        result = previous ? {...data, history: [...previous.history, ...data.history]} : data;
+      }
     } catch (failure) {
       if (!current(seq, uid, currentRole)) return;
       const unpublished = view === 'rank' || view === 'profile' ? 'ランキングはまだ公開されていません。' : undefined;
@@ -692,7 +742,7 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
     if (success) host.append(status(success, 'ranking-success'));
     if (view === 'rank') renderRank();
     else if (result && view === 'profile') {
-      host.append(renderProfile(result, (teacherUid, name) => go('badges', {teacherUid, name})),
+      host.append(renderProfile(result, (teacherUid, name) => go('badges', {teacherUid, name}), () => load()),
         button('← ランキングに戻る', () => go('rank')));
     } else if (result && view === 'badges') {
       host.append(renderBadges(result, target?.name));

@@ -90,3 +90,6 @@
 
 /* Compact registered badge catalog */
 .ranking-catalog-more{width:100%;margin-top:8px}.ranking-catalog-more[hidden]{display:none!important}.ranking-catalog-count{margin:4px 0}
+
+/* Badge-first profile; numeric totals remain available in ranking and server calculations. */
+.ranking-profile-badges{display:grid;gap:8px;min-width:0;padding:12px 0;border-top:1px solid #e1e7f2;border-bottom:1px solid #e1e7f2}.ranking-profile-badges-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.ranking-profile-badges .ranking-badge-gallery{grid-template-columns:repeat(auto-fill,minmax(76px,1fr));padding:4px 0;border-bottom:0}.ranking-profile-badges .ranking-badge-tile{min-width:0;overflow-wrap:anywhere}.ranking-profile-badges .ranking-badge-tile .ranking-badge-mark{width:52px;max-width:52px;min-height:52px;font-size:24px}

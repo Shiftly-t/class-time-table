@@ -147,8 +147,12 @@ async function browserTest() {
         if (name !== 'qaRankingAchievementApi') throw Error('unexpected callable');
         const teacherUid = input.teacherUid || 'teacher-a';
         switch (input.action) {
-          case 'listBadges':
-            return {data: {badges: [{...baselineBadge, teacherUid}]}};
+          case 'listBadges': {
+            if(window.failBadges) throw Object.assign(Error('badge unavailable'),{code:'functions/unavailable'});
+            if(teacherUid==='teacher-c') return {data:{badges:[]}};
+            const earned=teacherUid==='teacher-b' ? Array.from({length:7},(_,i)=>({...baselineBadge,teacherUid,badgeId:'earned-'+i,name:'講師Bバッジ'+(i+1)})) : [{...baselineBadge,teacherUid}];
+            return {data:{badges:earned}};
+          }
           case 'listHistory':
             return {data: {history: [{...award, action: input.cursor ? 'revised' : 'granted'}], nextCursor: input.cursor ? null : 'p2'}};
           case 'manage':
@@ -201,11 +205,34 @@ async function browserTest() {
     assert.equal(await dialog.locator('.ranking-person-row').count(), 0);
     await dialog.locator('.ranking-podium-person').filter({hasText: '講師B'}).click();
     await dialog.getByText('月別の担当授業コマ数（延べ）').waitFor();
-    await dialog.getByRole('button', {name: '獲得バッジを見る'}).click();
+    const profileBadges=dialog.locator('.ranking-profile-badges');
+    assert.equal(await dialog.locator('.ranking-summary,.ranking-stat').count(),0);
+    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),5);
+    await profileBadges.getByRole('button',{name:/すべて表示/}).click();
+    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),7);
+    await profileBadges.getByRole('button',{name:/閉じる/}).click();
+    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),5);
+    await dialog.getByRole('button', {name: '獲得バッジの詳細を見る'}).click();
     await dialog.getByText('講師Bの獲得バッジ').waitFor();
-    await dialog.getByText('自動付与', {exact: false}).waitFor();
+    await dialog.getByText('自動付与', {exact: false}).first().waitFor();
+    await tab('ランキング').click();
+    await dialog.locator('.ranking-podium-person').filter({hasText:'講師C'}).click();
+    await profileBadges.getByText('獲得したバッジはありません。').waitFor();
+    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),0);
+    await tab('プロフィール').click();
+    await profileBadges.getByText('自動バッジ',{exact:true}).waitFor();
+    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),1);
+    await page.evaluate(()=>{window.failBadges=true});
+    await tab('プロフィール').click();
+    await profileBadges.getByRole('button',{name:'バッジを再取得'}).waitFor();
+    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),0);
+    await dialog.getByText('月別の担当授業コマ数（延べ）').waitFor();
+    await page.evaluate(()=>{window.failBadges=false});
+    await profileBadges.getByRole('button',{name:'バッジを再取得'}).click();
+    await profileBadges.getByText('自動バッジ',{exact:true}).waitFor();
+    console.log('SUCCESS RANKING PROFILE INLINE BADGE TESTS');
 
-    await dialog.getByRole('button', {name: '閉じる'}).click();
+    await dialog.getByRole('button', {name: '閉じる',exact:true}).click();
     await page.evaluate(() => rankingFixture.notices());
     await page.locator('#notificationButton').click();
     const notification = page.locator('#notificationDialog');
