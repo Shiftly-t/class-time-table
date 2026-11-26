@@ -483,43 +483,78 @@ function definitionCatalog({data, save, editor}) {
 
 function grantForm({data, save}) {
   const form=el('form','ranking-owner-form');
-  const badge=select([['','選択してください'],...data.badges.map(x=>[x.badgeId,x.name+(x.archived?'（削除済み）':x.active?'':'（停止中）')])]); badge.required=true;
+  const direction=select([['badge','バッジを選ぶ → 複数の講師'],['teacher','講師を選ぶ → 複数のバッジ']],'badge');
+  const badge=select([['','選択してください'],...data.badges.map(x=>[x.badgeId,x.name+(x.archived?'（削除済み）':x.active?'':'（停止中）')])]);
+  const teacher=select([['','選択してください'],...data.teachers.map(x=>[x.teacherUid,x.name+(x.canGrant===false?'（履歴のみ）':'')])]);
+  const badgeField=field('手動バッジ',badge), teacherField=field('対象講師',teacher);
   const mode=select([['grant','付与する'],['revoke','取り消す']]);
   const reason=input('text');reason.required=true;reason.maxLength=500;
   const list=el('div','ranking-recipient-list');
+  const listTitle=el('strong','ranking-field-title','対象者（複数選択可能）');
   const action=submit('0名にバッジを付与する');
   const message=status('','ranking-form-status');
   const selected=new Set();
   const preview=el('div','ranking-grant-preview');
+  const note=el('p','ranking-note','複数バッジは1種類ずつ順番に保存します。途中で停止した場合は同じ内容で再試行できます。');
   function update(){
-    action.textContent=mode.value==='grant'?`${selected.size}名にバッジを付与する`:`${selected.size}名の付与を取り消す`;
-    action.disabled=!badge.value||!selected.size||selected.size>100;
+    const byTeacher=direction.value==='teacher', granting=mode.value==='grant';
+    action.textContent=byTeacher
+      ? (granting?selected.size+'個のバッジを付与する':selected.size+'個の付与を取り消す')
+      : (granting?selected.size+'名にバッジを付与する':selected.size+'名の付与を取り消す');
+    action.disabled=!(byTeacher?teacher.value:badge.value)||!selected.size||selected.size>100;
+  }
+  function addChoice(id,name,can,granted,extra,mark){
+    const cb=input('checkbox');cb.disabled=!can;
+    const label=el('label','ranking-recipient');
+    label.append(cb);
+    if(mark)label.append(mark);
+    label.append(el('span','',name),el('small','ranking-note',granted?'付与済み':extra||'未付与'));
+    cb.addEventListener('change',()=>{if(cb.checked)selected.add(id);else selected.delete(id);update()});
+    list.append(label);
   }
   function populate(){
-    selected.clear();list.replaceChildren();preview.replaceChildren();
-    const def=data.badges.find(x=>x.badgeId===badge.value);
-    if(def)preview.append(badgeMark(def),el('strong','',def.name));
-    for(const teacher of data.teachers){
-      const granted=data.grants.some(x=>x.badgeId===badge.value&&x.teacherUid===teacher.teacherUid);
-      const can=!!def&&(mode.value==='revoke'?granted:def.active&&!granted&&teacher.canGrant!==false);
-      const cb=input('checkbox');cb.disabled=!can;
-      const label=el('label','ranking-recipient');
-      label.append(cb,el('span','',teacher.name),el('small','ranking-note',granted?'付与済み':teacher.canGrant===false?'履歴のみ':'未付与'));
-      cb.addEventListener('change',()=>{if(cb.checked)selected.add(teacher.teacherUid);else selected.delete(teacher.teacherUid);update()});
-      list.append(label);
+    selected.clear();list.replaceChildren();preview.replaceChildren();message.textContent='';
+    const byTeacher=direction.value==='teacher', granting=mode.value==='grant';
+    badgeField.hidden=byTeacher;badge.disabled=byTeacher;badge.required=!byTeacher;
+    teacherField.hidden=!byTeacher;teacher.disabled=!byTeacher;teacher.required=byTeacher;
+    note.hidden=!byTeacher;
+    listTitle.textContent=byTeacher?'バッジ（複数選択可能）':'対象者（複数選択可能）';
+    if(byTeacher){
+      const person=data.teachers.find(x=>x.teacherUid===teacher.value);
+      if(!person){list.append(el('p','empty',data.teachers.length?'対象講師を選択してください。':'対象者がいません。'));update();return;}
+      preview.append(avatar(),el('strong','',person.name));
+      for(const def of data.badges){
+        const granted=data.grants.some(x=>x.badgeId===def.badgeId&&x.teacherUid===person.teacherUid);
+        const can=granting?def.active&&!def.archived&&!granted&&person.canGrant!==false:granted;
+        addChoice(def.badgeId,def.name,can,granted,def.archived?'削除済み':!def.active?'停止中':'',badgeMark(def));
+      }
+      if(!data.badges.length)list.append(el('p','empty','手動バッジがありません。'));
+    }else{
+      const def=data.badges.find(x=>x.badgeId===badge.value);
+      if(def)preview.append(badgeMark(def),el('strong','',def.name));
+      for(const person of data.teachers){
+        const granted=data.grants.some(x=>x.badgeId===badge.value&&x.teacherUid===person.teacherUid);
+        const can=!!def&&(granting?def.active&&!def.archived&&!granted&&person.canGrant!==false:granted);
+        addChoice(person.teacherUid,person.name,can,granted,person.canGrant===false?'履歴のみ':'');
+      }
+      if(!data.teachers.length)list.append(el('p','empty','対象者がいません。'));
     }
-    if(!data.teachers.length)list.append(el('p','empty','対象者がいません。'));
     update();
   }
-  badge.addEventListener('change',populate);mode.addEventListener('change',populate);
-  form.append(el('h3','','講師への一括付与・取消'),field('手動バッジ',badge),preview,field('操作',mode),
-    el('strong','ranking-field-title','対象者（複数選択可能）'),list,field('理由',reason),action,message);
+  for(const control of [direction,badge,teacher,mode])control.addEventListener('change',populate);
+  form.append(el('h3','','講師への一括付与・取消'),field('選択方法',direction),badgeField,teacherField,preview,field('操作',mode),
+    listTitle,list,note,field('理由',reason),action,message);
   form.addEventListener('submit',event=>{
     event.preventDefault();
     if(action.disabled||!reason.value.trim())return;
-    const count=selected.size;
-    save({action:mode.value==='grant'?'grantManualBadges':'revokeManualBadges',badgeId:badge.value,teacherUids:[...selected].sort(),reason:reason.value.trim()},form,message,
-      mode.value==='grant'?`${count}名にバッジを付与しました。`:`${count}名の付与を取り消しました。`);
+    const count=selected.size, granting=mode.value==='grant';
+    if(direction.value==='teacher'){
+      const commands=[...selected].sort().map(badgeId=>({action:granting?'grantManualBadges':'revokeManualBadges',badgeId,teacherUids:[teacher.value],reason:reason.value.trim()}));
+      save(commands,form,message,granting?count+'個のバッジを付与しました。':count+'個の付与を取り消しました。');
+    }else{
+      save({action:granting?'grantManualBadges':'revokeManualBadges',badgeId:badge.value,teacherUids:[...selected].sort(),reason:reason.value.trim()},form,message,
+        granting?count+'名にバッジを付与しました。':count+'名の付与を取り消しました。');
+    }
   });
   populate();return form;
 }
@@ -592,7 +627,7 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
   }
 
   function go(nextView, teacher) {
-    if (!available() || (nextView === 'owner' && getRole() !== 'owner')) return;
+    if (!available() || pendingMutation?.busy || (nextView === 'owner' && getRole() !== 'owner')) return;
     view = nextView;
     target = teacher;
     success = undefined;
@@ -674,8 +709,16 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
   async function save(data, form, message, successMessage) {
     if (!available() || view !== 'owner' || getRole() !== 'owner' || pendingMutation?.busy) return;
     const signature = JSON.stringify(data);
-    const operationId = pendingMutation?.signature === signature ? pendingMutation.operationId : crypto.randomUUID();
-    const mutation = {signature, operationId, busy: true};
+    const commands = Array.isArray(data) ? data : [data];
+    if (!commands.length) return;
+    if (pendingMutation?.batch && pendingMutation.signature !== signature) {
+      message.textContent='前回の一括処理の結果が未確認です。同じ内容で再試行するか、画面を閉じて再取得してください。';
+      return;
+    }
+    const mutation = pendingMutation?.signature === signature ? pendingMutation : {
+      signature, operationIds:commands.map(()=>crypto.randomUUID()), completed:0, batch:Array.isArray(data)
+    };
+    mutation.busy=true;
     pendingMutation = mutation;
     const seq = serial;
     const uid = getSession();
@@ -684,8 +727,14 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
     for (const control of controls) control.disabled = true;
     message.textContent = '保存しています…';
     try {
-      const reply = await callAchievement({...data, operationId});
-      if (!['committed', 'replayed'].includes(reply?.data?.state)) throw Error('INVALID_RESPONSE');
+      while(mutation.completed<commands.length){
+        if(!current(seq,uid,currentRole)||pendingMutation!==mutation)return;
+        const i=mutation.completed;
+        if(mutation.batch)message.textContent='保存しています… '+i+' / '+commands.length+'件確認済み';
+        const reply = await callAchievement({...commands[i], operationId:mutation.operationIds[i]});
+        if (!['committed', 'replayed'].includes(reply?.data?.state)) throw Error('INVALID_RESPONSE');
+        mutation.completed++;
+      }
       if (pendingMutation === mutation) pendingMutation = undefined;
       if (!current(seq, uid, currentRole)) return;
       success = successMessage;
@@ -693,7 +742,8 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
     } catch (failure) {
       if (pendingMutation === mutation) mutation.busy = false;
       if (!current(seq, uid, currentRole) || !form.isConnected) return;
-      message.textContent = failureMessage(failure, '保存を確認できませんでした。同じ内容で再試行できます。');
+      const detail=failureMessage(failure, '保存を確認できませんでした。同じ内容で再試行できます。');
+      message.textContent = mutation.batch ? mutation.completed+' / '+commands.length+'件の保存を確認済み。残りは未確認です。'+detail+' 同じ内容で再試行するか、画面を閉じて再取得してください。' : detail;
       for (const control of controls) control.disabled = false;
     }
   }
@@ -792,7 +842,7 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
 
     const head = el('div', 'ranking-head');
     const heading = el('h2', '', '講師ランキング');
-    const close = button('×', () => dialog.close(), 'close-modal');
+    const close = button('×', () => {if(!pendingMutation?.busy)dialog.close();}, 'close-modal');
     close.setAttribute('aria-label', '閉じる');
     head.append(heading, close);
 
@@ -838,6 +888,7 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
     host.querySelector('.close-modal')?.focus();
   }
   trigger.addEventListener('click', () => open('rank'));
+  dialog.addEventListener('cancel', event=>{if(pendingMutation?.busy)event.preventDefault();});
   dialog.addEventListener('close', () => {
     if (!dialog.open) clear();
   });
