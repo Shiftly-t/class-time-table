@@ -12,12 +12,17 @@ const ignoredControlTypes = new Set(['button', 'submit', 'reset', 'hidden']);
 
 function draftFingerprint(dialog) {
   const controls = [...dialog.querySelectorAll('input, select, textarea')];
-  return JSON.stringify(controls.filter(control => !ignoredControlTypes.has(control.type)).map(control => {
-    let value = control.value;
-    if (control.type === 'checkbox' || control.type === 'radio') value = control.checked;
-    if (control.type === 'select-multiple') value = [...control.selectedOptions].map(option => option.value);
-    return [control.id || control.name || '', control.type, value];
-  }));
+  return JSON.stringify(
+    controls
+      .filter((control) => !ignoredControlTypes.has(control.type))
+      .map((control) => {
+        let value = control.value;
+        if (control.type === 'checkbox' || control.type === 'radio') value = control.checked;
+        if (control.type === 'select-multiple')
+          value = [...control.selectedOptions].map((option) => option.value);
+        return [control.id || control.name || '', control.type, value];
+      }),
+  );
 }
 
 export function installWorkspaceDialogs(document, window) {
@@ -61,10 +66,10 @@ export function installWorkspaceDialogs(document, window) {
   }
 
   for (const dialog of document.querySelectorAll('dialog')) {
-    dialog.addEventListener('click', event => {
+    dialog.addEventListener('click', (event) => {
       if (event.target === dialog && canDismiss(dialog)) dialog.close();
     });
-    dialog.addEventListener('cancel', event => {
+    dialog.addEventListener('cancel', (event) => {
       if (!canDismiss(dialog)) event.preventDefault();
     });
     dialog.addEventListener('close', () => {
@@ -82,8 +87,15 @@ export function installWorkspaceDialogs(document, window) {
       // iPad Safariでは、キーボードを閉じる最初のタップで保存ボタンが反応しないことがある。
       if (event.type === 'pointerdown' && event.pointerType !== 'touch') return;
       const active = document.activeElement;
-      if (event.isPrimary === false || save.disabled || !active || !form.contains(active) ||
-          !['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) || active.type === 'hidden') return;
+      if (
+        event.isPrimary === false ||
+        save.disabled ||
+        !active ||
+        !form.contains(active) ||
+        !['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) ||
+        active.type === 'hidden'
+      )
+        return;
       if (event.cancelable) event.preventDefault();
       if (!form.reportValidity()) return;
       // 入力中の文字を確定してから、通常の submit ハンドラーを呼び出す。

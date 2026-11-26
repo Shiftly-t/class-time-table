@@ -60,7 +60,8 @@ function japaneseHolidays(year) {
   // A day between two national holidays can become a citizen's holiday.
   for (let day = 1; day <= daysInYear; day++) {
     const date = dateKey(new Date(year, 0, day));
-    if (date.slice(0, 4) !== String(year) || holidays.has(date) || localDateFromKey(date).getDay() === 0) continue;
+    if (date.slice(0, 4) !== String(year) || holidays.has(date) || localDateFromKey(date).getDay() === 0)
+      continue;
     if (holidays.has(datePlus(date, -1)) && holidays.has(datePlus(date, 1))) {
       holidays.set(date, '国民の休日');
     }

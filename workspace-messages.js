@@ -3,7 +3,12 @@ const NORMAL_RETRY_ID = 'normalAuthorityRetry';
 const INLINE_SUCCESS_CLASS = 'shiftly-inline-success';
 const MESSAGE_TIMEOUT_MS = 7000;
 
-export function installWorkspaceMessages({ messageHost, seasonalAuthority, bookingTransport, normalAuthority }) {
+export function installWorkspaceMessages({
+  messageHost,
+  seasonalAuthority,
+  bookingTransport,
+  normalAuthority,
+}) {
   let messageTimer;
   let actionGeneration = 0;
 
@@ -41,7 +46,7 @@ export function installWorkspaceMessages({ messageHost, seasonalAuthority, booki
   }
 
   function clearInlineSuccess() {
-    document.querySelectorAll('.' + INLINE_SUCCESS_CLASS).forEach(node => node.remove());
+    document.querySelectorAll('.' + INLINE_SUCCESS_CLASS).forEach((node) => node.remove());
   }
 
   function clearActions() {
@@ -76,7 +81,9 @@ export function installWorkspaceMessages({ messageHost, seasonalAuthority, booki
       }
     });
     const notice = getNotice();
-    const host = notice?.open ? notice.querySelector('#shiftlyNoticeActions') : openDialog() || messageHost.parentElement;
+    const host = notice?.open
+      ? notice.querySelector('#shiftlyNoticeActions')
+      : openDialog() || messageHost.parentElement;
     host.append(button);
   }
 
@@ -107,7 +114,7 @@ export function installWorkspaceMessages({ messageHost, seasonalAuthority, booki
         label: '講習APIの送信結果を確認',
         run: () => seasonalAuthority.confirmPending(),
         success: '保存済みです。画面を開き直して最新の内容を確認してください。',
-        onError: error => showMessage(error.message),
+        onError: (error) => showMessage(error.message),
       });
     } else if (bookingTransport.hasPending()) {
       addAction({
@@ -115,7 +122,7 @@ export function installWorkspaceMessages({ messageHost, seasonalAuthority, booki
         label: '送信結果を確認',
         run: () => bookingTransport.confirmPending(),
         success: '保存済みです。再送せず、画面を開き直して最新の内容を確認してください。',
-        onError: error => showMessage(error.message),
+        onError: (error) => showMessage(error.message),
       });
     }
 
@@ -125,7 +132,7 @@ export function installWorkspaceMessages({ messageHost, seasonalAuthority, booki
         label: '保存結果を確認・同じ処理を再送',
         run: () => normalAuthority.retryPending(),
         success: '保存済みの結果を確認しました。画面を閉じて最新の内容を確認してください。',
-        onError: error => trapError(error, '保存結果を確認できません。同じ処理を再送できます'),
+        onError: (error) => trapError(error, '保存結果を確認できません。同じ処理を再送できます'),
       });
     } else if (message) {
       messageTimer = setTimeout(() => {
@@ -146,8 +153,8 @@ export function installWorkspaceMessages({ messageHost, seasonalAuthority, booki
     renderMessage(message, true);
   }
 
-  showMessage.success = message => renderMessage(message);
-  showMessage.error = message => showMessage(message, 'error');
+  showMessage.success = (message) => renderMessage(message);
+  showMessage.error = (message) => showMessage(message, 'error');
 
   function trapError(error, fallback) {
     console.error(error);
@@ -157,55 +164,46 @@ export function installWorkspaceMessages({ messageHost, seasonalAuthority, booki
   return { showMessage, trapError, reset };
 }
 
-function friendlyShiftlyError(e,fallback='処理に失敗しました'){
-  const code=String(e?.code||'').split('/').pop();
-  const message=String(e?.message||'');
+function friendlyShiftlyError(e, fallback = '処理に失敗しました') {
+  const code = String(e?.code || '')
+    .split('/')
+    .pop();
+  const message = String(e?.message || '');
 
-  if(e?.userMessage)return e.userMessage;
-  if(e?.code==='normal-authority/blocked')return message;
+  if (e?.userMessage) return e.userMessage;
+  if (e?.code === 'normal-authority/blocked') return message;
 
-  const reasons={
+  const reasons = {
     'Teacher cannot work at this time':
       '担当講師は指定日時に勤務できません。勤務時間と欠席設定を確認してください。',
-    'Weekly slot is outside teacher workdays':
-      '担当講師の通常勤務時間外です。勤務コマを確認してください。',
-    'Teacher capacity exceeded':
-      '担当講師の受講人数上限を超えています。',
-    'Student already has an overlapping lesson':
-      '同じ生徒の授業時間が重複しています。',
-    'School is closed':
-      '指定日は休校日です。',
-    'Move target is closed':
-      '移動先は休校日です。',
-    'Reload work settings and revision':
-      '勤務設定が変更されています。再読み込みしてください。',
-    'Reload updated work settings':
-      '勤務設定を再読み込みしてください。',
-    'Weekly source changed; reload':
-      '通常授業の設定が変更されています。',
-    'Administrator permission required':
-      '管理者権限が必要です。',
-    'Verified App Check required':
-      'アプリの認証を確認できません。'
+    'Weekly slot is outside teacher workdays': '担当講師の通常勤務時間外です。勤務コマを確認してください。',
+    'Teacher capacity exceeded': '担当講師の受講人数上限を超えています。',
+    'Student already has an overlapping lesson': '同じ生徒の授業時間が重複しています。',
+    'School is closed': '指定日は休校日です。',
+    'Move target is closed': '移動先は休校日です。',
+    'Reload work settings and revision': '勤務設定が変更されています。再読み込みしてください。',
+    'Reload updated work settings': '勤務設定を再読み込みしてください。',
+    'Weekly source changed; reload': '通常授業の設定が変更されています。',
+    'Administrator permission required': '管理者権限が必要です。',
+    'Verified App Check required': 'アプリの認証を確認できません。',
   };
 
-  if(Object.hasOwn(reasons,message))return reasons[message];
+  if (Object.hasOwn(reasons, message)) return reasons[message];
 
-  const hints={
-    'permission-denied':'操作権限がありません。',
-    'unauthenticated':'再ログインしてください。',
-    'aborted':'データが変更された可能性があります。再読み込みしてください。',
-    'invalid-argument':'入力内容を確認してください。',
-    'already-exists':'登録内容が重複していないか確認してください。',
-    'failed-precondition':'操作に必要な条件を満たしていません。設定を確認してください。',
-    'resource-exhausted':'処理可能な上限を超えています。',
-    'unavailable':'通信状態と保存結果を確認してください。',
-    'deadline-exceeded':'保存結果を確認してください。',
-    'internal':'保存結果を確認し、解決しない場合は運営に連絡してください。'
+  const hints = {
+    'permission-denied': '操作権限がありません。',
+    'unauthenticated': '再ログインしてください。',
+    'aborted': 'データが変更された可能性があります。再読み込みしてください。',
+    'invalid-argument': '入力内容を確認してください。',
+    'already-exists': '登録内容が重複していないか確認してください。',
+    'failed-precondition': '操作に必要な条件を満たしていません。設定を確認してください。',
+    'resource-exhausted': '処理可能な上限を超えています。',
+    'unavailable': '通信状態と保存結果を確認してください。',
+    'deadline-exceeded': '保存結果を確認してください。',
+    'internal': '保存結果を確認し、解決しない場合は運営に連絡してください。',
   };
 
-  const hint=Object.hasOwn(hints,code)
-    ?hints[code]:'解決しない場合は運営に連絡してください。';
+  const hint = Object.hasOwn(hints, code) ? hints[code] : '解決しない場合は運営に連絡してください。';
 
-  return [fallback,hint].join(String.fromCharCode(10));
+  return [fallback, hint].join(String.fromCharCode(10));
 }

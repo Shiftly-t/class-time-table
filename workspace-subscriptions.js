@@ -6,7 +6,7 @@ export function createWorkspaceSubscriptions(onSnapshot, sessionGuard) {
   function subscribe(ref, onValue, onError) {
     const currentSession = sessionGuard();
     const activeGeneration = generation;
-    const guard = handler => value => {
+    const guard = (handler) => (value) => {
       if (activeGeneration === generation && currentSession()) handler(value);
     };
     unsubscribers.push(onSnapshot(ref, guard(onValue), guard(onError)));

@@ -1,5 +1,4 @@
-export const lessonEnded = (date, end) =>
-  Date.parse(`${date}T${end}:00+09:00`) <= Date.now();
+export const lessonEnded = (date, end) => Date.parse(`${date}T${end}:00+09:00`) <= Date.now();
 
 export function askCorrectionReason(date) {
   const dialog = document.createElement('dialog');
@@ -30,7 +29,7 @@ export function askCorrectionReason(date) {
   save.value = 'save';
   save.textContent = '訂正を保存する';
   input.addEventListener('input', () => input.setCustomValidity(''));
-  form.addEventListener('submit', event => {
+  form.addEventListener('submit', (event) => {
     if (input.value.trim()) return;
     event.preventDefault();
     input.setCustomValidity('訂正理由を入力してください。');
@@ -40,12 +39,16 @@ export function askCorrectionReason(date) {
   form.append(label, actions);
   dialog.append(title, form);
   document.body.append(dialog);
-  return new Promise(resolve => {
-    dialog.addEventListener('close', () => {
-      const reason = dialog.returnValue === 'save' ? input.value.trim() : '';
-      dialog.remove();
-      resolve(reason || null);
-    }, {once: true});
+  return new Promise((resolve) => {
+    dialog.addEventListener(
+      'close',
+      () => {
+        const reason = dialog.returnValue === 'save' ? input.value.trim() : '';
+        dialog.remove();
+        resolve(reason || null);
+      },
+      { once: true },
+    );
     dialog.showModal();
     input.focus();
   });
