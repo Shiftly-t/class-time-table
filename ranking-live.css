@@ -95,3 +95,48 @@
 .ranking-profile-badges{display:grid;gap:8px;min-width:0;padding:12px 0;border-top:1px solid #e1e7f2;border-bottom:1px solid #e1e7f2}.ranking-profile-badges-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.ranking-profile-badges .ranking-badge-gallery{grid-template-columns:repeat(auto-fill,minmax(76px,1fr));padding:4px 0;border-bottom:0}.ranking-profile-badges .ranking-badge-tile{min-width:0;overflow-wrap:anywhere}.ranking-profile-badges .ranking-badge-tile .ranking-badge-mark{width:52px;max-width:52px;min-height:52px;font-size:24px}
 
 .ranking-profile-order-editor{display:grid;gap:8px;min-width:0}.ranking-profile-order-editor[hidden],.ranking-profile-badges [hidden]{display:none!important}.ranking-profile-order-row{display:flex;align-items:center;gap:8px;min-width:0;border-bottom:1px solid #e1e7f2;padding:6px 0}.ranking-profile-order-row strong{flex:1;min-width:0;overflow-wrap:anywhere}.ranking-profile-order-row button{min-width:40px;min-height:40px}.ranking-profile-order-row .ranking-badge-mark{flex:none;width:36px;min-height:36px;font-size:18px}
+
+/* Keep native Safari month controls inside their own grid track. */
+#rankingDialog .ranking-filters{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));
+  align-items:start;
+  gap:12px 16px;
+  min-width:0;
+}
+#rankingDialog .ranking-filters > label{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:8px;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  margin:0;
+}
+#rankingDialog .ranking-filters > label > :is(input,select){
+  box-sizing:border-box;
+  display:block;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  height:44px;
+  min-height:44px;
+  margin:0;
+  padding:0 12px;
+  font-size:14px;
+}
+#rankingDialog .ranking-filters input[type="month"]{
+  -webkit-appearance:none;
+  appearance:none;
+}
+#rankingDialog .ranking-filters input[type="month"]::-webkit-date-and-time-value{
+  min-width:0;
+  margin:0;
+  text-align:center;
+}
+@media(max-width:900px){
+  #rankingDialog .ranking-filters{
+    grid-template-columns:minmax(0,1fr);
+    gap:12px;
+  }
+}
