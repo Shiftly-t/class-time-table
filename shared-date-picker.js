@@ -14,7 +14,7 @@ export function monthDays(year,month){
 export function dateAllowed(value,min,max){
   return validDate(value)&&(!validDate(min)||value>=min)&&(!validDate(max)||value<=max);
 }
-export function installSharedDatePicker({ids,today,allowed}){
+export function installSharedDatePicker({ids,today,allowed,gate}){
   const make=(tag,cls,text)=>{const n=document.createElement(tag);n.className=cls||'';if(text!==undefined)n.textContent=text;return n;};
   const btn=(text,cls,fn)=>{const b=make('button',cls,text);b.type='button';b.addEventListener('click',fn);return b;};
   const dialog=make('dialog','modal shared-calendar-dialog');
@@ -90,6 +90,7 @@ export function installSharedDatePicker({ids,today,allowed}){
     new MutationObserver(sync).observe(input,{attributes:true,attributeFilter:['disabled','readonly']});
     sync();
   }
+  if(gate)new MutationObserver(()=>{if(dialog.open&&!usable(target))dialog.close();}).observe(gate,{attributes:true,attributeFilter:['hidden']});
   dialog.addEventListener('close',()=>{if(dialog.open)return;const previousTrigger=trigger;target=trigger=parentDialog=null;if(previousTrigger?.isConnected&&!previousTrigger.disabled&&allowed())previousTrigger.focus({preventScroll:true});});
   return dialog;
 }

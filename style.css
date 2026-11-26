@@ -1147,3 +1147,9 @@ dialog.modal>.modal-content>.modal-head>.close-modal{flex:none;min-width:44px;mi
 .dashboard-search-result>*{min-width:0}
 .dashboard-search-result small{color:#58667f}
 @media(max-width:480px){.dashboard-kpis>.panel,.dashboard-section{padding:12px}.dashboard-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Keep success feedback visible inside the active modal's top layer. */
+.shiftly-inline-success{background:#eef8f0;border:1px solid #bedfc4;border-radius:10px;color:#166534;font-size:13px;font-weight:650;padding:10px 12px;line-height:1.5;overflow-wrap:anywhere;margin:0 0 12px}
+dialog.modal .form-grid>*{min-width:0;max-width:100%}
+dialog.modal .form-grid :is(input,select,textarea){max-width:100%}
+@media(max-width:480px){dialog.modal .form-grid :is(input:not([type=checkbox]):not([type=radio]),select,textarea){font-size:16px}}

@@ -14,7 +14,7 @@ import { bookingAppCheckSiteKey } from './booking-config.js';
 import { createNormalAuthorityClient } from './normal-authority-client.js?v=qa-errorui-20261119-01';
 import { installNormalEditor } from './normal-editor.js?v=prod-ui-20261124-schedule-first';
 import { installTeacherWorkPage } from './teacher-work.js?v=prod-ui-20261126-date-browsing';
-import { installSharedDatePicker } from './shared-date-picker.js?v=20261126-ux1';
+import { installSharedDatePicker } from './shared-date-picker.js?v=20261126-ux3';
 import { summarizeDay,searchDirectory,readDisplayPreferences,writeDisplayPreferences } from './workspace-ux.js?v=20261126-ux2';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
@@ -363,6 +363,19 @@ showMessage.error=message=>showMessage(message,'error');
 function renderMessage(message,modal=false) {
 
   $('message').textContent=modal?'':message;clearTimeout(messageTimer);
+  document.querySelectorAll('.shiftly-inline-success').forEach(n=>n.remove());
+  if(!modal&&message){
+    const active=document.activeElement?.closest('dialog[open]');
+    const top=active||[...document.querySelectorAll('dialog[open]')].at(-1);
+    const content=top?.querySelector('.modal-content');
+    if(content&&top.id!=='shiftlyNotice'){
+      const status=make('p','shiftly-inline-success',message);
+      status.setAttribute('role','status');
+      const head=content.querySelector('.modal-head');
+      if(head)head.after(status);else content.prepend(status);
+      $('message').textContent='';
+    }
+  }
   document.getElementById('normalAuthorityRetry')?.remove();
   document.getElementById('bookingResultCheck')?.remove();
   if(seasonalAuthority.hasPending()){
@@ -376,7 +389,7 @@ function renderMessage(message,modal=false) {
     const retry=make('button','ghost','保存結果を確認・同じ処理を再送');retry.id='normalAuthorityRetry';retry.type='button';
     retry.addEventListener('click',async()=>{retry.disabled=true;try{await normalAuthority.retryPending();closeShiftlyNotice();showMessage.success('保存済みの結果を確認しました。画面を閉じて最新の内容を確認してください。');}catch(e){trapError(e,'保存結果を確認できません。同じ処理を再送できます');}});
     messageActionHost().append(retry);
-  }else if(message)messageTimer=setTimeout(()=>$('message').textContent='',7000);
+  }else if(message)messageTimer=setTimeout(()=>{$('message').textContent='';document.querySelectorAll('.shiftly-inline-success').forEach(n=>n.remove());},7000);
 }
 
 function friendlyShiftlyError(e,fallback='処理に失敗しました'){
@@ -439,10 +452,32 @@ function trapError(e,fallback='処理に失敗しました'){
 
 function make(tag, className='', text='') { const node=document.createElement(tag); if(className) node.className=className; if(text!==undefined && text!==null) node.textContent=String(text); return node; }
 function cell(row,value,className='') { const td=make('td',className,value); row.append(td); return td; }
-function showDialog(id) { $(id).showModal(); }
-function closeDialog(id) { $(id).close(); }
-document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>closeDialog(button.dataset.close)));
-document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+const guardedDialogIds=new Set(['closureDialog','examDialog','editorNewDialog','courseDeadlineDialog','courseDialog','studentDialog','lessonFormDialog']);
+const dialogBaselines=new WeakMap();
+function dialogFingerprint(dialog){
+  return JSON.stringify([...dialog.querySelectorAll('input,select,textarea')].filter(node=>!['button','submit','reset','hidden'].includes(node.type)).map(node=>[
+    node.id||node.name||'',node.type,
+    node.type==='checkbox'||node.type==='radio'?node.checked:node.multiple?[...node.selectedOptions].map(o=>o.value):node.value
+  ]));
+}
+function hasDialogDraft(dialog){
+  return dialog.open&&dialogBaselines.has(dialog)&&dialogBaselines.get(dialog)!==dialogFingerprint(dialog);
+}
+function canDismissDialog(dialog){
+  return !hasDialogDraft(dialog)||confirm('未保存の入力内容があります。保存せず閉じますか？');
+}
+function showDialog(id) {
+  const dialog=$(id);if(dialog.open)return;
+  if(guardedDialogIds.has(id))dialogBaselines.set(dialog,dialogFingerprint(dialog));
+  dialog.showModal();
+}
+function closeDialog(id) { const dialog=$(id);if(dialog.open)dialog.close(); }
+document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>{const d=$(button.dataset.close);if(d&&canDismissDialog(d))closeDialog(button.dataset.close);}));
+document.querySelectorAll('dialog').forEach(d=>{
+  d.addEventListener('click',e=>{if(e.target===d&&canDismissDialog(d))d.close();});
+  d.addEventListener('cancel',e=>{if(!canDismissDialog(d))e.preventDefault();});
+  d.addEventListener('close',()=>{if(!d.open)dialogBaselines.delete(d);});
+});
 
 // iPad Safari: when an input/textarea still has focus, the first tap on a
 // dialog's Save button can be consumed by the virtual keyboard dismissing.
@@ -2618,6 +2653,7 @@ function renderAvailabilityHome(){
 setInterval(()=>{
   if(!state.user)return;
   refreshAcademicYear();
+  if(state.page==='dashboard'&&$('dashboardDate').dataset.date!==todayKey())renderDashboard();
   renderAvailabilityHome();
   renderNoticeButton();
   if($('notificationDialog').open)renderNotifications();
@@ -2626,6 +2662,7 @@ setInterval(()=>{
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden||!state.user)return;
   refreshAcademicYear();
+  if(state.page==='dashboard')renderDashboard();
   renderAvailabilityHome();renderNoticeButton();if($('notificationDialog').open)renderNotifications();
   if(state.page==='availability')renderAvailabilityPage();
 });
@@ -3656,12 +3693,13 @@ regularEditor=installNormalEditor({
 installSharedDatePicker({
   ids:['editorDate','normalDate','closureDate','editorNewDate','courseStart','courseEnd','lessonDate','workSpecialDate'],
   today:todayKey,
-  allowed:()=>Boolean(state.user&&!$('appPanel').hidden)
+  allowed:()=>Boolean(state.user&&!$('appPanel').hidden),gate:$('appPanel')
 });
 function dashboardCanRead(){return isAdmin()&&Boolean(state.user)&&!$('appPanel').hidden;}
 function renderDashboard(){
   if(!dashboardCanRead())return;
   const date=todayKey();
+  $('dashboardDate').dataset.date=date;
   $('dashboardDate').textContent=date.slice(0,4)+'年'+prettyDate(date);
   const ready=dashboardReady.students&&dashboardReady.people&&['entriesStatus','closuresStatus','openDaysStatus','examStatus','coursesStatus'].every(k=>state[k]==='ready')&&!hasCourseConflict(date);
   const teacherReady=ready&&teacherWorkDataReady()&&state.teacherAbsencesStatus==='ready';
@@ -3734,6 +3772,7 @@ $('dashboardSystemLink').addEventListener('click',()=>{if(dashboardCanRead()&&is
 
 function hasWorkspaceDraft(){
   if(!state.user)return false;
+  if([...document.querySelectorAll('dialog[open]')].some(hasDialogDraft))return true;
   if(regularEditor?.hasChanges()||regularEditor?.isBusy()||teacherWorkPage?.hasChanges()||teacherWorkPage?.isBusy())return true;
   if(courseEditor?.busy||courseEditorChanges().length||availabilityEditor?.busy||availabilityEditor.sourceKey!==availabilitySetKey(availabilityEditor.draft))return true;
   try{
@@ -3762,7 +3801,6 @@ if(location.origin==='https://shiftly-t.web.app'&&firebaseConfig.projectId==='sh
     for(const id of ['appPanel','notificationButton'])observer.observe($(id),{attributes:true,attributeFilter:['hidden']});
     const maintenanceLabel=$('maintenanceModeLabel');
     if(maintenanceLabel)observer.observe(maintenanceLabel,{childList:true});
-    observer.observe($('rankingButton'),{attributes:true,attributeFilter:['hidden']});
     if(state.page==='dashboard')renderDashboard();
   }).catch(()=>console.warn('Ranking UI unavailable'));
 }

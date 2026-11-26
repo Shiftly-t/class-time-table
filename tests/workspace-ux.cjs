@@ -1,0 +1,21 @@
+// Offline unit checks for the dashboard, local preferences and shared calendar.
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const load=file=>new Function(fs.readFileSync(path.resolve(__dirname,'..',file),'utf8').replace(/^export\s+/gm,'')+'\nreturn '+(file==='workspace-ux.js'?'{summarizeDay,searchDirectory,readDisplayPreferences,writeDisplayPreferences}':'{validDate,monthDays,dateAllowed}'))();
+const u=load('workspace-ux.js'),d=load('shared-date-picker.js');
+const p=[{number:1,start:'17:30',end:'18:25'}],row={start:p[0].start,end:p[0].end,teacherUid:'a'};
+assert.deepEqual(u.summarizeDay([row,row,{...row,teacherUid:'b',teacherAbsent:true},{...row,status:'cancelled'}],p,new Set(['a','b'])),{lessons:3,teachers:1,counts:[{label:'1限',time:'17:30〜18:25',count:3}]});
+assert.equal(u.summarizeDay([],p,new Set()).lessons,0);
+assert.equal(u.searchDirectory('Ａ',[{id:'s',name:'a'}],[{id:'t',name:'A'}]).length,2);
+assert.deepEqual(u.searchDirectory('',[{id:'s',name:'a'}],[]),[]);
+const m=new Map(),storage={getItem:k=>m.get(k),setItem:(k,v)=>m.set(k,v)};
+u.writeDisplayPreferences(storage,'a',{scheduleView:'week'});
+assert.equal(u.readDisplayPreferences(storage,'a').scheduleView,'week');
+assert.deepEqual(u.readDisplayPreferences(storage,'b'),{});
+assert.equal(d.validDate('2028-02-29'),true);assert.equal(d.validDate('2026-02-29'),false);
+assert.equal(d.monthDays(2026,11).leading,6);
+assert.equal(d.monthDays(2028,2).dates.length,29);
+assert.equal(d.dateAllowed('2026-11-30','2026-11-01','2026-11-30'),true);
+assert.equal(d.dateAllowed('2026-12-01','2026-11-01','2026-11-30'),false);
+console.log('SUCCESS WORKSPACE UX UNIT TESTS');
