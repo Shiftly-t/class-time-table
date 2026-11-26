@@ -833,10 +833,17 @@ function renderBrandVersion(version){
   el.textContent=label;el.title=label;el.hidden=!label;
 }
 function applyMaintenanceState(){
-  $("restoreJobPanel").hidden=!restoreBlocked();
-  if(restoreBlocked()){if($('bookingFrameHost').firstElementChild)resetBookingFrame();$("appPanel").hidden=true;$("maintenancePanel").hidden=true;$("notificationButton").hidden=true;return;}
-
+  const wasHidden=$('appPanel').hidden;
+  const restoring=restoreBlocked();
   const blocked=maintenanceState.enabled && !isOwner();
+  const willHide=restoring||blocked||!maintenanceState.loaded;
+  if(willHide&&!wasHidden&&workspaceScrollPage){
+    workspaceScrollPositions.set(workspaceScrollPage,Math.max(0,window.scrollY));
+    cancelWorkspaceScrollRestore();
+  }
+  $("restoreJobPanel").hidden=!restoring;
+  if(restoring){if($('bookingFrameHost').firstElementChild)resetBookingFrame();$("appPanel").hidden=true;$("maintenancePanel").hidden=true;$("notificationButton").hidden=true;return;}
+
   if((blocked||!maintenanceState.loaded)&&$('bookingFrameHost').firstElementChild)resetBookingFrame();
   else if(!blocked&&maintenanceState.loaded&&state.page==='bookingManagement'&&isAdmin()){
     $('bookingManagementPage').hidden=false;openBookingFrame();
@@ -849,6 +856,7 @@ function applyMaintenanceState(){
   $('maintenanceStatus').textContent=maintenanceState.loaded?'ただいまメンテナンス中です':'利用状況を確認しています…';
   if(!blocked && maintenanceState.loaded && state.user){ $('notificationButton').hidden=false; }
   if(isOwner())renderMaintenanceOwner();
+  if(wasHidden&&!$('appPanel').hidden&&state.page&&workspaceScrollPage===state.page)restoreWorkspaceScroll(state.page);
 }
 function renderMaintenanceOwner(){
   if(!isOwner()||!$('maintenanceOwnerPage'))return;
@@ -3396,6 +3404,7 @@ const loginFormNode=$('loginForm');
 const loginFormParent=loginFormNode.parentElement;
 
 function loggedOut(){
+  state.page='';
   renderBrandVersion('');
   resetWorkspaceScroll();
   resetBookingFrame();
@@ -3417,6 +3426,7 @@ function loggedOut(){
   for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();
 }
 async function loggedIn(user){
+  state.page='';
   renderBrandVersion('');
   resetWorkspaceScroll();
   resetBookingFrame();
@@ -3595,7 +3605,8 @@ function startBusinessSubscriptions(user){
     renderNoticeButton();
     if($('notificationDialog').open){renderNotifications();markVisibleOfficialRead();}
   },err=>trapError(err,'運営のお知らせの既読情報を取得できません')));
-  nav(isAdmin()?'count':'teacherLessons');
+  // Subscription recovery is not a new login. Keep the current workspace.
+  if(!state.page)nav(isAdmin()?'count':'teacherLessons');
 }
 $('loginForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=event.submitter;button.disabled=true;
