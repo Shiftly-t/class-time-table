@@ -82,6 +82,64 @@ function section(title) {
   return node;
 }
 
+// In-page picker avoids the native full-screen iOS month wheel.
+function rankingPeriodPicker(kind, key, today, onChange) {
+  const monthly=kind==='month';
+  const [currentYear,currentMonth]=today.split('-').map(Number);
+  const maxYear=monthly?currentYear:currentYear-(currentMonth<4?1:0);
+  const minYear=2000;
+  const selectedYear=Number(key.slice(0,4));
+  const selectedMonth=monthly?Number(key.slice(5,7)):0;
+  let browseYear=selectedYear;
+  const fieldset=el('div','ranking-period-field');
+  const title=el('span','ranking-period-label','対象期間');
+  const format=(y,m)=>monthly?y+'年'+m+'月':y+'年度';
+  const trigger=button(format(selectedYear,selectedMonth),()=>setOpen(panel.hidden),'ranking-period-trigger');
+  trigger.dataset.rankingFocus='period';
+  trigger.setAttribute('aria-label','対象期間：'+format(selectedYear,selectedMonth));
+  trigger.setAttribute('aria-expanded','false');
+  trigger.setAttribute('aria-controls','rankingPeriodPickerPanel');
+  const panel=el('div','ranking-period-picker');
+  panel.id='rankingPeriodPickerPanel';panel.hidden=true;
+  const bar=el('div','ranking-picker-nav');
+  const yearText=el('strong','ranking-picker-year');
+  const prev=button('‹',()=>{browseYear=Math.max(minYear,browseYear-(monthly?1:12));paint();},'ranking-picker-arrow');
+  const next=button('›',()=>{browseYear=Math.min(maxYear,browseYear+(monthly?1:12));paint();},'ranking-picker-arrow');
+  prev.setAttribute('aria-label',monthly?'前年':'前の年度一覧');
+  next.setAttribute('aria-label',monthly?'翌年':'次の年度一覧');
+  const grid=el('div','ranking-picker-grid');
+  function setOpen(open){
+    panel.hidden=!open;
+    trigger.setAttribute('aria-expanded',String(open));
+    if(open){browseYear=monthly?selectedYear:Math.max(minYear,selectedYear-11);paint();}
+  }
+  function choose(y,m){
+    const value=monthly?String(y)+'-'+String(m).padStart(2,'0'):String(y);
+    setOpen(false);trigger.focus({preventScroll:true});onChange(value);
+  }
+  function paint(){
+    grid.replaceChildren();
+    const last=Math.min(maxYear,browseYear+11);
+    yearText.textContent=monthly?browseYear+'年':browseYear+'〜'+last+'年度';
+    prev.disabled=browseYear<=minYear;
+    next.disabled=monthly?browseYear>=maxYear:last>=maxYear;
+    const first=monthly?1:browseYear, end=monthly?12:last;
+    for(let n=first;n<=end;n++){
+      const y=monthly?browseYear:n,m=monthly?n:0;
+      const selected=y===selectedYear&&(!monthly||m===selectedMonth);
+      const choice=button(monthly?m+'月':y+'年度',()=>choose(y,m),'ranking-picker-choice'+(selected?' active':''));
+      choice.disabled=monthly&&y===currentYear&&m>currentMonth;
+      choice.setAttribute('aria-pressed',String(selected));
+      grid.append(choice);
+    }
+  }
+  panel.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();setOpen(false);trigger.focus({preventScroll:true});}});
+  bar.append(prev,yearText,next);
+  panel.append(bar,grid,button('閉じる',()=>{setOpen(false);trigger.focus({preventScroll:true});},'ranking-picker-close ghost'));
+  fieldset.append(title,trigger,panel);
+  return fieldset;
+}
+
 function formatDate(value) {
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? japaneseDate.format(timestamp) : '';
@@ -762,23 +820,9 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
 
     const filters = el('div', 'ranking-filters');
     if (kind !== 'cumulative') {
-      const period = input(kind === 'month' ? 'month' : 'number', key);
-      period.dataset.rankingFocus = 'period';
-      period.required = true;
-      if (kind === 'year') {
-        period.min = '2000';
-        period.max = String(Number(today().slice(0, 4)) - (Number(today().slice(5, 7)) < 4 ? 1 : 0));
-      } else {
-        period.min = '2000-01';
-        period.max = today().slice(0, 7);
-      }
-      period.addEventListener('change', () => {
-        if (period.reportValidity() && period.value !== key) {
-          key = period.value;
-          load();
-        }
-      });
-      filters.append(field('対象期間', period));
+      filters.append(rankingPeriodPicker(kind, key, today(), next => {
+        if (next !== key) {key = next; load();}
+      }));
     }
     const department = select(metrics.map(([id, label]) => [id, label]), metric);
     department.dataset.rankingFocus = 'metric';

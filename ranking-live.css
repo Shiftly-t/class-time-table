@@ -140,3 +140,20 @@
     gap:12px;
   }
 }
+
+/* A site-owned period picker: no native date input or iOS date wheel. */
+#rankingDialog .ranking-period-field{display:grid;gap:8px;min-width:0;max-width:100%;align-content:start}
+#rankingDialog .ranking-period-label{font-size:12px;font-weight:750;color:#58667f;line-height:normal}
+#rankingDialog .ranking-period-trigger{position:relative;box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;min-width:0;height:44px;min-height:44px;margin:0;padding:0 34px;border:1px solid #dce3ef;border-radius:10px;background:#fff;color:#293850;font-size:16px;font-weight:750;line-height:1.25;text-align:center}
+#rankingDialog .ranking-period-trigger::after{content:"";position:absolute;right:14px;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);top:calc(50% - 5px)}
+#rankingDialog .ranking-period-trigger[aria-expanded="true"]::after{transform:rotate(225deg);top:calc(50% - 1px)}
+#rankingDialog .ranking-period-picker{display:grid;gap:10px;min-width:0;padding:12px;border:1px solid #dce3ef;border-radius:12px;background:#fff}
+#rankingDialog .ranking-period-picker[hidden]{display:none!important}
+#rankingDialog .ranking-picker-nav{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;gap:6px;align-items:center;text-align:center}
+#rankingDialog .ranking-picker-year{font-size:14px;overflow-wrap:anywhere}
+#rankingDialog .ranking-picker-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+#rankingDialog .ranking-picker-arrow,#rankingDialog .ranking-picker-choice,#rankingDialog .ranking-picker-close{display:flex;align-items:center;justify-content:center;min-width:0;min-height:44px;margin:0;padding:6px 3px;border:1px solid #dce3ef;border-radius:8px;background:#fff;color:#293850;font-size:14px;font-weight:700;line-height:1.25;white-space:normal}
+#rankingDialog .ranking-picker-arrow{font-size:24px}
+#rankingDialog .ranking-picker-choice.active{background:#4f63e9;color:white;border-color:#4f63e9}
+#rankingDialog .ranking-picker-arrow:disabled,#rankingDialog .ranking-picker-choice:disabled{opacity:.35;cursor:default}
+#rankingDialog .ranking-filters > label > select{font-size:16px}
