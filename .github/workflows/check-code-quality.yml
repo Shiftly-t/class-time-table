@@ -40,3 +40,27 @@ jobs:
       - run: npm run test:browser
         env:
           SHIFTLY_TEST_BROWSER: ${{ matrix.browser }}
+
+  webkit-main-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit
+      - name: Execute the original WebKit harness against the unmodified main assets
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          SHIFTLY_TEST_BROWSER: webkit
+        run: |
+          mkdir -p "$RUNNER_TEMP/shiftly-main" diagnostic
+          git archive "$BASE_SHA" | tar -x -C "$RUNNER_TEMP/shiftly-main"
+          git archive 90c15bc18cd8cbc20b6166be5a30a27c6075a65c tests/browser | tar -x -C diagnostic
+          SHIFTLY_TEST_APP_ROOT="$RUNNER_TEMP/shiftly-main" node --test diagnostic/tests/browser/regression.cjs
