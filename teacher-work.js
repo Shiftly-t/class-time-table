@@ -126,16 +126,25 @@ export function installTeacherWorkPage(ctx){
       dayBaseline=dateKey(value);
     }
     teacherSelect.replaceChildren();
+    if(!list.length){
+      const option=document.createElement('option');
+      option.value='';option.textContent='講師が登録されていません';
+      teacherSelect.append(option);
+    }
     for(const p of list){
       const o=document.createElement('option');o.value=p.id;o.textContent=p.name||p.id;teacherSelect.append(o);
     }
     teacherSelect.value=selected;
     const ready=featureEnabled&&state.teacherWeeklyWorkStatus==='ready'&&state.teacherDateWorkStatus==='ready';
     $('workError').textContent=!featureEnabled?'この機能はまだ有効になっていません。':!ready?'勤務設定を確認できません。保存と新規配置を停止しています。運営に確認してください。':'';
-    $('workWeekInfo').textContent=storedWeek(selected)
+    $('workWeekInfo').textContent=!selected
+      ?'講師を登録すると通常勤務時間を設定できます。'
+      :storedWeek(selected)
       ?'保存済み：'+(sorted(storedWeek(selected).weekdays||[]).map(n=>days.find(d=>d.n===n)?.t+'曜').join('・')||'出勤曜日なし')
       :'未設定：従来通り全曜日が出勤可能です';
-    $('workDayInfo').textContent=storedDay(specialDate,selected)
+    $('workDayInfo').textContent=!selected
+      ?'日付は選択できます。勤務設定の保存には講師の登録が必要です。'
+      :storedDay(specialDate,selected)
       ?'この日は特別設定あり（通常勤務時間より優先）'
       :'特別設定なし（通常勤務時間を使用）';
     $('workSpecialDate').value=specialDate;
@@ -151,7 +160,7 @@ export function installTeacherWorkPage(ctx){
       row.append(title);
       for(const p of CLASS_PERIODS){
         checkbox(row,p.number,p.number+'限',
-          (weekDraft[d.n]||[]).includes(p.number),e=>{
+          Boolean(selected)&&(weekDraft[d.n]||[]).includes(p.number),e=>{
             const values=weekDraft[d.n]||[];
             const next=e.target.checked
               ?sorted([...new Set([...values,p.number])])
@@ -164,16 +173,17 @@ export function installTeacherWorkPage(ctx){
       weekOptions.append(row);
     }
     for(const p of CLASS_PERIODS)checkbox(dateOptions,p.number,
-      p.number+'限 '+p.start+'〜'+p.end,dateDraft.includes(p.number),e=>{
+      p.number+'限 '+p.start+'〜'+p.end,Boolean(selected)&&dateDraft.includes(p.number),e=>{
         dateDraft=e.target.checked?sorted([...new Set([...dateDraft,p.number])]):dateDraft.filter(n=>n!==p.number);
         dayDirty=true;
       });
     teacherSelect.disabled=busy||!list.length;
-    $('workSpecialDate').disabled=busy||!list.length;
+    // Date browsing is independent of whether a teacher has been registered.
+    $('workSpecialDate').disabled=busy;
     $('workWeekSave').disabled=busy||!selected||!ready;
     $('workDaySave').disabled=busy||!selected||!ready;
     $('workDayClear').disabled=busy||!selected||!ready||!storedDay(specialDate,selected);
-    for(const node of page.querySelectorAll('input[type=checkbox]'))node.disabled=busy||!ready;
+    for(const node of page.querySelectorAll('input[type=checkbox]'))node.disabled=busy||!selected||!ready;
   }
   function confirmDiscard(){return !weekDirty&&!dayDirty||confirm('未保存の通常勤務時間・臨時出勤設定を破棄しますか？');}
   teacherSelect.addEventListener('change',()=>{
