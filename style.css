@@ -1194,3 +1194,8 @@ dialog.modal .form-grid :is(input,select,textarea){max-width:100%}
     flex-grow:1;
   }
 }
+
+/* Quiet, static guidance beneath the scrollable navigation. */
+.menu-scroll-hint{margin:4px 0 0;padding:0 4px;text-align:right;color:#748198;font-size:11px;font-weight:400;line-height:1.4}
+@media(min-width:900px){.menu-scroll-hint{display:none!important}}
+@media print{.menu-scroll-hint{display:none!important}}

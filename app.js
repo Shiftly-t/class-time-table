@@ -15,7 +15,7 @@ import { createNormalAuthorityClient } from './normal-authority-client.js?v=qa-e
 import { installNormalEditor } from './normal-editor.js?v=prod-ui-20261124-schedule-first';
 import { installTeacherWorkPage } from './teacher-work.js?v=prod-ui-20261126-date-browsing';
 import { installSharedDatePicker } from './shared-date-picker.js?v=20261126-ux3';
-import { installMenuScrollHint } from './menu-scroll-hint.js?v=20261126-1';
+import { installMenuScrollHint } from './menu-scroll-hint.js?v=20261126-static';
 import { summarizeDay,searchDirectory,readDisplayPreferences,writeDisplayPreferences } from './workspace-ux.js?v=20261126-ux2';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
@@ -1036,7 +1036,7 @@ if(typeof ResizeObserver==='function'){
 for(const type of ['pointerdown','touchstart','wheel','keydown']){
   window.addEventListener(type,cancelWorkspaceScrollRestore,{capture:true,passive:true});
 }
-const menuScrollHint=installMenuScrollHint({menu:document.querySelector('#appPanel > .welcome-line .nav-tabs'),enabled:()=>Boolean(state.user&&maintenanceState.loaded&&!$('appPanel').hidden)});
+const menuScrollHint=installMenuScrollHint({menu:document.querySelector('#appPanel > .welcome-line .nav-tabs'),hint:$('menuScrollHintText'),gate:$('appPanel')});
 function revealActiveWorkspaceTab(){
   const menu=document.querySelector('#appPanel > .welcome-line .nav-tabs');
   if(!menu||menu.scrollWidth<=menu.clientWidth)return;
