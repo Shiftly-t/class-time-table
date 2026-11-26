@@ -20,6 +20,7 @@ import { summarizeDay,searchDirectory,readDisplayPreferences,writeDisplayPrefere
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
 
+// Firebase initialization and API clients
 const { firebaseConfig, teacherWorkFeatureEnabled, normalAuthorityApiEnabled } = config;
 const { databaseId, functionsRegion, callableNames } = firebaseTargetForPage(config, bookingAppCheckSiteKey);
 const fbApp = initializeApp(firebaseConfig);
@@ -39,6 +40,7 @@ const db = databaseId ? getFirestore(fbApp, databaseId) : getFirestore(fbApp);
 const $ = id => document.getElementById(id);
 // 既存HTMLのrequired属性を解除（教科は文字列として空欄保存する）。
 for (const id of ['lessonSubject','editorNewSubject']) { const el=$(id); if(el){el.required=false;el.placeholder='未入力でも保存できます';const label=el.closest('label');if(label?.firstChild?.nodeType===Node.TEXT_NODE)label.firstChild.textContent='教科（任意）';} }
+// Calendar utilities and role checks
 const japanDateKey = () => new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const todayKey = () => japanDateKey();
 const dateKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -49,9 +51,43 @@ const isManagementRole = role => role === 'owner' || role === 'admin';
 // 管理権限とは別に、担当講師として割り当て可能なロールを限定する。
 const isAssignableTeacher = role => role === 'employee' || role === 'admin';
 const isAdmin = () => isManagementRole(state.profile?.role);
+// Application state
 const dashboardReady={students:false,people:false};
 const maintenanceState={loaded:false,enabled:false,message:'',version:'',updatedAt:null,startedAt:null,unsub:null,dataStarted:false,history:[],busy:false};
-const state = { user:null, profile:null, date:todayKey(), scheduleView:'day', page:'', students:[], people:[], entries:[], entriesStatus:'loading', closures:{}, closuresStatus:'loading', openDays:{}, openDaysStatus:'loading', examEvents:{}, examStatus:'loading', courses:[], coursesStatus:'loading', notices:[], officialAnnouncements:[], officialSeenIds:new Set(), officialSeenReady:false, activeLesson:null, availability:new Map(), availabilityStatus:{}, availabilityUnsub:[], teacherAbsences:{}, teacherAbsencesStatus:'loading', teacherWeeklyWork:{}, teacherWeeklyWorkStatus:teacherWorkFeatureEnabled?'loading':'disabled', teacherDateWork:{}, teacherDateWorkStatus:teacherWorkFeatureEnabled?'loading':'disabled', unsub:[] };
+const state = {
+  user: null,
+  profile: null,
+  date: todayKey(),
+  scheduleView: 'day',
+  page: '',
+  students: [],
+  people: [],
+  entries: [],
+  entriesStatus: 'loading',
+  closures: {},
+  closuresStatus: 'loading',
+  openDays: {},
+  openDaysStatus: 'loading',
+  examEvents: {},
+  examStatus: 'loading',
+  courses: [],
+  coursesStatus: 'loading',
+  notices: [],
+  officialAnnouncements: [],
+  officialSeenIds: new Set(),
+  officialSeenReady: false,
+  activeLesson: null,
+  availability: new Map(),
+  availabilityStatus: {},
+  availabilityUnsub: [],
+  teacherAbsences: {},
+  teacherAbsencesStatus: 'loading',
+  teacherWeeklyWork: {},
+  teacherWeeklyWorkStatus: teacherWorkFeatureEnabled?'loading':'disabled',
+  teacherDateWork: {},
+  teacherDateWorkStatus: teacherWorkFeatureEnabled?'loading':'disabled',
+  unsub: []
+};
 installHelpGuide({getRole:()=>state.profile?.role,getUser:()=>state.user?.uid});
 // Derive sticky offsets from the actual bars, including role/device-specific wrapping.
 {
@@ -467,6 +503,7 @@ function hasDialogDraft(dialog){
 function canDismissDialog(dialog){
   return !hasDialogDraft(dialog)||confirm('未保存の入力内容があります。保存せず閉じますか？');
 }
+// Modal lifecycle and draft protection
 function showDialog(id) {
   const dialog=$(id);if(dialog.open)return;
   if(guardedDialogIds.has(id))dialogBaselines.set(dialog,dialogFingerprint(dialog));
@@ -871,6 +908,7 @@ function renderBrandVersion(version){
   const label=value?'ver '+value.replace(/^(?:ver\.?\s*|v\s*)(?=\d)/i,''):'';
   el.textContent=label;el.title=label;el.hidden=!label;
 }
+// Maintenance and access state
 function applyMaintenanceState(){
   const wasHidden=$('appPanel').hidden;
   const restoring=restoreBlocked();
@@ -1037,6 +1075,7 @@ for(const type of ['pointerdown','touchstart','wheel','keydown']){
   window.addEventListener(type,cancelWorkspaceScrollRestore,{capture:true,passive:true});
 }
 const menuScrollHint=installMenuScrollHint({menu:document.querySelector('#appPanel > .welcome-line .nav-tabs'),hint:$('menuScrollHintText'),gate:$('appPanel')});
+// Workspace navigation and scroll restoration
 function revealActiveWorkspaceTab(){
   const menu=document.querySelector('#appPanel > .welcome-line .nav-tabs');
   if(!menu||menu.scrollWidth<=menu.clientWidth)return;
@@ -1239,6 +1278,7 @@ function renderAll() { if(!state.user) return; renderLessons(); if(isAdmin()){re
 // Shiftly's four fixed teaching periods. A continuous booking is split ONLY in
 // the timetable UI. Both display cards keep the same source lesson ID and memo.
 // A booking with non-standard start/end times remains a single card.
+// Timetable display and lesson periods
 const CLASS_PERIODS = [
   {number:1,start:'17:30',end:'18:25'},
   {number:2,start:'18:30',end:'19:25'},
@@ -1580,6 +1620,7 @@ $('openDayForm').addEventListener('submit',async event=>{
 });
 // Full-school closure management: only administrators may mutate this collection.
 // Stored lesson data remains untouched and becomes visible again if closure is removed.
+// School calendar management
 function renderClosures(){
   if(!state.user)return;
   const host=$('closureList'),grid=$('closureCalendarGrid');
@@ -1775,6 +1816,7 @@ async function setCourseArchived(course, archived){
     showMessage.success(`${courseDisplayName(course)}を${action}にしました。`);
   }catch(error){trapError(error,'講習の表示状態を変更できませんでした。Firestoreルールも確認してください。');}
 }
+// Seasonal course management
 function renderCourses(){
   if(!isAdmin())return;
   const host=$('courseList');host.replaceChildren();
@@ -2060,6 +2102,7 @@ function renderNoticeButton(){
   $('notificationButton').setAttribute('aria-label',unread?`通知・未読${unread}件`:'通知を表示');
 }
 let rankingNoticeOpen;
+// Notification inbox
 function renderNotifications(){
   renderOfficialAnnouncements();renderOwnerAnnouncementManagement();
   const parent=$('notificationList');parent.replaceChildren();
@@ -2190,6 +2233,7 @@ function collectRegularSlots(){
 }
 
 let studentEditBaseline=null,studentEditRecord=null;
+// Student editing and enrollment
 function openStudent(id){
   if(!isAdmin())return;
   const student=state.students.find(s=>s.id===id);
@@ -2745,6 +2789,7 @@ function availabilityCanEdit(course){
   return Boolean(state.user && course && course.archived!==true && state.availabilityStatus[course.id]==='ready'
     && (isAdmin() || (availabilityDeadlineDate(course)?.getTime()||0)>=Date.now()));
 }
+// Teacher availability editor
 function renderAvailabilityPage(){
   if(!state.user||state.page!=='availability')return;
   const courseSelect=$('availabilityCourse'),oldCourse=availabilityEditor.courseId;
@@ -3468,6 +3513,7 @@ function syncBookingManagementShortcut(){
 const loginFormNode=$('loginForm');
 const loginFormParent=loginFormNode.parentElement;
 
+// Authentication and session lifecycle
 function loggedOut(){
   menuScrollHint.stop();
   state.page='';
@@ -3588,6 +3634,7 @@ async function loggedIn(user){
   });
   if(isOwner()&&!restoreBlocked())loadMaintenanceHistory();
 }
+// Firestore subscriptions
 function startBusinessSubscriptions(user){
   if(maintenanceState.dataStarted||!state.user||state.user.uid!==user.uid)return;
   maintenanceState.dataStarted=true;
@@ -3712,6 +3759,7 @@ installSharedDatePicker({
   allowed:()=>Boolean(state.user&&!$('appPanel').hidden),gate:$('appPanel')
 });
 function dashboardCanRead(){return isAdmin()&&Boolean(state.user)&&!$('appPanel').hidden;}
+// Dashboard and directory search
 function renderDashboard(){
   if(!dashboardCanRead())return;
   const date=todayKey();

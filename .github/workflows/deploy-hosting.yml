@@ -26,6 +26,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+      - name: Validate application modules and offline unit tests
+        run: |
+          node tests/check-static.cjs
+          node tests/workspace-ux.cjs
       - name: Prepare static files and validate production target
         shell: bash
         run: |

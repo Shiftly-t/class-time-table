@@ -1,5 +1,8 @@
 # Shiftly-T production Web release candidate — 2026-11-24
 
+> **過去の開発記録です。** 現行の本番構成やデプロイ手順と異なる場合があります。[README](README.md) と [開発ガイド](docs/development.md) を参照し、以下の手順をそのまま本番環境に適用しないでください。
+
+
 Status: **NOT DEPLOYED**. This branch/PR is a staged release candidate only; no production changes are made by opening the PR.
 
 - Source: QA-verified front-end under `production-hosting/` at `ca7af07a7cf38cd6fb32add2c5ffc94d97296f2f`.

@@ -1,0 +1,20 @@
+# Local dependencies and browser test output
+node_modules/
+playwright-report/
+test-results/
+
+# Local credentials and environment files
+.env
+.env.*
+!.env.example
+*service-account*.json
+*serviceAccount*.json
+*.pem
+*.key
+gha-creds-*.json
+
+# Local Firebase and backup artifacts
+.firebase/
+firebase-debug.log*
+*-backup/
+shiftly-reset-backup*/
