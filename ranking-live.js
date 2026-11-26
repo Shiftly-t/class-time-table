@@ -776,7 +776,7 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
     const tabItems = [['rank', 'ランキング'], ['profile', 'プロフィール'], ['badges', '獲得バッジ'], ['history', '表彰履歴']];
     if (getRole() === 'owner') tabItems.push(['owner', 'バッジ管理']);
     for (const [id, label] of tabItems) tabs.append(toggle(label, view === id, () => go(id), id));
-    host.append(head, status('確定済み実績', 'ranking-demo'), tabs);
+    host.append(head, tabs);
 
     if (success) host.append(status(success, 'ranking-success'));
     if (view === 'rank') renderRank();
