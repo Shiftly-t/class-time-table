@@ -42,7 +42,9 @@ for name,test in tests.items():
  const app=initializeApp({projectId:'demo-shiftly-ranking-stage161'}),db=getFirestore(app);
  const coor=require('./coordination.cjs').createCoordinator({rawDb:db,FieldValue,Timestamp,core,HttpsError,key:()=> 'ad'.repeat(32)});
  const bridge=require('./stage2-bridge.cjs').createStage2Bridge({coor,core,Timestamp,reservedDate:()=>false,legacyAdmin:()=>{throw Error('UNEXPECTED LEGACY ADMIN');},legacyPublic:()=>{throw Error('UNEXPECTED LEGACY PUBLIC');}});
- const qaBookingAdminApi={run:req=>bridge.bookingAdminApi(req)};"""
+ const methods=['bookingAdminApi','adminApi','bookingAdmin','admin'].filter(k=>typeof bridge[k]==='function');
+ assert.equal(methods.length,1,'Booking bridge entry: '+Object.keys(bridge).join(','));
+ const qaBookingAdminApi={run:req=>bridge[methods[0]](req)};"""
         if s.count(old)!=1: raise RuntimeError("Booking fixture anchor mismatch")
         s=s.replace(old,new)
         anchor="  assert.equal((await db.doc(entry).get()).get('confirmed').length,1);"
