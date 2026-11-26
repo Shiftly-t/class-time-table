@@ -34,6 +34,10 @@ function mockTemplate(key,edit){
  root.querySelectorAll('button').forEach(el=>{el.type='button';if(!el.dataset.practiceAction&&!el.dataset.practiceField)el.dataset.practiceAction='wrong';});
  root.querySelectorAll('a').forEach(el=>el.removeAttribute('href'));
  root.querySelectorAll('[autofocus]').forEach(el=>el.removeAttribute('autofocus'));
+ if(key==='absence'){
+  const wrap=document.createElement('div');wrap.className='practice-mock-dialog';
+  wrap.append(...root.childNodes);root.append(wrap);
+ }
  return t.innerHTML;
 }
 const menuItems={employee:['時間割','生徒一覧','休校日管理','勤務希望登録'],admin:['生徒管理','時間割','休校日管理','講師管理','講習期間管理','講習予約管理'],owner:['生徒管理','時間割','休校日管理','講師管理','講習期間管理','講習予約管理','変更履歴・バックアップ','システム管理']};
@@ -152,7 +156,12 @@ export function renderPractice(host,{allowed,selected,query}){
  const topics=practiceTopics(allowed,selected,query);
  const make=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el;};
  const button=(label,fn,cls='ghost')=>{const el=make('button',cls,label);el.type='button';el.addEventListener('click',fn);return el;};
+ function closeOverlay(){
+  const overlay=host.querySelector('dialog.practice-overlay[open]');
+  if(overlay)overlay.close();
+ }
  function menu(){
+  closeOverlay();
   host.closest('.help-guide-shell')?.classList.remove('is-practicing');
   host.replaceChildren();
   const intro=make('div','practice-intro');intro.append(make('h3','','模擬操作チュートリアル'),make('p','','黄色い枠と指示を参考に、実際に操作して覚えます。練習データは保存されません。'));host.append(intro);
@@ -165,6 +174,7 @@ export function renderPractice(host,{allowed,selected,query}){
   host.closest('.help-guide-shell')?.classList.add('is-practicing');
   let index=0,values={};
   function render(){
+   closeOverlay();
    host.replaceChildren();
    const top=make('div','practice-top');top.append(button('← 一覧に戻る',menu),make('strong','',t.title),button('最初から',()=>{index=0;values={};render();}));host.append(top);
    const progress=make('progress','practice-progress');progress.max=t.steps.length;progress.value=index;host.append(progress);
@@ -181,8 +191,28 @@ export function renderPractice(host,{allowed,selected,query}){
    if(title==='通常授業の担当を振り替える')markup=index<2?scheduleMock('admin',true,index===1?'edit':''):index===2?normalMock('teacher'):index===3?normalMock('teacher')+absenceMock():normalMock(index===4?'pick':index===5?'move':'save');
    if(index===0&&title==='講習予約を確定・公開する')markup=studentListMock();
    if(index===0&&t.role==='owner')markup=studentListMock();
+   // The real booking detail is inline; only the final confirmation is modal.
+   if(title==='講習予約を確定・公開する'&&step.action==='ok'){
+    markup=t.steps[index-1].html()+'<div class="practice-mock-dialog">'+markup+'</div>';
+   }
    screen.innerHTML=mockMenu(t,index)+markup;frame.append(screen);host.append(frame);
    const feedback=make('p','practice-feedback');feedback.setAttribute('role','status');host.append(feedback);
+   const mock=screen.querySelector('.practice-mock-dialog');
+   let overlay=null;
+   if(mock){
+    // Keep the inert mock controls inside the delegated practice screen.
+    // Native showModal puts this dialog above the already-open guide dialog.
+    overlay=make('dialog','modal practice-overlay');
+    overlay.setAttribute('aria-label',t.title+'（練習）');
+    const body=make('div','practice-overlay-body');
+    const bar=make('div','practice-overlay-top');
+    const instruction=make('p','practice-overlay-instruction', 'STEP '+(index+1)+' / '+t.steps.length+'　'+step.hint);
+    instruction.tabIndex=-1;instruction.setAttribute('autofocus','');
+    bar.append(instruction,button('練習一覧に戻る',menu,'ghost'));
+    mock.replaceWith(overlay);
+    body.append(bar,mock,feedback);overlay.append(body);
+    overlay.addEventListener('cancel',e=>{e.preventDefault();menu();});
+   }
    screen.querySelectorAll('[data-practice-field]').forEach(el=>{
     const k=el.dataset.practiceField;if(k in values){if(el.type==='checkbox')el.checked=values[k];else el.value=values[k];}
     const change=()=>{values[k]=el.type==='checkbox'?el.checked:el.value;};el.addEventListener('input',change);el.addEventListener('change',()=>{change();if((step.action==='all'&&k==='filter'&&el.value==='all')||(step.action==='course'&&k==='course'&&t.role==='employee'&&el.value)){index++;render();}});
@@ -194,6 +224,7 @@ export function renderPractice(host,{allowed,selected,query}){
     if(step.valid&&!step.valid(values)){feedback.textContent='入力内容・選択内容を確認してからもう一度押してください。';return;}
     index++;render();
    });
+   if(overlay)overlay.showModal();
   }
   render();
  }
