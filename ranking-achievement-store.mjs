@@ -14,6 +14,7 @@ const COLLECTIONS = {
 };
 const fields = {
   listBadges: ['teacherUid'], listHistory: ['cursor'], manage: [],
+  saveBadgeOrder: ['operationId', 'recordIds'],
   saveManualBadge: ['operationId', 'badgeId', 'name', 'color', 'icon', 'active', 'description'],
   saveAutomaticRule: ['operationId', 'ruleId', 'name', 'color', 'icon', 'active', 'category', 'kind', 'metric', 'criterion', 'value', 'description'],
   archiveDefinition: ['operationId', 'definitionId', 'definitionType'],
@@ -45,6 +46,11 @@ function commandOf(data) {
   }
   if (action === 'manage') return { action };
   if (!isAchievementId(operationId)) throw Error('INVALID_ACHIEVEMENT_INPUT');
+  if (action === 'saveBadgeOrder') {
+    const {recordIds} = data;
+    if (!Array.isArray(recordIds) || recordIds.length > 2000 || !recordIds.every(id => typeof id === 'string' && /^[a-f0-9]{64}$/.test(id)) || new Set(recordIds).size !== recordIds.length) throw Error('INVALID_ACHIEVEMENT_INPUT');
+    return {action, operationId, recordIds};
+  }
   if (action === 'archiveDefinition') {
     const {definitionId, definitionType} = data;
     if (!isAchievementId(definitionId) || !['manual', 'rule'].includes(definitionType)) throw Error('INVALID_ACHIEVEMENT_INPUT');
@@ -115,23 +121,31 @@ export function createRankingAchievements({ db, clock = () => new Date().toISOSt
     }
   }
 
+  const orderPath = uid => 'rankingInternalConfig/badgeOrder_' + uid;
+  async function activeBadgeDocs(tx, uid) {
+    return (await documents(tx, collection('records').where('teacherUid', '==', uid), 2000))
+      .filter(doc => {const x=doc.data();return x.active && x.content.category === 'badge';});
+  }
   async function handle(request) {
     const actor = request?.auth?.uid;
     if (!isTeacherUid(actor) || !request.app) throw Error('RANKING_UNAUTHENTICATED');
     const command = commandOf(request.data);
     const now = nowIso();
     const isPublic = command.action === 'listBadges' || command.action === 'listHistory';
+    const isOrder = command.action === 'saveBadgeOrder';
     return db.runTransaction(async tx => {
       const [{ config, unavailable }, user] = await Promise.all([operationalState(tx), read(tx, `users/${actor}`)]);
-      if (!appRoles.includes(user?.role) || (!isPublic && user.role !== 'owner')) throw Error('RANKING_FORBIDDEN');
+      if (!appRoles.includes(user?.role) || (!isPublic && !isOrder && user.role !== 'owner')) throw Error('RANKING_FORBIDDEN');
+      if (isOrder && config?.publicationEnabled !== true) throw Error('RANKING_NOT_PUBLISHED');
       fullConfig(config, unavailable);
       if (isPublic) {
         if (config.publicationEnabled !== true) throw Error('RANKING_NOT_PUBLISHED');
         if (command.action === 'listBadges') {
           const teacherUid = command.teacherUid ?? actor;
-          const records = await documents(tx, collection('records').where('teacherUid', '==', teacherUid), 2000);
-          const badges = records.map(doc => doc.data()).filter(x => x.active && x.content.category === 'badge')
-            .map(x => publicBadge({ ...x.content, awardedAt: x.awardedAt }));
+          const [records, preference] = await Promise.all([activeBadgeDocs(tx, teacherUid),read(tx, orderPath(teacherUid))]);
+          const priority = new Map((Array.isArray(preference?.recordIds) ? preference.recordIds : []).map((id,i)=>[id,i]));
+          const badges = records.map(doc => ({...publicBadge({...doc.data().content, awardedAt:doc.data().awardedAt}),recordId:doc.id}))
+            .sort((a,b)=>(priority.get(a.recordId)??Infinity)-(priority.get(b.recordId)??Infinity) || String(a.awardedAt).localeCompare(String(b.awardedAt)) || a.recordId.localeCompare(b.recordId));
           return { teacherUid, badges };
         }
         // Firestore orderBy omits documents without this field (manual audit and automatic badge events).
@@ -172,7 +186,12 @@ export function createRankingAchievements({ db, clock = () => new Date().toISOSt
         if (previousOperation.signature !== signature) throw Error('RANKING_OPERATION_ID_REUSED');
         return { state: 'replayed' };
       }
-      if (command.action === 'archiveDefinition') {
+      if (isOrder) {
+        const docs = await activeBadgeDocs(tx, actor);
+        const ids = new Set(docs.map(doc=>doc.id));
+        if (ids.size !== command.recordIds.length || command.recordIds.some(id=>!ids.has(id))) throw Error('INVALID_ACHIEVEMENT_INPUT');
+        tx.set(db.doc(orderPath(actor)),{recordIds:command.recordIds,updatedAt:now});
+      } else if (command.action === 'archiveDefinition') {
         const target = ref('catalog', `${command.definitionType}_${command.definitionId}`);
         const before = snapshot(await tx.get(target));
         if (!before || before.type !== command.definitionType) throw Error('INVALID_ACHIEVEMENT_INPUT');

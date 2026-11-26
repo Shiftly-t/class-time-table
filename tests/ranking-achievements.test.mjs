@@ -229,3 +229,29 @@ assert(!(await run('a',{action:'listBadges'})).badges.some(x=>x.badgeId==='miles
 await run('o',{...grant,action:'revokeManualBadge',operationId:'revoke-archived'});
 assert(!(await run('a',{action:'listBadges'})).badges.some(x=>x.badgeId==='special'));
 console.log('SUCCESS RANKING DEFINITION ARCHIVE TESTS');
+
+// Personal badge order is isolated by authenticated actor, with no grant or notification side effects.
+await run('o',{...bulk,operationId:'order-fixture-bulk'});
+await run('o',{...manual,badgeId:'order-extra',operationId:'order-fixture-create'});
+await run('o',{...grant,badgeId:'order-extra',operationId:'order-fixture-grant'});
+const own=(await run('a',{action:'listBadges'})).badges.map(x=>x.recordId);
+const other=(await run('b',{action:'listBadges'})).badges.map(x=>x.recordId);
+assert(own.length>=2);
+const reverse=[...own].reverse();
+const cmd={action:'saveBadgeOrder',operationId:'order-save',recordIds:reverse};
+const countBefore=['rankingInternalAchievements','rankingInternalAchievementHistory','rankingInternalAchievementOutbox'].map(k=>records(k).length);
+await assert.rejects(()=>run('a',{...cmd,teacherUid:'b'}),/INVALID/);
+await assert.rejects(()=>run('x',cmd),/FORBIDDEN/);
+await assert.rejects(()=>run('b',cmd),/INVALID/);
+await assert.rejects(()=>run('a',{...cmd,recordIds:[own[0],own[0]]}),/INVALID/);
+await run('a',cmd);
+assert.equal((await run('a',cmd)).state,'replayed');
+assert.deepEqual((await run('o',{action:'listBadges',teacherUid:'a'})).badges.map(x=>x.recordId),reverse);
+assert.deepEqual((await run('b',{action:'listBadges'})).badges.map(x=>x.recordId),other);
+assert.deepEqual(['rankingInternalAchievements','rankingInternalAchievementHistory','rankingInternalAchievementOutbox'].map(k=>records(k).length),countBefore);
+await run('o',{...manual,badgeId:'order-new',operationId:'order-new-create'});
+await run('o',{...grant,badgeId:'order-new',operationId:'order-new-grant'});
+assert.deepEqual((await run('a',{action:'listBadges'})).badges.slice(0,reverse.length).map(x=>x.recordId),reverse);
+await run('o',{...grant,badgeId:'order-extra',action:'revokeManualBadge',operationId:'order-extra-revoke'});
+assert(!(await run('a',{action:'listBadges'})).badges.some(x=>x.badgeId==='order-extra'));
+console.log('SUCCESS RANKING PERSONAL BADGE ORDER TESTS');

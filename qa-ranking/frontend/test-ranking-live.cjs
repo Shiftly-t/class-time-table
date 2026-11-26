@@ -124,6 +124,7 @@ async function browserTest() {
       const badges = [];
       const rules = [];
       const grants = [];
+      let ownOrder=[];
       window.seedCatalog = () => {
         for(let i=1;i<=6;i++){
           badges.push({badgeId:'fixture-manual-'+i,name:'追加運営'+i,color:'#3344ff',icon:'★',active:true});
@@ -150,9 +151,13 @@ async function browserTest() {
           case 'listBadges': {
             if(window.failBadges) throw Object.assign(Error('badge unavailable'),{code:'functions/unavailable'});
             if(teacherUid==='teacher-c') return {data:{badges:[]}};
-            const earned=teacherUid==='teacher-b' ? Array.from({length:7},(_,i)=>({...baselineBadge,teacherUid,badgeId:'earned-'+i,name:'講師Bバッジ'+(i+1)})) : [{...baselineBadge,teacherUid}];
-            return {data:{badges:earned}};
+            const earned=teacherUid==='teacher-b' ? Array.from({length:7},(_,i)=>({...baselineBadge,teacherUid,badgeId:'earned-'+i,name:'講師Bバッジ'+(i+1),recordId:(i+10).toString(16).padStart(64,'0')})) :
+              Array.from({length:7},(_,i)=>({...baselineBadge,teacherUid,recordId:i.toString(16).padStart(64,'0'),name:i===0?'自動バッジ':'自分バッジ'+(i+1)}));
+            if(teacherUid==='teacher-a'&&ownOrder.length)earned.sort((a,b)=>ownOrder.indexOf(a.recordId)-ownOrder.indexOf(b.recordId));
+            return {data:{teacherUid,badges:earned}};
           }
+          case 'saveBadgeOrder':
+            ownOrder=input.recordIds.slice();break;
           case 'listHistory':
             return {data: {history: [{...award, action: input.cursor ? 'revised' : 'granted'}], nextCursor: input.cursor ? null : 'p2'}};
           case 'manage':
@@ -207,11 +212,12 @@ async function browserTest() {
     await dialog.getByText('月別の担当授業コマ数（延べ）').waitFor();
     const profileBadges=dialog.locator('.ranking-profile-badges');
     assert.equal(await dialog.locator('.ranking-summary,.ranking-stat').count(),0);
-    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),5);
+    assert.equal(await profileBadges.getByRole('button',{name:'並び替え'}).isVisible(),false);
+    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),6);
     await profileBadges.getByRole('button',{name:/すべて表示/}).click();
     assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),7);
     await profileBadges.getByRole('button',{name:/閉じる/}).click();
-    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),5);
+    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),6);
     await dialog.getByRole('button', {name: '獲得バッジの詳細を見る'}).click();
     await dialog.getByText('講師Bの獲得バッジ').waitFor();
     await dialog.getByText('自動付与', {exact: false}).first().waitFor();
@@ -221,7 +227,16 @@ async function browserTest() {
     assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),0);
     await tab('プロフィール').click();
     await profileBadges.getByText('自動バッジ',{exact:true}).waitFor();
-    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),1);
+    assert.equal(await profileBadges.locator('.ranking-badge-tile').count(),6);
+    await profileBadges.getByRole('button',{name:'並び替え'}).click();
+    await profileBadges.getByRole('button',{name:'自分バッジ2を上へ'}).click();
+    await profileBadges.getByRole('button',{name:'並び順を保存'}).click();
+    await dialog.getByText('並び順を保存しました。').waitFor();
+    await profileBadges.locator('.ranking-badge-tile').first().getByText('自分バッジ2',{exact:true}).waitFor();
+    await tab('ランキング').click();
+    await tab('プロフィール').click();
+    await profileBadges.locator('.ranking-badge-tile').first().getByText('自分バッジ2',{exact:true}).waitFor();
+    console.log('SUCCESS RANKING PROFILE PERSONAL ORDER UI TESTS');
     await page.evaluate(()=>{window.failBadges=true});
     await tab('プロフィール').click();
     await profileBadges.getByRole('button',{name:'バッジを再取得'}).waitFor();

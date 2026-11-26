@@ -149,7 +149,7 @@ function coverageNotice(coverage) {
   return status(`未確定の日付があります。確定済み ${coverage.recorded} / ${coverage.expected} 日`);
 }
 
-function renderProfile(data, showBadges, retry) {
+function renderProfile(data, showBadges, retry, saveOrder) {
   const card = el('section', 'ranking-profile');
   const profile = data.profile;
   if (!profile) {
@@ -167,7 +167,7 @@ function renderProfile(data, showBadges, retry) {
   } else {
     card.append(coverageNotice(data.coverage));
   }
-  card.append(renderProfileBadges(data, retry));
+  card.append(renderProfileBadges(data, retry, saveOrder));
   if (data.coverage.complete) {
     if (profile.monthly.length) {
       const heading = el('h4', '', '月別の担当授業コマ数（延べ）');
@@ -197,7 +197,7 @@ function badgeMark(item) {
   return mark;
 }
 
-function renderProfileBadges(data, retry) {
+function renderProfileBadges(data, retry, saveOrder) {
   const area = el('div', 'ranking-profile-badges');
   const head = el('div', 'ranking-profile-badges-head');
   head.append(el('h4', '', '獲得バッジ'));
@@ -216,20 +216,52 @@ function renderProfileBadges(data, retry) {
   gallery.id = 'rankingProfileBadgeGallery';
   area.append(gallery);
   let expanded = false;
+  let editing = false;
+  let draft = [];
+  let busy = false;
+  const edit = button('並び替え',()=>{editing=true;draft=[...badges];refresh();},'ghost');
+  const editor = el('div','ranking-profile-order-editor');
+  const message = status('','ranking-note');
   const more = button('', () => { expanded = !expanded; refresh(); }, 'ghost ranking-catalog-more');
   more.setAttribute('aria-controls', gallery.id);
   function refresh() {
     gallery.replaceChildren();
-    for (const badge of expanded ? badges : badges.slice(0, 5)) {
+    for (const badge of expanded ? badges : badges.slice(0, 6)) {
       const tile = el('div', 'ranking-badge-tile');
       tile.append(badgeMark(badge), el('strong', '', badge.name));
       gallery.append(tile);
     }
-    more.hidden = badges.length <= 5;
+    more.hidden = editing || badges.length <= 6;
     more.textContent = expanded ? '↑ 閉じる' : '↓ すべて表示（' + badges.length + '個）';
     more.setAttribute('aria-expanded', String(expanded && !more.hidden));
+    gallery.hidden=editing;
+    edit.hidden=editing || !saveOrder || badges.length<2 || badges.some(b=>typeof b.recordId!=='string');
+    editor.hidden=!editing;
+    editor.replaceChildren();
+    if (!editing) return;
+    editor.append(el('p','ranking-note','上から6個をプロフィールに優先表示します。'));
+    for(const [i,badge] of draft.entries()){
+      const row=el('div','ranking-profile-order-row');
+      const label=el('strong','',String(i+1)+'. '+badge.name);
+      const move=(offset)=>{const j=i+offset;if(j<0||j>=draft.length||busy)return;[draft[i],draft[j]]=[draft[j],draft[i]];refresh();};
+      const up=button('↑',()=>move(-1),'ghost');
+      const down=button('↓',()=>move(1),'ghost');
+      up.setAttribute('aria-label',badge.name+'を上へ');down.setAttribute('aria-label',badge.name+'を下へ');
+      up.disabled=busy||i===0;down.disabled=busy||i===draft.length-1;
+      row.append(badgeMark(badge),label,up,down);editor.append(row);
+    }
+    const commit=button('並び順を保存',async()=>{
+      if(busy)return;busy=true;message.textContent='';refresh();
+      try{await saveOrder(draft.map(b=>b.recordId));}
+      catch(error){message.textContent=failureMessage(error,'並び順を保存できませんでした。再試行または再取得してください。');}
+      finally{busy=false;refresh();}
+    });
+    const cancel=button('キャンセル',()=>{editing=false;message.textContent='';refresh();},'ghost');
+    commit.disabled=cancel.disabled=busy;
+    editor.append(commit,cancel,message);
   }
-  area.append(more);
+  head.append(edit);
+  area.append(more,editor);
   refresh();
   return area;
 }
@@ -608,6 +640,13 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
     }
   }
 
+  async function saveProfileOrder(recordIds) {
+    if(!available() || view!=='profile' || result?.profile?.teacherUid!==getSession()) throw Error('PROFILE_ORDER_FORBIDDEN');
+    const seq=serial, uid=getSession(), currentRole=getRole();
+    await callAchievement({action:'saveBadgeOrder',operationId:crypto.randomUUID(),recordIds});
+    if(current(seq,uid,currentRole)){success='並び順を保存しました。';await load();}
+  }
+
   async function save(data, form, message, successMessage) {
     if (!available() || view !== 'owner' || getRole() !== 'owner' || pendingMutation?.busy) return;
     const signature = JSON.stringify(data);
@@ -742,7 +781,7 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
     if (success) host.append(status(success, 'ranking-success'));
     if (view === 'rank') renderRank();
     else if (result && view === 'profile') {
-      host.append(renderProfile(result, (teacherUid, name) => go('badges', {teacherUid, name}), () => load()),
+      host.append(renderProfile(result, (teacherUid, name) => go('badges', {teacherUid, name}), () => load(), result.profile?.teacherUid===getSession()?saveProfileOrder:undefined),
         button('← ランキングに戻る', () => go('rank')));
     } else if (result && view === 'badges') {
       host.append(renderBadges(result, target?.name));
