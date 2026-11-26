@@ -87,3 +87,6 @@
 
 /* Unified owner catalog */
 .ranking-catalog-list{display:grid;gap:8px;min-width:0}.ranking-catalog-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e1e7f2;border-radius:12px;padding:10px;min-width:0}.ranking-catalog-info{flex:1 1 150px;min-width:0;display:grid;gap:4px;overflow-wrap:anywhere}.ranking-catalog-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-left:auto}.ranking-catalog-actions button{min-width:60px}.ranking-owner-form{scroll-margin-top:12px}
+
+/* Compact registered badge catalog */
+.ranking-catalog-more{width:100%;margin-top:8px}.ranking-catalog-more[hidden]{display:none!important}.ranking-catalog-count{margin:4px 0}

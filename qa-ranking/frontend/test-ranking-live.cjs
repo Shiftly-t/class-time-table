@@ -124,6 +124,12 @@ async function browserTest() {
       const badges = [];
       const rules = [];
       const grants = [];
+      window.seedCatalog = () => {
+        for(let i=1;i<=6;i++){
+          badges.push({badgeId:'fixture-manual-'+i,name:'追加運営'+i,color:'#3344ff',icon:'★',active:true});
+          rules.push({ruleId:'fixture-rule-'+i,name:'追加自動'+i,color:'#3344ff',icon:'★',active:true,category:'badge',kind:'all',metric:'slots',criterion:'minimum',value:i});
+        }
+      };
       window.callLog = [];
       window.mockCallable = async ({region}, name, input) => {
         callLog.push({region, name, ...input});
@@ -284,6 +290,40 @@ async function browserTest() {
     assert.equal(attempts.length, 2);
     assert.equal(attempts[0].operationId, attempts[1].operationId);
     assert.equal(attempts[0].badgeId, attempts[1].badgeId);
+
+    // Catalog folding must preserve filters, archive visibility and row actions.
+    await page.evaluate(()=>window.seedCatalog());
+    await tab('ランキング').click();
+    await tab('バッジ管理').click();
+    const catalogRows=dialog.locator('.ranking-catalog-row');
+    const more=dialog.locator('.ranking-catalog-more');
+    await more.waitFor();
+    assert.equal(await catalogRows.count(),5);
+    assert.match(await more.textContent(),/13件/);
+    assert.equal(await more.getAttribute('aria-expanded'),'false');
+    await more.click();
+    assert.equal(await catalogRows.count(),13);
+    assert.equal(await more.getAttribute('aria-expanded'),'true');
+    await more.click();
+    assert.equal(await catalogRows.count(),5);
+    await dialog.getByLabel('付与方法').selectOption('rule');
+    assert.equal(await catalogRows.count(),5);
+    assert.match(await more.textContent(),/6件/);
+    await more.click();
+    assert.equal(await catalogRows.count(),6);
+    await dialog.getByLabel('削除済みも表示').check();
+    assert.equal(await catalogRows.count(),5);
+    assert.match(await more.textContent(),/7件/);
+    await more.click();
+    assert.equal(await catalogRows.count(),7);
+    assert.equal(await row('月間表彰・改').getByRole('button',{name:'編集'}).count(),0);
+    await row('追加自動6').getByRole('button',{name:'編集'}).click();
+    assert.equal(await automatic.getByLabel('バッジ名称').inputValue(),'追加自動6');
+    await dialog.getByLabel('付与方法').selectOption('manual');
+    assert.equal(await catalogRows.count(),5);
+    await more.click();
+    assert.equal(await catalogRows.count(),7);
+    console.log('SUCCESS RANKING CATALOG COLLAPSE AND FILTER TESTS');
 
     for (const [width, height] of [[320, 700], [768, 1024], [1280, 900]]) {
       await page.setViewportSize({width, height});

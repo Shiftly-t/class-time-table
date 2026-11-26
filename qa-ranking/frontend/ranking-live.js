@@ -345,12 +345,23 @@ function definitionCatalog({data, save, manual, automatic}) {
   const filter=select([['all','すべて'],['manual','運営付与'],['rule','自動付与']]);
   const archived=input('checkbox');
   const list=el('div','ranking-catalog-list');
+  list.id='rankingDefinitionCatalogList';
+  const pageSize=5;
+  let expanded=false;
+  const count=status('','ranking-note ranking-catalog-count');
+  const more=button('',()=>{expanded=!expanded;refresh();},'ghost ranking-catalog-more');
+  more.setAttribute('aria-controls',list.id);
   const message=status('','ranking-form-status');
   const definitions=[...data.badges.map(x=>({...x,type:'manual',id:x.badgeId})),...data.rules.map(x=>({...x,type:'rule',id:x.ruleId}))];
   function refresh(){
     list.replaceChildren();
     const visible=definitions.filter(x=>(filter.value==='all'||filter.value===x.type)&&(archived.checked||!x.archived));
-    for(const x of visible){
+    const displayed=expanded?visible:visible.slice(0,pageSize);
+    count.textContent=visible.length ? displayed.length+' / '+visible.length+'件表示' : '0件';
+    more.hidden=visible.length<=pageSize;
+    more.setAttribute('aria-expanded',String(expanded&&!more.hidden));
+    more.textContent=expanded?'↑ 閉じる':'↓ すべて表示（'+visible.length+'件）';
+    for(const x of displayed){
       const row=el('div','ranking-catalog-row');
       const info=el('div','ranking-catalog-info');
       info.append(el('strong','',x.name),el('span','ranking-note',(x.type==='manual'?'運営付与':'自動付与 · '+(x.category==='award'?'表彰':'バッジ'))+' · '+(x.archived?'削除済み':x.active?'有効':'停止中')));
@@ -373,9 +384,10 @@ function definitionCatalog({data, save, manual, automatic}) {
     }
     if(!visible.length)list.append(el('p','empty','登録済みのバッジ・表彰はありません。'));
   }
-  filter.addEventListener('change',refresh);archived.addEventListener('change',refresh);
+  const reset=()=>{expanded=false;refresh();};
+  filter.addEventListener('change',reset);archived.addEventListener('change',reset);
   const archiveLabel=field('削除済みも表示',archived);archiveLabel.className='ranking-checkbox';
-  card.append(field('付与方法',filter),archiveLabel,list,message);
+  card.append(field('付与方法',filter),archiveLabel,count,list,more,message);
   refresh();return card;
 }
 
