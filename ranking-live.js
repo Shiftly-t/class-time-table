@@ -319,21 +319,21 @@ function renderHistory(data, loadMore) {
 const badgeIcons = ['🏆','🥇','👑','💎','⭐','🤝','🌸','🔥','🎖️','🛡️','🚀','🎓'];
 const badgeColors = ['#c89c38','#98a3b3','#b87947','#4f63e9','#238c74','#9062bd','#ce536b','#344155'];
 
-function badgeDefinitionForm({definitions, save, auto = false}) {
-  const idKey = auto ? 'ruleId' : 'badgeId';
+function badgeDefinitionForm({data, save}) {
   const form = el('form', 'ranking-owner-form ranking-badge-builder');
-  definitions = definitions.filter(x=>!x.archived);
-  const picker = select([['',auto?'新しい自動ルール':'新しい手動バッジ'],...definitions.map(x=>[x[idKey],x.name+(x.active?'':'（停止中）')])]);
-  picker.dataset.catalogPicker = auto ? 'rule' : 'manual';
+  const method = select([['manual','手動バッジ（運営付与）'],['rule','自動バッジ・表彰']], 'manual');
+  const picker = select([]);
+  picker.dataset.catalogPicker = 'manual';
+  let auto=false, idKey='badgeId', definitions=[];
   const name = input('text'); name.required=true; name.maxLength=60; name.placeholder='例：特別功労賞';
   const description = el('textarea'); description.rows=3; description.maxLength=300; description.placeholder='バッジの説明（任意）';
   const active = input('checkbox');
-  const activeLabel = field(auto?'ルールを有効にする':'新規付与を許可する',active); activeLabel.className='ranking-checkbox';
+  const activeLabel = field('新規付与を許可する',active); activeLabel.className='ranking-checkbox';
   const category=select([['badge','バッジ'],['award','表彰']]);
   const kind=select([['month','月間'],['year','年度'],['all','累計']]);
   const metric=select(metrics.map(([key,label])=>[key,label]));
   const criterion=select([['minimum','実績が指定値以上'],['rank','指定順位以内']]);
-  const value=input('number');value.min='1';value.step='1';value.required=auto;
+  const value=input('number');value.min='1';value.step='1';
   function constrain(){
     const award=category.value==='award';
     kind.querySelector('[value="all"]').disabled=award;
@@ -383,17 +383,39 @@ function badgeDefinitionForm({definitions, save, auto = false}) {
     if(auto&&!item)active.checked=false;
     newId=undefined;refresh();
   }
-  picker.addEventListener('change',populate);
+  function selectMethod(type, id=''){
+    if(!['manual','rule'].includes(type))return;
+    method.value=type;
+    auto=type==='rule';
+    idKey=auto?'ruleId':'badgeId';
+    definitions=(auto?data.rules:data.badges).filter(x=>!x.archived);
+    picker.dataset.catalogPicker=type;
+    picker.replaceChildren(...select([['',auto?'新しい自動ルール':'新しい手動バッジ'],...definitions.map(x=>[x[idKey],x.name+(x.active?'':'（停止中）')])]).children);
+    picker.value=definitions.some(x=>x[idKey]===id)?id:'';
+    ruleFields.hidden=!auto; ruleNote.hidden=!auto;
+    for(const control of [category,kind,metric,criterion,value])control.disabled=!auto;
+    value.required=auto;
+    activeLabel.firstChild.textContent=auto?'ルールを有効にする':'新規付与を許可する';
+    descriptionLabel.firstChild.textContent=auto?'バッジ・表彰の説明':'バッジの説明';
+    saveButton.textContent=auto?'自動ルールを保存する':'バッジを保存する';
+    message.textContent='';
+    populate();
+  }
+  method.addEventListener('change',()=>selectMethod(method.value));
+  picker.addEventListener('change',()=>{message.textContent='';populate();});
   name.addEventListener('input',refresh);description.addEventListener('input',refresh);
   custom.addEventListener('input',()=>{icon=custom.value.trim()||badgeIcons[1];refresh()});
   customColor.addEventListener('input',()=>{color=customColor.value;refresh()});
   const more=el('details','ranking-custom-options'); more.append(el('summary','','その他のアイコン・色'),field('アイコン文字',custom),field('カスタムカラー',customColor));
   const message=status('','ranking-form-status');
-  form.append(el('h3','',auto?'自動バッジ・表彰ルール':'オリジナルバッジを作成・編集'),field('編集対象',picker),preview,field('バッジ名称',name),
+  const descriptionLabel=field('バッジの説明',description);
+  const ruleNote=el('p','ranking-note','表彰は締め済みの月間・年度実績を対象にします。');
+  const saveButton=submit('バッジを保存する');
+  form.append(el('h3','','バッジ・表彰を作成・編集'),field('付与方法',method),
+    el('p','ranking-note','付与方法や編集対象を切り替えると、未保存の入力内容はリセットされます。'),
+    field('編集対象',picker),preview,field('バッジ名称',name),
     el('strong','ranking-field-title','アイコン'),icons,el('strong','ranking-field-title','バッジカラー'),colors,more,
-    field(auto?'バッジ・表彰の説明':'バッジの説明',description));
-  if(auto)form.append(el('p','ranking-note','表彰は締め済みの月間・年度実績を対象にします。'),ruleFields);
-  form.append(activeLabel,submit(auto?'自動ルールを保存する':'バッジを保存する'),message);
+    descriptionLabel,ruleNote,ruleFields,activeLabel,saveButton,message);
   form.addEventListener('submit',event=>{
     event.preventDefault();
     if(!name.value.trim()||!icon.trim()){message.textContent='名称とアイコンを入力してください。';return;}
@@ -401,11 +423,15 @@ function badgeDefinitionForm({definitions, save, auto = false}) {
     if(auto)Object.assign(data,{category:category.value,kind:kind.value,metric:metric.value,criterion:criterion.value,value:Number(value.value)});
     save(data,form,message,auto?'自動ルールを保存しました。':'手動バッジを保存しました。');
   });
-  populate();
-  return form;
+  selectMethod('manual');
+  return {form, edit(type,id){
+    selectMethod(type,id);
+    form.scrollIntoView({block:'start'});
+    picker.focus({preventScroll:true});
+  }};
 }
 
-function definitionCatalog({data, save, manual, automatic}) {
+function definitionCatalog({data, save, editor}) {
   const card=section('登録済みバッジ・表彰一覧');
   card.classList.add('ranking-owner-form');
   const filter=select([['all','すべて'],['manual','運営付与'],['rule','自動付与']]);
@@ -437,9 +463,7 @@ function definitionCatalog({data, save, manual, automatic}) {
       if(!x.archived){
         const actions=el('div','ranking-catalog-actions');
         actions.append(button('編集',()=>{
-          const form=x.type==='manual'?manual:automatic;
-          const picker=form.querySelector('[data-catalog-picker]');
-          picker.value=x.id;picker.dispatchEvent(new Event('change'));form.scrollIntoView({block:'start'});picker.focus({preventScroll:true});
+          editor.edit(x.type,x.id);
         }),button('削除',()=>{
           if(!window.confirm('「'+x.name+'」を削除しますか？ 過去の付与記録を保持し、新規付与を停止します。'))return;
           save({action:'archiveDefinition',definitionType:x.type,definitionId:x.id},card,message,'バッジ・表彰を削除しました。');
@@ -788,9 +812,8 @@ export function installRankingLive({trigger, dialog, host, call, callAchievement
     } else if (result && view === 'history') {
       host.append(renderHistory(result, load));
     } else if (result && view === 'owner') {
-      const manual=badgeDefinitionForm({definitions: result.badges, save});
-      const automatic=badgeDefinitionForm({definitions: result.rules, save, auto:true});
-      host.append(definitionCatalog({data:result,save,manual,automatic}),manual,automatic,
+      const editor=badgeDefinitionForm({data:result,save});
+      host.append(definitionCatalog({data:result,save,editor}),editor.form,
         grantForm({data:result,save}),manualHistory(result));
     }
 
