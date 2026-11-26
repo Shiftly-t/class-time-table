@@ -1,4 +1,4 @@
-import { todayKey, prettyDate } from './calendar-date.js';
+import { japanDateKey as todayKey, prettyDate } from './calendar-date.js';
 import { CLASS_PERIODS } from './timetable.js';
 import { isWithdrawn } from './student-enrollment.js';
 import { summarizeDay, searchDirectory } from './workspace-ux.js?v=20261126-ux2';
