@@ -1104,3 +1104,24 @@
 .practice-overlay .practice-feedback{position:sticky;bottom:0;z-index:3;background:#fff;padding:8px;border:1px solid #f1c38c;border-radius:8px;overflow-wrap:anywhere}
 .practice-overlay .practice-feedback:empty{display:none}
 @media(max-width:600px){.practice-live-screen dialog.practice-overlay{width:calc(100% - 16px);max-width:calc(100% - 16px);max-height:92vh;max-height:92dvh}.practice-overlay-body{max-height:92vh;max-height:92dvh;padding:8px}.practice-live-screen .practice-overlay .practice-mock-dialog .modal-content{padding:10px 6px}}
+
+/* Shared date controls and narrow viewport dialog safety. */
+.shared-date-field{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:center;gap:6px;width:100%;min-width:0;max-width:100%}
+.shared-date-field>input[type=date]{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font-size:16px}
+.shared-date-open{display:grid;place-items:center;min-width:44px;width:44px;height:44px;margin:0;padding:0;border:1px solid #dce3ef;border-radius:10px;background:#fff;color:#4f63e9;font-size:22px;font-weight:750}
+.shared-date-open:disabled{opacity:.45;cursor:default}
+.normal-date-nav>.shared-date-field{flex:0 1 224px;width:224px}
+#courseEditorDateNav .shared-date-field{min-width:0}
+#sharedDateDialog{width:min(420px,calc(100% - 20px));max-height:calc(100dvh - 20px);margin:auto;overflow:auto}
+#sharedDateDialog .modal-content{max-height:calc(100dvh - 20px);padding:18px;overflow:auto}
+#sharedDateDialog .schedule-picker-day:disabled{opacity:.35;cursor:default}
+dialog.modal{max-height:min(88vh,calc(100dvh - 16px))}
+dialog.modal>.modal-content{min-width:0;max-width:100%;max-height:min(88vh,calc(100dvh - 16px))}
+dialog.modal>.modal-content>.modal-head{min-width:0}
+dialog.modal>.modal-content>.modal-head>h2{min-width:0;overflow-wrap:anywhere}
+dialog.modal>.modal-content>.modal-head>.close-modal{flex:none;min-width:44px;min-height:44px}
+@media(max-width:480px){
+  #sharedDateDialog .modal-content{padding:12px}
+  .normal-date-nav>.shared-date-field{flex:1 1 185px;width:auto}
+  dialog.modal>.modal-content>.modal-actions{flex-wrap:wrap}
+}

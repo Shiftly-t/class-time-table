@@ -14,6 +14,7 @@ import { bookingAppCheckSiteKey } from './booking-config.js';
 import { createNormalAuthorityClient } from './normal-authority-client.js?v=qa-errorui-20261119-01';
 import { installNormalEditor } from './normal-editor.js?v=prod-ui-20261124-schedule-first';
 import { installTeacherWorkPage } from './teacher-work.js?v=prod-ui-20261126-date-browsing';
+import { installSharedDatePicker } from './shared-date-picker.js?v=20261126-ux1';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
 
@@ -998,6 +999,10 @@ for(const type of ['pointerdown','touchstart','wheel','keydown']){
 }
 function nav(page) {
   if(page==='bookingManagement'&&!isAdmin())return;
+  if(page!==state.page&&state.page==='courseEditor'&&courseEditor?.busy){showMessage('講習配置の保存中です。完了してから移動してください。');return;}
+  if(page!==state.page&&state.page==='availability'&&availabilityEditor?.busy){showMessage('勤務希望の保存中です。完了してから移動してください。');return;}
+  if(page!==state.page&&state.page==='courseEditor'&&courseEditorChanges().length&&!confirm('未反映の講習配置があります。画面を移動しますか？（入力はこのログイン中保持されます）'))return;
+  if(page!==state.page&&state.page==='availability'&&availabilityEditor.sourceKey!==availabilitySetKey(availabilityEditor.draft)&&!confirm('未保存の勤務希望があります。画面を移動しますか？（入力はこのログイン中保持されます）'))return;
   if(state.page==='bookingManagement'&&page!=='bookingManagement'&&!canLeaveBookingFrame())return;
   if(regularEditor?.isBusy()){showMessage('保存中です。完了してから画面を移動してください。');return;}
   if(state.page==='adminLessons'&&page!=='adminLessons'&&regularEditor?.hasChanges()){
@@ -3616,6 +3621,7 @@ $('loginForm').addEventListener('submit',async event=>{
 $('logout').addEventListener('click',()=>{if(!state.user||$('logoutConfirmDialog').open)return;showDialog('logoutConfirmDialog');});
 $('logoutConfirm').addEventListener('click',async()=>{
   if(!state.user||$('logoutConfirm').disabled)return;
+  if(hasWorkspaceDraft()&&!confirm('未保存または処理中の変更があります。ログアウトすると入力内容が失われる場合があります。続行しますか？'))return;
   $('logoutConfirm').disabled=true;$('logoutCancel').disabled=true;$('logout').disabled=true;
   try{closeDialog('logoutConfirmDialog');await signOut(auth);}
   catch(e){trapError(e,'ログアウトに失敗しました');}
@@ -3633,6 +3639,26 @@ regularEditor=installNormalEditor({
   normalAuthority:normalEditorCommands,
   teacherWorkReady:teacherWorkDataReady,
   canTeacherWork:(uid,date,period)=>teacherWorkPage?.works(uid,date,period)!==false
+});
+// The main app's editable date fields share a calendar. Their native controls
+// remain available as an accessible fallback; existing change handlers own the data.
+installSharedDatePicker({
+  ids:['editorDate','normalDate','closureDate','editorNewDate','courseStart','courseEnd','lessonDate','workSpecialDate'],
+  today:todayKey,
+  allowed:()=>Boolean(state.user&&!$('appPanel').hidden)
+});
+function hasWorkspaceDraft(){
+  if(!state.user)return false;
+  if(regularEditor?.hasChanges()||regularEditor?.isBusy()||teacherWorkPage?.hasChanges()||teacherWorkPage?.isBusy())return true;
+  if(courseEditor?.busy||courseEditorChanges().length||availabilityEditor?.busy||availabilityEditor.sourceKey!==availabilitySetKey(availabilityEditor.draft))return true;
+  try{
+    const status=$('bookingFrameHost').firstElementChild?.contentWindow?.shiftlyBookingNavigationStatus?.();
+    return Boolean(status?.draft||status?.busy);
+  }catch{return false;}
+}
+window.addEventListener('beforeunload',event=>{
+  if(!hasWorkspaceDraft())return;
+  event.preventDefault();event.returnValue='';
 });
 let authRecovery=null;
 
