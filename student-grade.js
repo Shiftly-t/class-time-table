@@ -1,5 +1,5 @@
 // Pure, read-only academic-year presentation. No Firebase imports or writes.
-const japanDateKey=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+import { japanDateKey } from './calendar-date.js';
 export function gradeInfo(value=''){
   const raw=String(value||'').trim();
   // Examples: 小2 / 小学2年 / 小学校2年 / 中3 / 中学3年 / 高校1年.
