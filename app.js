@@ -1035,6 +1035,17 @@ if(typeof ResizeObserver==='function'){
 for(const type of ['pointerdown','touchstart','wheel','keydown']){
   window.addEventListener(type,cancelWorkspaceScrollRestore,{capture:true,passive:true});
 }
+function revealActiveWorkspaceTab(){
+  const menu=document.querySelector('#appPanel > .welcome-line .nav-tabs');
+  if(!menu||menu.scrollWidth<=menu.clientWidth)return;
+  const active=menu.querySelector('.nav-tab.active:not([hidden])');
+  if(!active)return;
+  const viewport=menu.getBoundingClientRect(),tab=active.getBoundingClientRect();
+  // Move only the horizontal menu, never the document's vertical scroll.
+  const left=viewport.left+menu.clientLeft,right=left+menu.clientWidth;
+  if(tab.left<left)menu.scrollLeft+=tab.left-left;
+  else if(tab.right>right)menu.scrollLeft+=tab.right-right;
+}
 function nav(page) {
   if((page==='dashboard'||page==='bookingManagement')&&!isAdmin())return;
   if(page!==state.page&&state.page==='courseEditor'&&courseEditor?.busy){showMessage('講習配置の保存中です。完了してから移動してください。');return;}
@@ -1098,6 +1109,7 @@ function nav(page) {
   }
   renderAvailabilityHome();
   if(scrollChanged)restoreWorkspaceScroll(page);
+  revealActiveWorkspaceTab();
 }
 $('navDashboard').addEventListener('click',()=>nav('dashboard'));
 $('navCount').addEventListener('click',()=>nav('count'));

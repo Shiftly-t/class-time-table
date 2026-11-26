@@ -1153,3 +1153,44 @@ dialog.modal>.modal-content>.modal-head>.close-modal{flex:none;min-width:44px;mi
 dialog.modal .form-grid>*{min-width:0;max-width:100%}
 dialog.modal .form-grid :is(input,select,textarea){max-width:100%}
 @media(max-width:480px){dialog.modal .form-grid :is(input:not([type=checkbox]):not([type=radio]),select,textarea){font-size:16px}}
+
+/* Compact workspace navigation: one swipeable row, including split-view iPad. */
+@media screen and (max-width:899px){
+  #appPanel>.welcome-line{
+    min-width:0;
+    max-width:100%;
+    margin-bottom:12px;
+  }
+  #appPanel>.welcome-line .nav-tabs,
+  #appPanel>.welcome-line .nav-tabs:has(>#navTeacherLessons:not([hidden])){
+    display:flex;
+    flex-wrap:nowrap;
+    justify-content:flex-start;
+    align-items:stretch;
+    gap:0;
+    box-sizing:border-box;
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    overflow-x:auto;
+    overflow-y:hidden;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+    scrollbar-color:#b8c4df transparent;
+  }
+  #appPanel>.welcome-line .nav-tabs>.nav-tab,
+  #appPanel>.welcome-line .nav-tabs:has(>#navTeacherLessons:not([hidden]))>.nav-tab{
+    flex:0 0 auto;
+    min-width:82px;
+    min-height:44px;
+    padding:11px 14px 13px;
+    font-size:13px;
+    line-height:1.4;
+    white-space:nowrap;
+    overflow-wrap:normal;
+  }
+  #appPanel>.welcome-line .nav-tabs:has(>#navTeacherLessons:not([hidden]))>.nav-tab{
+    flex-grow:1;
+  }
+}
