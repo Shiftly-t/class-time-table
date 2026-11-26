@@ -1,0 +1,12 @@
+{
+  "name": "shiftly-t",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/check-static.cjs tests/workspace-ux.cjs tests/workspace-dialogs.cjs tests/workspace-scroll.cjs tests/workspace-subscriptions.cjs tests/timetable.cjs",
+    "test:browser": "node --test tests/browser/regression.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
