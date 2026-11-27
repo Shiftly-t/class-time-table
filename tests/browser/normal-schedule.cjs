@@ -159,8 +159,39 @@ async function normalSchedule({ browserName, context, page, date, openApplicatio
   await dragLesson(browserName, context, lesson('teacher'), cell('other', 3));
   await lesson('other').waitFor();
   assert.equal(await lesson('other').count(), 1);
-  await lesson('other').tap();
-  assert.equal(await cell('other', 3).locator('.is-selected').count(), 1);
+  const selection = cell('other', 3).locator('.is-selected');
+  assert.equal(await selection.count(), 0);
+  const tapTrace = await page.evaluateHandle(() => {
+    const events = [];
+    const controller = new AbortController();
+    for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'touchstart', 'touchend', 'click']) {
+      document.addEventListener(
+        type,
+        (event) => events.push({
+          type,
+          pointerType: event.pointerType,
+          pointerId: event.pointerId,
+          primary: event.isPrimary,
+          detail: event.detail,
+          insideCard: Boolean(event.target.closest?.('.normal-entry')),
+        }),
+        { capture: true, signal: controller.signal },
+      );
+    }
+    return { events, controller };
+  });
+  try {
+    await lesson('other').tap();
+    assert.equal(await selection.count(), 1);
+    await lesson('other').tap();
+    assert.equal(await selection.count(), 0);
+  } catch (error) {
+    error.message += '\nTouch events: ' + JSON.stringify(await tapTrace.evaluate(({ events }) => events));
+    throw error;
+  } finally {
+    await tapTrace.evaluate(({ controller }) => controller.abort());
+    await tapTrace.dispose();
+  }
   await page.locator('#normalUndo').click();
   assert.equal(await lesson('teacher').count(), 1);
 

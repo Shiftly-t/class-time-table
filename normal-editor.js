@@ -85,23 +85,23 @@ export function installNormalEditor(ctx) {
       <div class="modal-actions"><button class="primary" type="submit">仮設定に反映</button></div>
     </form>`;
   document.body.append(absenceDialog);
-  // A touch selection re-renders the card. Its synthesized click may target the
-  // replacement node, so a closure on the removed button cannot suppress it.
-  let pointerClickGuard = null;
-  $('normalGrid').addEventListener(
+  const grid = $('normalGrid');
+  let pointerClickDeadline = 0;
+  function clearPointerClickGuard() {
+    pointerClickDeadline = 0;
+  }
+  // Touch selection and dragging can redraw the grid before the browser's
+  // compatibility click, whose pointer ID and target can differ by engine.
+  // The next press starts an independent gesture.
+  grid.addEventListener('pointerdown', clearPointerClickGuard, true);
+  grid.addEventListener('touchstart', clearPointerClickGuard, { capture: true, passive: true });
+  grid.addEventListener(
     'click',
     (event) => {
-      const g = pointerClickGuard;
-      if (!g || performance.now() > g.until) return;
-      const samePointer =
-        'pointerId' in event
-          ? event.pointerId === g.id
-          : Math.hypot(event.clientX - g.x, event.clientY - g.y) < 25;
-      if (samePointer && Math.hypot(event.clientX - g.x, event.clientY - g.y) < 25) {
-        pointerClickGuard = null;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
+      if (!pointerClickDeadline || performance.now() > pointerClickDeadline || event.detail === 0) return;
+      clearPointerClickGuard();
+      event.preventDefault();
+      event.stopImmediatePropagation();
     },
     true,
   );
@@ -284,12 +284,16 @@ export function installNormalEditor(ctx) {
   function reset() {
     m.renderedDate = '';
     m.loadedDate = '';
+    m.baseline = '';
     m.history = [];
     m.selected = '';
     m.draft = new Map();
     m.originals = new Map();
     m.absent = new Map();
     m.absentOriginals = new Map();
+    m.drag = null;
+    clearPointerClickGuard();
+    m.openUid = '';
     m.external = false;
   }
   function onData() {
@@ -326,13 +330,8 @@ export function installNormalEditor(ctx) {
     );
     b.title = 'タップで選択、移動先をタップ。iPadではドラッグ操作も可能です。';
     b.setAttribute('aria-pressed', String(selected));
-    let suppressClick = false;
     b.addEventListener('click', (event) => {
       event.stopPropagation();
-      if (suppressClick) {
-        suppressClick = false;
-        return;
-      }
       selectLesson(entry.id);
     });
     if (entry.status !== 'scheduled') return b;
@@ -369,24 +368,16 @@ export function installNormalEditor(ctx) {
     b.addEventListener('pointerup', (event) => {
       const drag = m.drag;
       if (!drag || drag.id !== entry.id || drag.pointerId !== event.pointerId) return;
-      if (drag.moved || event.pointerType === 'touch')
-        pointerClickGuard = {
-          id: event.pointerId,
-          x: event.clientX,
-          y: event.clientY,
-          until: performance.now() + 650,
-        };
       m.drag = null;
       b.classList.remove('is-dragging');
       document
         .querySelectorAll('.normal-cell.is-drop-target')
         .forEach((el) => el.classList.remove('is-drop-target'));
+      if (drag.moved || event.pointerType === 'touch') pointerClickDeadline = performance.now() + 650;
       if (drag.moved) {
-        suppressClick = true;
         if (drag.target) move(entry.id, drag.target.dataset.uid, Number(drag.target.dataset.period));
         else showMessage('移動先の講師の出勤可能なコマまでドラッグしてください。');
       } else if (event.pointerType === 'touch') {
-        suppressClick = true;
         event.preventDefault();
         selectLesson(entry.id);
       }
