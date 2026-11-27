@@ -2,6 +2,11 @@ const assert = require('node:assert/strict');
 const { after, before, test } = require('node:test');
 const { normalSchedule } = require('./normal-schedule.cjs');
 const { seasonalCourses } = require('./seasonal-courses.cjs');
+const { maintenanceReadFailure, sessionPrivacy } = require('./session-privacy.cjs');
+const { publicBookingResponseChecks } = require('./public-booking.cjs');
+const { qrPrint } = require('./qr-print.cjs');
+const { ranking } = require('./ranking.cjs');
+const { staleDialogOperations } = require('./dialog-operations.cjs');
 const { adjust, browsers, condition, fixtureUrl, launch, openPage, startServer } = require('./harness.cjs');
 
 const date = '2026-11-12';
@@ -232,6 +237,59 @@ for (const browserName of browsers) {
         const { page, close } = await openPage(browser, server, { viewport: { width: 1024, height: 1366 } });
         try {
           await seasonalCourses({ page, openApplication, logIn });
+        } finally {
+          await close();
+        }
+      });
+
+      await suite.test('logout clears the preceding session contents', async () => {
+        const { page, close } = await openPage(browser, server, { viewport: { width: 1024, height: 1366 } });
+        try {
+          await sessionPrivacy({ page, date, openApplication, logIn, logOut });
+        } finally {
+          await close();
+        }
+      });
+
+      for (const role of ['admin', 'owner']) {
+        await suite.test(`maintenance read failure releases ${role} subscriptions`, async () => {
+          const { page, close } = await openPage(browser, server, {
+            viewport: { width: 1024, height: 1366 },
+          });
+          try {
+            await maintenanceReadFailure({ page, openApplication, logIn, logOut, role });
+          } finally {
+            await close();
+          }
+        });
+      }
+
+      await suite.test('late save success and failure leave reopened forms intact', async () => {
+        const { page, close } = await openPage(browser, server, { viewport: { width: 1024, height: 1366 } });
+        try {
+          await staleDialogOperations({ page, openApplication, logIn });
+        } finally {
+          await close();
+        }
+      });
+
+      await suite.test('public booking validates the Callable view before rendering', async () => {
+        const { page, close } = await openPage(browser, server, { viewport: { width: 390, height: 844 } });
+        try {
+          await publicBookingResponseChecks(page, server, fixtureUrl);
+        } finally {
+          await close();
+        }
+      });
+
+      await suite.test('QR print preserves geometry and rejects invalid responses', () =>
+        qrPrint(browser, server),
+      );
+
+      await suite.test('ranking and badge controls enforce roles and maintenance gates', async () => {
+        const { page, close } = await openPage(browser, server, { viewport: { width: 1024, height: 1366 } });
+        try {
+          await ranking({ page, server });
         } finally {
           await close();
         }
