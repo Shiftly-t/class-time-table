@@ -101,6 +101,26 @@ test('forced closure skips confirmation and a delayed close event preserves a re
   assert.equal(confirm.mock.callCount(), 0);
 });
 
+test('an operation is scoped to the dialog opening that started it', () => {
+  const { student, controller } = mount();
+  const beforeOpening = controller.captureOpening('studentDialog');
+  controller.showDialog('studentDialog');
+  const first = controller.captureOpening('studentDialog');
+  assert.equal(beforeOpening(), false);
+  assert.equal(first(), true);
+
+  controller.closeDialog('studentDialog');
+  assert.equal(first(), false);
+  controller.showDialog('studentDialog');
+  const reopened = controller.captureOpening('studentDialog');
+  fire(student, 'close');
+  assert.equal(first(), false);
+  assert.equal(reopened(), true);
+
+  controller.closeAllDialogs();
+  assert.equal(reopened(), false);
+});
+
 for (const pointerEvents of [true, false]) {
   const eventType = pointerEvents ? 'pointerdown' : 'touchstart';
   test(`${eventType} saves a focused form through native validation and submission`, () => {

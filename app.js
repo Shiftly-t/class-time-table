@@ -136,6 +136,7 @@ const isAdmin = () => isManagementRole(state.profile?.role);
 const dashboardReady = { students: false, people: false };
 const maintenanceState = {
   loaded: false,
+  readError: false,
   enabled: false,
   message: '',
   version: '',
@@ -291,7 +292,7 @@ function cell(row, value, className = '') {
   row.append(td);
   return td;
 }
-const { showDialog, closeDialog, closeAllDialogs, hasOpenDialogDraft, enableOneTapSave } =
+const { showDialog, closeDialog, closeAllDialogs, hasOpenDialogDraft, enableOneTapSave, captureOpening } =
   installWorkspaceDialogs(document, window);
 
 ['studentForm', 'lessonForm', 'memoForm', 'closureForm', 'courseForm', 'courseDeadlineForm'].forEach(
@@ -322,6 +323,11 @@ const sessionGuard = () => {
     uid = state.user?.uid;
   return () => Boolean(uid && epoch === authGeneration && state.user?.uid === uid);
 };
+function dialogOperationGuard(...ids) {
+  const sameSession = sessionGuard();
+  const openings = ids.map(captureOpening);
+  return () => sameSession() && openings.every((isCurrent) => isCurrent());
+}
 const businessSubscriptions = createWorkspaceSubscriptions(onSnapshot, sessionGuard);
 const availabilitySubscriptions = createWorkspaceSubscriptions(onSnapshot, sessionGuard);
 function archivedValue(value) {
@@ -1129,17 +1135,23 @@ function applyMaintenanceState() {
     $('bookingManagementPage').hidden = false;
     openBookingFrame();
   }
-  $('maintenancePanel').hidden = !blocked;
+  $('maintenancePanel').hidden = !blocked && !maintenanceState.readError;
   $('appPanel').hidden = blocked || !maintenanceState.loaded;
   $('notificationButton').hidden = blocked || !maintenanceState.loaded;
-  $('maintenanceMessage').textContent =
-    maintenanceState.message || '現在、機能の更新と動作確認を行っています。';
-  $('maintenanceVersion').textContent = maintenanceState.version
-    ? `対象バージョン：${maintenanceState.version}`
-    : '';
-  $('maintenanceStatus').textContent = maintenanceState.loaded
-    ? 'ただいまメンテナンス中です'
-    : '利用状況を確認しています…';
+  if (maintenanceState.readError) {
+    $('maintenanceStatus').textContent = '利用状況を確認できません';
+    $('maintenanceMessage').textContent = 'Firebaseルールの公開状況を運営に確認してください。';
+    $('maintenanceVersion').textContent = '';
+  } else {
+    $('maintenanceMessage').textContent =
+      maintenanceState.message || '現在、機能の更新と動作確認を行っています。';
+    $('maintenanceVersion').textContent = maintenanceState.version
+      ? `対象バージョン：${maintenanceState.version}`
+      : '';
+    $('maintenanceStatus').textContent = maintenanceState.loaded
+      ? 'ただいまメンテナンス中です'
+      : '利用状況を確認しています…';
+  }
   if (!blocked && maintenanceState.loaded && state.user) {
     $('notificationButton').hidden = false;
   }
@@ -2168,6 +2180,7 @@ $('openDayForm').addEventListener('submit', async (event) => {
     return;
   }
   const button = event.submitter || $('openDayForm').querySelector('button[type=submit]');
+  const current = dialogOperationGuard('openDayDialog');
   button.disabled = true;
   try {
     const after = { date, note, updatedBy: state.user.uid, updatedAt: serverTimestamp() };
@@ -2179,10 +2192,11 @@ $('openDayForm').addEventListener('submit', async (event) => {
       auditChange(batch, `schoolOpenDays/${date}`, null, after, '追加', `${prettyDate(date)}の特別開校`);
       await batch.commit();
     }
+    if (!current()) return;
     closeDialog('openDayDialog');
     showMessage.success(`${prettyDate(date)}を開校日に変更しました。${openDayWarning(date)}`);
   } catch (e) {
-    trapError(e, '特別開校日の保存に失敗しました');
+    if (current()) trapError(e, '特別開校日の保存に失敗しました');
   } finally {
     button.disabled = false;
   }
@@ -2405,6 +2419,7 @@ $('closureForm').addEventListener('submit', async (event) => {
     return;
   }
   const button = event.submitter;
+  const current = dialogOperationGuard('closureDialog');
   button.disabled = true;
   try {
     const before = normalAuthority.enabled() ? closureEditBefore : explicitClosureFor(date);
@@ -2424,13 +2439,14 @@ $('closureForm').addEventListener('submit', async (event) => {
       );
       await batch.commit();
     }
+    if (!current()) return;
     closureCalendarView.selected = date;
     closureCalendarView.month = date.slice(0, 7);
     closeDialog('closureDialog');
     renderClosures();
     showMessage.success(`${prettyDate(date)}の休校設定を保存しました。授業データは削除されません。`);
   } catch (e) {
-    trapError(e, '休校日の保存に失敗しました');
+    if (current()) trapError(e, '休校日の保存に失敗しました');
   } finally {
     button.disabled = false;
   }
@@ -2447,6 +2463,7 @@ $('deleteClosure').addEventListener('click', async () => {
   )
     return;
   const button = $('deleteClosure');
+  const current = dialogOperationGuard('closureDialog');
   button.disabled = true;
   try {
     if (seasonalAuthority.enabled())
@@ -2469,6 +2486,7 @@ $('deleteClosure').addEventListener('click', async () => {
       );
       await batch.commit();
     }
+    if (!current()) return;
     closeDialog('closureDialog');
     renderClosures();
     showMessage.success(
@@ -2477,7 +2495,7 @@ $('deleteClosure').addEventListener('click', async () => {
         : '休校日を解除しました。元の授業予定が再表示されます。',
     );
   } catch (e) {
-    trapError(e, '休校日の解除に失敗しました');
+    if (current()) trapError(e, '休校日の解除に失敗しました');
   } finally {
     button.disabled = false;
   }
@@ -2517,6 +2535,7 @@ $('examForm').addEventListener('submit', async (event) => {
     return;
   }
   const button = event.submitter;
+  const current = dialogOperationGuard('examDialog');
   button.disabled = true;
   try {
     const previous = normalAuthority.enabled() ? examEditBefore : examFor(date),
@@ -2550,10 +2569,11 @@ $('examForm').addEventListener('submit', async (event) => {
       );
       await batch.commit();
     }
+    if (!current()) return;
     closeDialog('examDialog');
     showMessage.success(`${prettyDate(date)}の模試・テストを登録しました。この日の休校扱いを解除しました。`);
   } catch (error) {
-    trapError(error, '模試の登録に失敗しました');
+    if (current()) trapError(error, '模試の登録に失敗しました');
   } finally {
     button.disabled = false;
   }
@@ -2564,6 +2584,7 @@ $('deleteExam').addEventListener('click', async () => {
   if (!examFor(date)) return;
   if (!confirm(`${prettyDate(date)}の模試・テスト予定を削除しますか？`)) return;
   const button = $('deleteExam');
+  const current = dialogOperationGuard('examDialog');
   button.disabled = true;
   try {
     if (seasonalAuthority.enabled())
@@ -2581,10 +2602,11 @@ $('deleteExam').addEventListener('click', async () => {
       );
       await batch.commit();
     }
+    if (!current()) return;
     closeDialog('examDialog');
     showMessage.success('模試・テスト予定を削除しました。日曜・祝日・手動休校の設定が再び適用されます。');
   } catch (error) {
-    trapError(error, '模試を削除できませんでした');
+    if (current()) trapError(error, '模試を削除できませんでした');
   } finally {
     button.disabled = false;
   }
@@ -2834,6 +2856,7 @@ $('courseDeadlineForm').addEventListener('submit', async (event) => {
     return;
   }
   const button = event.submitter || $('courseDeadlineForm').querySelector('[type="submit"]');
+  const current = dialogOperationGuard('courseDeadlineDialog');
   button.disabled = true;
   try {
     const before = state.courses.find((c) => c.id === id),
@@ -2853,10 +2876,11 @@ $('courseDeadlineForm').addEventListener('submit', async (event) => {
       );
       await batch.commit();
     }
+    if (!current()) return;
     closeDialog('courseDeadlineDialog');
     showMessage.success('勤務希望の提出締切を変更しました。');
   } catch (e) {
-    trapError(e, '提出締切の変更に失敗しました');
+    if (current()) trapError(e, '提出締切の変更に失敗しました');
   } finally {
     button.disabled = false;
   }
@@ -2929,6 +2953,7 @@ $('courseForm').addEventListener('submit', async (event) => {
     return;
   }
   const button = event.submitter;
+  const current = dialogOperationGuard('courseDialog');
   button.disabled = true;
   try {
     const before = state.courses.find((c) => c.id === id),
@@ -2948,6 +2973,7 @@ $('courseForm').addEventListener('submit', async (event) => {
       if (state.availabilityStatus[id] !== 'ready')
         throw Error('勤務希望を確認できないため、講習構成を変更できません。');
       const data = (await bookingEditorCall({ action: 'getSettings', courseId: id })).data;
+      if (!current()) return;
       if (!data || !Object.hasOwn(data, 'settings'))
         throw Error('予約設定を確認できないため、講習構成を変更できません。');
       assertCourseStructureEditable({
@@ -2984,10 +3010,11 @@ $('courseForm').addEventListener('submit', async (event) => {
       );
       await batch.commit();
     }
+    if (!current()) return;
     closeDialog('courseDialog');
     showMessage.success(`${name}期間を保存しました。期間内は講習授業だけが表示されます。`);
   } catch (e) {
-    trapError(e, '講習期間の保存に失敗しました');
+    if (current()) trapError(e, '講習期間の保存に失敗しました');
   } finally {
     button.disabled = false;
   }
@@ -3011,17 +3038,20 @@ $('deleteCourse').addEventListener('click', async () => {
     )
   )
     return;
+  const current = dialogOperationGuard('courseDialog');
   const button = $('deleteCourse');
   button.disabled = true;
   $('courseDeleteNotice').hidden = true;
   try {
     if (seasonalAuthority.enabled()) {
       await commands.deleteCourse({ courseId: id, before: course });
+      if (!current()) return;
       closeDialog('courseDialog');
       showMessage.success('空の講習期間を削除しました。');
       return;
     }
     const availabilityDocs = await getDocs(collection(db, 'specialCourses', id, 'teacherAvailability'));
+    if (!current()) return;
     if (availabilityDocs.size > 170)
       throw Error('勤務希望が多数あるため一度に削除できません。運営に相談してください。');
     const batch = writeBatch(db);
@@ -3040,6 +3070,7 @@ $('deleteCourse').addEventListener('click', async () => {
     }
     const metaRef = doc(db, 'specialCourses', id, 'scheduleMeta', 'state');
     const meta = await getDoc(metaRef);
+    if (!current()) return;
     if (meta.exists()) {
       batch.delete(metaRef);
       auditChange(batch, metaRef.path, meta.data(), null, '削除', `${course.name}の配置管理情報`, group);
@@ -3047,9 +3078,11 @@ $('deleteCourse').addEventListener('click', async () => {
     batch.delete(doc(db, 'specialCourses', id));
     auditChange(batch, `specialCourses/${id}`, course, null, '削除', `${course.name}講習期間`, group);
     await batch.commit();
+    if (!current()) return;
     closeDialog('courseDialog');
     showMessage.success('講習期間と勤務希望を解除しました。通常授業が再表示されます。');
   } catch (e) {
+    if (!current()) return;
     console.error('講習期間削除エラー', e);
     const permission = String(e?.code || '').includes('permission-denied');
     const note = $('courseDeleteNotice');
@@ -3392,6 +3425,7 @@ $('broadcastForm').addEventListener('submit', async (event) => {
   )
     return;
   const button = $('broadcastSend');
+  const current = dialogOperationGuard('notificationDialog');
   button.disabled = true;
   try {
     await setDoc(doc(collection(db, 'officialAnnouncements')), {
@@ -3401,10 +3435,11 @@ $('broadcastForm').addEventListener('submit', async (event) => {
       createdBy: state.user.uid,
       createdAt: serverTimestamp(),
     });
+    if (!current()) return;
     $('broadcastMessage').value = '';
     showMessage.success('運営のお知らせを登録しました。指定した期間に全スタッフへ表示されます。');
   } catch (error) {
-    trapError(error, '運営のお知らせを登録できませんでした');
+    if (current()) trapError(error, '運営のお知らせを登録できませんでした');
   } finally {
     button.disabled = false;
   }
@@ -3559,8 +3594,9 @@ function openStudent(id) {
   showDialog('studentDialog');
 }
 $('addStudent').addEventListener('click', () => openStudent(''));
-async function updateStudentEntryLabels(studentId, studentData) {
+async function updateStudentEntryLabels(studentId, studentData, sameSession) {
   const docs = await getDocs(query(collection(db, 'timetableEntries'), where('studentId', '==', studentId)));
+  if (!sameSession()) return;
   let batch = writeBatch(db),
     count = 0;
   const group = doc(collection(db, 'auditLogs')).id;
@@ -3580,11 +3616,13 @@ async function updateStudentEntryLabels(studentId, studentData) {
     count++;
     if (count === 175) {
       await batch.commit();
+      if (!sameSession()) return;
       batch = writeBatch(db);
       count = 0;
     }
   }
   if (count) await batch.commit();
+  if (!sameSession()) return;
   const recipients = [
     ...new Set(
       docs.docs
@@ -3636,6 +3674,9 @@ $('studentForm').addEventListener('submit', async (event) => {
     showMessage('在籍状態を含む生徒の編集は管理用APIの対応が必要です。履歴を保持して停止しました。');
     return;
   }
+  const sameSession = sessionGuard();
+  const current = dialogOperationGuard('studentDialog');
+  const expectedStudent = studentEditBaseline;
   const button = event.submitter;
   button.disabled = true;
   let studentSaved = false,
@@ -3644,20 +3685,27 @@ $('studentForm').addEventListener('submit', async (event) => {
     if (normalAuthority.enabled()) {
       if (!$('studentId').value) $('studentId').value = id;
       await commands.saveStudent({ studentId: id, before, value: data });
+      if (!current()) return;
       closeDialog('studentDialog');
       showMessage.success('生徒情報・通常授業・授業表示情報をまとめて保存しました。');
       return;
     }
     if (wasEditing && ['name', 'grade', 'school'].some((key) => before?.[key] !== data[key])) {
       const linked = await getDocs(query(collection(db, 'timetableEntries'), where('studentId', '==', id)));
-      if (!(await canDirectlyWriteLessons(linked.docs.map((snap) => ({ ...snap.data(), id: snap.id })))))
+      if (
+        !(await canDirectlyWriteLessons(
+          linked.docs.map((snap) => ({ ...snap.data(), id: snap.id })),
+          current,
+        ))
+      )
         return;
     }
+    if (!current()) return;
     await runTransaction(db, async (tx) => {
       const ref = doc(db, 'schoolStudents', id),
         snap = await tx.get(ref);
       const current = snap.exists() ? snap.data() : null;
-      if (recordFingerprint(current) !== studentEditBaseline)
+      if (recordFingerprint(current) !== expectedStudent)
         throw Error('他の端末で生徒情報が変更されました。画面を閉じて読み直してください。');
       savedStudent = { ...current, ...data };
       tx.set(ref, savedStudent);
@@ -3672,9 +3720,13 @@ $('studentForm').addEventListener('submit', async (event) => {
     });
     // The primary save succeeded even if later label/notification propagation fails.
     studentSaved = true;
-    studentEditBaseline = recordFingerprint(savedStudent);
-    $('studentId').value = id;
-    if (wasEditing) await updateStudentEntryLabels(id, data);
+    if (!sameSession()) return;
+    if (current()) {
+      studentEditBaseline = recordFingerprint(savedStudent);
+      $('studentId').value = id;
+    }
+    if (wasEditing) await updateStudentEntryLabels(id, data, sameSession);
+    if (!sameSession()) return;
     if (JSON.stringify(before?.regularSlots || {}) !== JSON.stringify(data.regularSlots)) {
       const affected = [...everySlot(before || {}), ...everySlot(data)].map((s) => s.teacherUid);
       const oldSlots = everySlot(before || {}),
@@ -3692,9 +3744,11 @@ $('studentForm').addEventListener('submit', async (event) => {
         `通常授業が変更されました（変更前：${oldSummary} → 変更後：${nextSummary}）。`,
       );
     }
+    if (!current()) return;
     closeDialog('studentDialog');
     showMessage.success('生徒情報を保存しました。通常授業は指定曜日の時間割に自動表示されます。');
   } catch (e) {
+    if (!current()) return;
     trapError(
       e,
       studentSaved
@@ -3748,16 +3802,16 @@ function withdrawalPlanText(plan) {
 let pendingWithdrawal = null;
 $('withdrawStudent').addEventListener('click', async () => {
   if (!isAdmin()) return;
-  const studentId = $('studentId').value,
-    current = sessionGuard();
+  const studentId = $('studentId').value;
   pendingWithdrawal = null;
   $('confirmWithdrawal').disabled = true;
   showDialog('withdrawalDialog');
+  const current = dialogOperationGuard('studentDialog', 'withdrawalDialog');
   $('withdrawalSummary').style.whiteSpace = 'pre-line';
   $('withdrawalSummary').textContent = '退塾の影響を確認しています…';
   try {
     const plan = await commands.planWithdrawal(studentId);
-    if (!current() || !$('withdrawalDialog').open) return;
+    if (!current()) return;
     pendingWithdrawal = { studentId, plan, actorUid: state.user.uid, epoch: authGeneration };
     $('withdrawalSummary').textContent = withdrawalPlanText(plan);
     $('confirmWithdrawal').disabled = plan.canApply !== true;
@@ -3775,7 +3829,7 @@ $('confirmWithdrawal').addEventListener('click', async () => {
     !$('withdrawalDialog').open
   )
     return;
-  const current = sessionGuard();
+  const current = dialogOperationGuard('studentDialog', 'withdrawalDialog');
   $('confirmWithdrawal').disabled = true;
   try {
     await commands.withdrawStudent(request);
@@ -4008,6 +4062,7 @@ let lessonSaveBusy = false;
 $('lessonForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!isAdmin() || lessonSaveBusy) return;
+  const current = dialogOperationGuard('lessonFormDialog');
   lessonSaveBusy = true;
   try {
     if (
@@ -4110,9 +4165,10 @@ $('lessonForm').addEventListener('submit', async (event) => {
     // the course editor (0–4 per slot, default 2). Never silently assume 2.
     if (
       !(seasonalAuthority.enabled() && course) &&
-      !(await canDirectlyWriteLessons([{ ...data, id }, old].filter(Boolean)))
+      !(await canDirectlyWriteLessons([{ ...data, id }, old].filter(Boolean), current))
     )
       return;
+    if (!current()) return;
     if (course && data.status !== 'cancelled') {
       const periodIndex = course.periods.findIndex((p) => p.start === start && p.end === end);
       if (periodIndex < 0 || !availabilityAllows(course.id, teacher.id, date, periodIndex)) {
@@ -4124,6 +4180,7 @@ $('lessonForm').addEventListener('submit', async (event) => {
       let teacherLimit = 2;
       try {
         const response = (await bookingEditorCall({ action: 'teachers', courseId: course.id })).data;
+        if (!current()) return;
         const settings = (response.teachers || []).find((x) => x.id === teacher.id);
         if (!settings) {
           showMessage('担当講師の予約上限を確認できません。');
@@ -4135,7 +4192,8 @@ $('lessonForm').addEventListener('submit', async (event) => {
           ? Math.max(0, Math.min(courseEditorCapacity.maxTeacherCapacity, n))
           : 2;
       } catch (error) {
-        showMessage('担当講師の予約上限を取得できません：' + String(error?.message || 'エラー'));
+        if (current())
+          showMessage('担当講師の予約上限を取得できません：' + String(error?.message || 'エラー'));
         return;
       }
       const peers = lessonsOnDate(date).filter(
@@ -4198,10 +4256,11 @@ $('lessonForm').addEventListener('submit', async (event) => {
           if (old?.teacherUid && old.teacherUid !== teacher.id) affected.push(old.teacherUid);
           await sendLessonNotifications(affected, old, { ...next, id }, 'save', tx);
         });
+      if (!current()) return;
       closeDialog('lessonFormDialog');
       showMessage.success('授業を保存し、関係する担当教師に通知しました。');
     } catch (e) {
-      trapError(e, '授業の保存に失敗しました');
+      if (current()) trapError(e, '授業の保存に失敗しました');
     } finally {
       btn.disabled = false;
     }
@@ -4215,7 +4274,9 @@ $('deleteLesson').addEventListener('click', async () => {
     ? lessonEditRecord
     : state.entries.find((e) => e.id === $('lessonId').value);
   if (!old) return;
-  if (!(seasonalAuthority.enabled() && old.courseId) && !(await canDirectlyWriteLessons([old]))) return;
+  const current = dialogOperationGuard('lessonFormDialog');
+  if (!(seasonalAuthority.enabled() && old.courseId) && !(await canDirectlyWriteLessons([old], current)))
+    return;
   if (
     !confirm(
       old.regularId
@@ -4236,12 +4297,14 @@ $('deleteLesson').addEventListener('click', async () => {
         ).cancelled
       )
         return;
+      if (!current()) return;
       closeDialog('lessonFormDialog');
       showMessage.success('講習授業をAPIで削除しました。');
       return;
     }
     if (normalAuthority.enabled() && !old.courseId) {
       await commands.saveDay({ date: old.date, changes: [{ id: old.id, before: old, remove: true }] });
+      if (!current()) return;
       closeDialog('lessonFormDialog');
       showMessage.success('授業を削除しました。');
       return;
@@ -4264,10 +4327,11 @@ $('deleteLesson').addEventListener('click', async () => {
       );
     await sendLessonNotifications([old.teacherUid], old, null, 'delete', batch);
     await batch.commit();
+    if (!current()) return;
     closeDialog('lessonFormDialog');
     showMessage.success('授業を削除しました。');
   } catch (e) {
-    trapError(e, '授業の削除に失敗しました');
+    if (current()) trapError(e, '授業の削除に失敗しました');
   }
 });
 function renderUpcomingForLesson(lesson) {
@@ -4342,12 +4406,17 @@ $('memoForm').addEventListener('submit', async (event) => {
   const lesson = normalAuthority.enabled() ? memoEditRecord : lessonById(state.activeLesson);
   if (!lesson) return;
   const content = $('memoContent').value.trim();
+  const expected = memoEditBaseline;
   const button = event.submitter;
+  const current = dialogOperationGuard('detailDialog');
   button.disabled = true;
   try {
-    if (!(seasonalAuthority.enabled() && lesson.courseId) && !(await canDirectlyWriteLessons([lesson])))
+    if (
+      !(seasonalAuthority.enabled() && lesson.courseId) &&
+      !(await canDirectlyWriteLessons([lesson], current))
+    )
       return;
-    const expected = memoEditBaseline;
+    if (!current()) return;
     if (seasonalAuthority.enabled() && lesson.courseId) {
       await commands.saveMemo({ before: lesson, memo: content });
     } else if (normalAuthority.enabled() && !lesson.courseId) {
@@ -4376,10 +4445,11 @@ $('memoForm').addEventListener('submit', async (event) => {
         );
         await sendLessonNotifications([lesson.teacherUid], lesson, { ...lesson, memo: content }, 'memo', tx);
       });
+    if (!current()) return;
     closeDialog('detailDialog');
     showMessage.success('伝達事項を保存しました。時間割にも反映されます。');
   } catch (e) {
-    trapError(e, '伝達事項の保存に失敗しました');
+    if (current()) trapError(e, '伝達事項の保存に失敗しました');
   } finally {
     button.disabled = false;
   }
@@ -5963,7 +6033,8 @@ $('editorSave').addEventListener('click', publishCourseEditor);
 const isBookingOwnedLesson = (lesson) => String(lesson?.id || '').startsWith('b_');
 const BOOKING_WRITE_MESSAGE =
   '予約管理対象の授業です。変更・取消は「講習予約管理」で行ってください。伝達事項・生徒削除・復元は運営に確認してください。';
-async function canDirectlyWriteLessons(entries) {
+async function canDirectlyWriteLessons(entries, current = sessionGuard()) {
+  if (!current()) return false;
   if (entries.some(isBookingOwnedLesson)) {
     showMessage(BOOKING_WRITE_MESSAGE);
     return false;
@@ -5971,6 +6042,7 @@ async function canDirectlyWriteLessons(entries) {
   for (const courseId of new Set(entries.map((e) => e?.courseId).filter(Boolean))) {
     try {
       const response = (await bookingEditorCall({ action: 'getSettings', courseId })).data;
+      if (!current()) return false;
       if (!response || !Object.prototype.hasOwnProperty.call(response, 'settings'))
         throw Error('予約設定の応答を確認できません');
       if (response.serverOwnsTimetable === true || response.settings?.enabled === true) {
@@ -5978,7 +6050,8 @@ async function canDirectlyWriteLessons(entries) {
         return false;
       }
     } catch (error) {
-      showMessage('予約設定を確認できません。通信状態を確認し、講習予約管理で操作してください。');
+      if (current())
+        showMessage('予約設定を確認できません。通信状態を確認し、講習予約管理で操作してください。');
       return false;
     }
   }
@@ -6026,15 +6099,104 @@ function syncBookingManagementShortcut() {
 const loginFormNode = $('loginForm');
 const loginFormParent = loginFormNode.parentElement;
 
+function clearSessionView() {
+  closeAllDialogs();
+  // Hidden workspaces share the document with the login form. Remove their
+  // rendered records and field values when the authenticated session ends.
+  for (const id of [
+    'welcomeName',
+    'identity',
+    'noticeCount',
+    'dashboardSearchResults',
+    'dashboardPeriods',
+    'studentResults',
+    'teacherStudentResults',
+    'countRows',
+    'teacherStudentRows',
+    'regularRows',
+    'legacyRegularNote',
+    'withdrawalSummary',
+    'deleteStudentSummary',
+    'displayDate',
+    'lessonList',
+    'lessonStudent',
+    'lessonTeacher',
+    'lessonCoursePeriod',
+    'lessonCourseHint',
+    'detailTitle',
+    'detailDate',
+    'detailSubject',
+    'detailTeacher',
+    'detailGrade',
+    'futureDates',
+    'memoReadOnly',
+    'normalGrid',
+    'normalEditorWarning',
+    'normalAbsenceTitle',
+    'normalAbsenceOptions',
+    'normalAbsenceScheduleHint',
+    'workTeacher',
+    'workWeekInfo',
+    'workWeekDays',
+    'workDayInfo',
+    'workDayPeriods',
+    'closureCalendarGrid',
+    'closureList',
+    'closureSelectedCourse',
+    'closureSelectedNote',
+    'closureSelectedExamInfo',
+    'courseList',
+    'coursePeriodRows',
+    'deadlineEditCourseLabel',
+    'courseDeleteNoticeTitle',
+    'courseDeleteNoticeMessage',
+    'editorCourse',
+    'editorGrid',
+    'editorWarning',
+    'editorNewStudent',
+    'editorNewTeacher',
+    'editorNewPeriod',
+    'availabilityCourse',
+    'availabilityPerson',
+    'availabilityGrid',
+    'availabilityPeriodOverview',
+    'availabilityWeekLabel',
+    'availabilityDeadlineInfo',
+    'availabilityEditingState',
+    'notificationList',
+    'officialNoticeList',
+    'ownerAnnouncementList',
+    'shiftlyNoticeText',
+    'ownerAuditList',
+    'ownerArchiveList',
+    'ownerAuditMessage',
+    'maintenanceHistoryList',
+    'maintenanceProgress',
+  ]) {
+    $(id)?.replaceChildren();
+  }
+  for (const form of document.querySelectorAll('dialog form')) form.reset();
+  // The value of a hidden input is also its default, so form.reset() retains it.
+  for (const input of document.querySelectorAll('dialog input[type=hidden]')) input.value = '';
+  for (const id of [
+    'dashboardSearch',
+    'studentSearch',
+    'teacherStudentSearch',
+    'ownerBackupLabel',
+    'maintenanceNoticeInput',
+    'maintenanceVersionInput',
+  ]) {
+    $(id).value = '';
+  }
+  $('dashboardLessonCount').textContent = '—';
+  $('dashboardTeacherCount').textContent = '—';
+  renderNoticeButton();
+}
+
 // Authentication and session lifecycle
 function loggedOut() {
   menuScrollHint.stop();
   state.page = '';
-  $('dashboardSearch').value = '';
-  $('dashboardSearchResults').replaceChildren();
-  $('dashboardPeriods').replaceChildren();
-  $('dashboardLessonCount').textContent = '—';
-  $('dashboardTeacherCount').textContent = '—';
   renderBrandVersion('');
   workspaceScroll.reset();
   resetBookingFrame();
@@ -6044,14 +6206,12 @@ function loggedOut() {
   }
   authGeneration++;
   resetAuthorityClients();
-  pendingWithdrawal = null;
-  pendingStudentDeletion = null;
-  studentEditBaseline = null;
   if (maintenanceState.unsub) {
     maintenanceState.unsub();
     maintenanceState.unsub = null;
   }
   maintenanceState.loaded = false;
+  maintenanceState.readError = false;
   maintenanceState.dataStarted = false;
   maintenanceState.enabled = false;
   maintenanceState.history = [];
@@ -6066,27 +6226,16 @@ function loggedOut() {
     archiveCursor: null,
     totalBackupCount: null,
   });
-  $('ownerAuditList').replaceChildren();
-  $('ownerArchiveList').replaceChildren();
-  $('ownerAuditMessage').textContent = '';
   resetSubscriptions();
   state.user = state.profile = null;
-  courseEditorCapacity.version++;
-  courseEditorCapacity.ready = false;
-  courseEditorCapacity.teachers.clear();
   syncBookingManagementShortcut();
   clearAvailabilitySubscriptions();
   resetSessionRecords();
-  resetCourseEditor();
-  resetAvailabilityEditor();
   $('loginPanel').hidden = false;
   $('appPanel').hidden = true;
   $('logout').hidden = true;
   $('notificationButton').hidden = true;
-  $('identity').textContent = '';
   $('password').value = '';
-  $('noticeCount').hidden = true;
-  closeAllDialogs();
 }
 function resetSessionRecords() {
   Object.assign(
@@ -6095,8 +6244,20 @@ function resetSessionRecords() {
     emptyTeacherWorkRecords(teacherWorkFeatureEnabled),
     emptySessionRecords(),
   );
+  state.activeLesson = null;
+  studentEditRecord = studentEditBaseline = null;
+  lessonEditRecord = memoEditRecord = null;
+  lessonEditBaseline = memoEditBaseline = 'null';
+  closureEditBefore = examEditBefore = null;
+  pendingWithdrawal = pendingStudentDeletion = null;
+  courseEditorCapacity.version++;
+  courseEditorCapacity.ready = false;
+  courseEditorCapacity.teachers.clear();
+  resetCourseEditor();
+  resetAvailabilityEditor();
   regularEditor?.reset();
   teacherWorkPage?.reset();
+  clearSessionView();
 }
 
 async function loggedIn(user) {
@@ -6114,8 +6275,6 @@ async function loggedIn(user) {
   state.people = [];
   $('appPanel').hidden = true;
   $('notificationButton').hidden = true;
-  $('identity').textContent = '';
-  closeAllDialogs();
   Object.assign(auditState, {
     logs: [],
     archives: [],
@@ -6126,9 +6285,6 @@ async function loggedIn(user) {
     totalBackupCount: null,
   });
   maintenanceState.busy = false;
-  $('ownerAuditList').replaceChildren();
-  $('ownerArchiveList').replaceChildren();
-  $('ownerAuditMessage').textContent = '';
   resetAuthorityClients();
   if (maintenanceState.unsub) {
     maintenanceState.unsub();
@@ -6188,8 +6344,6 @@ async function loggedIn(user) {
   $('broadcastStart').value = localDateTimeInput(now);
   $('broadcastEnd').value = localDateTimeInput(new Date(now.getTime() + 7 * 86400000));
   $('teacherFilterWrap').hidden = isAdmin();
-  resetCourseEditor();
-  resetAvailabilityEditor();
   $('teacherFilter').value = 'mine';
   state.date = todayKey();
   state.scheduleView = 'day';
@@ -6202,6 +6356,7 @@ async function loggedIn(user) {
   // Workspaces remain hidden until the server-side maintenance state is known.
   $('appPanel').hidden = true;
   maintenanceState.loaded = false;
+  maintenanceState.readError = false;
   maintenanceState.dataStarted = false;
   if (maintenanceState.unsub) {
     maintenanceState.unsub();
@@ -6245,6 +6400,7 @@ async function loggedIn(user) {
       if (!current()) return;
       const data = snapshot.exists() ? snapshot.data() : {};
       maintenanceState.loaded = true;
+      maintenanceState.readError = false;
       maintenanceState.enabled = data.enabled === true;
       maintenanceState.message = String(data.message || '');
       maintenanceState.version = String(data.version || '');
@@ -6274,21 +6430,21 @@ async function loggedIn(user) {
     (error) => {
       if (!current()) return;
       console.error('メンテナンス状態を確認できません', error);
-      renderBrandVersion('');
       maintenanceState.loaded = false;
-      $('appPanel').hidden = true;
-      $('maintenancePanel').hidden = false;
-      $('maintenanceStatus').textContent = '利用状況を確認できません';
-      $('maintenanceMessage').textContent = 'Firebaseルールの公開状況を運営に確認してください。';
-      $('maintenanceVersion').textContent = '';
-      $('notificationButton').hidden = true;
+      maintenanceState.readError = true;
+      resetSubscriptions();
+      clearAvailabilitySubscriptions();
+      closeAllDialogs();
+      resetWorkspaceMessages();
+      renderBrandVersion('');
+      applyMaintenanceState();
     },
   );
   if (isOwner() && !restoreBlocked()) loadMaintenanceHistory();
 }
 // Firestore subscriptions
 function startBusinessSubscriptions(user) {
-  if (maintenanceState.dataStarted || !state.user || state.user.uid !== user.uid) return;
+  if (!maintenanceState.loaded || maintenanceState.dataStarted || state.user?.uid !== user.uid) return;
   maintenanceState.dataStarted = true;
   const { subscribe } = businessSubscriptions;
   subscribe(

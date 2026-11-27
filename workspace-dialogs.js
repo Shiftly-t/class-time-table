@@ -27,6 +27,7 @@ function draftFingerprint(dialog) {
 
 export function installWorkspaceDialogs(document, window) {
   const baselines = new WeakMap();
+  const openings = new WeakMap();
 
   function hasDraft(dialog) {
     return dialog.open && baselines.has(dialog) && baselines.get(dialog) !== draftFingerprint(dialog);
@@ -38,9 +39,17 @@ export function installWorkspaceDialogs(document, window) {
 
   function showDialog(id) {
     const dialog = document.getElementById(id);
+    openings.set(dialog, {});
     if (dialog.open) return;
     if (guardedDialogIds.has(id)) baselines.set(dialog, draftFingerprint(dialog));
     dialog.showModal();
+  }
+
+  function captureOpening(id) {
+    const dialog = document.getElementById(id);
+    const opening = dialog?.open ? openings.get(dialog) : null;
+    // A close event can be delivered after the same element has been reopened.
+    return () => Boolean(opening && dialog.open && openings.get(dialog) === opening);
   }
 
   function closeDialog(id) {
@@ -107,5 +116,5 @@ export function installWorkspaceDialogs(document, window) {
     save.addEventListener(eventType, submitFromFocusedField, { passive: false });
   }
 
-  return { showDialog, closeDialog, closeAllDialogs, hasOpenDialogDraft, enableOneTapSave };
+  return { showDialog, closeDialog, closeAllDialogs, hasOpenDialogDraft, enableOneTapSave, captureOpening };
 }

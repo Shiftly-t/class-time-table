@@ -58,6 +58,15 @@ function publish(listener) {
   });
 }
 
+function failSnapshot(path) {
+  const failed = [...listeners].filter((listener) => listener.ref.path === path);
+  if (!failed.length) throw new Error(`Missing subscription: ${path}`);
+  for (const listener of failed) {
+    listeners.delete(listener);
+    queueMicrotask(() => listener.error(Object.assign(new Error('Fixture read failed'), { code: 'permission-denied' })));
+  }
+}
+
 function setRecords(changes) {
   for (const [path, value] of Object.entries(changes)) {
     if (value === null) records.delete(path);
@@ -156,6 +165,7 @@ export const httpsCallable = (_functions, name) => async (request) => {
 export const fixture = {
   setRecords,
   setUser,
+  failSnapshot,
   getRecord: (path) => structuredClone(records.get(path)),
   listenCount: () => listeners.size,
   listensTo: (path) => [...listeners].some((listener) => listener.ref.path === path),
