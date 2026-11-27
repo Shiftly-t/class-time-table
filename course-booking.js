@@ -3,6 +3,7 @@ import {
   getFunctions,
   httpsCallable,
 } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
+import { readPublicBookingView } from './booking-public-response.js';
 import { createBookingTransport } from './booking-transport.js';
 import * as config from './config.js';
 import { firebaseTargetForPage } from './firebase-target.js';
@@ -142,7 +143,7 @@ function notify(s, error = false, showSuccess = false) {
 }
 
 async function api(action, fields = {}) {
-  return (await transport.call({ ...ids, studentName: name, action, ...fields })).data;
+  return (await transport.call({ ...ids, studentName: name, action, ...fields }))?.data;
 }
 const busyDisabledButtons = new WeakSet();
 
@@ -242,7 +243,7 @@ function lis(arr) {
   return `<ul class="entrylist">${arr.map((id) => `<li>${esc(label(id))}</li>`).join('')}</ul>`;
 }
 async function reload() {
-  data = await api('view');
+  data = readPublicBookingView(await api('view'));
   $('title').textContent = `${datedCourseName(data.course.name, data.course.startDate)}｜予約・確認`;
   render();
 }
@@ -293,8 +294,8 @@ function calendar(choose) {
               full = (s.remaining ?? 0) < 1 && !was,
               disabled = s.disabled || !choose || full;
             return choose
-              ? `<button type="button" class="slot ${full ? 'full' : ''}" data-slot="${esc(s.id)}" aria-pressed="${checked}" ${disabled ? 'disabled' : ''}><strong>${esc(s.start)}〜${esc(s.end)}</strong><small>${checked ? '✓ 選択中' : s.disabled ? '休講' : full ? '満席' : '残り' + s.remaining + '枠'}</small></button>`
-              : `<div class="slot ${s.disabled ? 'full' : ''}"><strong>${esc(s.start)}〜${esc(s.end)}</strong>${!s.disabled && data.phase !== 'before' ? `<small>残り${s.remaining}枠</small>` : ''}</div>`;
+              ? `<button type="button" class="slot ${full ? 'full' : ''}" data-slot="${esc(s.id)}" aria-pressed="${checked}" ${disabled ? 'disabled' : ''}><strong>${esc(s.start)}〜${esc(s.end)}</strong><small>${checked ? '✓ 選択中' : s.disabled ? '休講' : full ? '満席' : '残り' + esc(s.remaining ?? 0) + '枠'}</small></button>`
+              : `<div class="slot ${s.disabled ? 'full' : ''}"><strong>${esc(s.start)}〜${esc(s.end)}</strong>${!s.disabled && data.phase !== 'before' ? `<small>残り${esc(s.remaining)}枠</small>` : ''}</div>`;
           })
           .join('')}</div></div>`,
     )
@@ -312,7 +313,7 @@ function review() {
 function submitted() {
   const b = data.booking;
   const unpub = b.confirmedCount - b.published.length;
-  let h = `<div class="divider"></div><span class="badge ok">希望提出済み</span><div class="statrow"><div class="stat"><strong>${b.wishes.length}</strong><small>希望コマ</small></div><div class="stat"><strong>${b.confirmedCount}</strong><small>確定コマ</small></div><div class="stat"><strong>${b.published.length}</strong><small>公開コマ</small></div></div><h3>提出した希望日時</h3>${lis(b.wishes)}<p class="muted">保護者から伝えたいこと：${esc(b.remarks || '（記入なし）')}</p>`;
+  let h = `<div class="divider"></div><span class="badge ok">希望提出済み</span><div class="statrow"><div class="stat"><strong>${b.wishes.length}</strong><small>希望コマ</small></div><div class="stat"><strong>${esc(b.confirmedCount)}</strong><small>確定コマ</small></div><div class="stat"><strong>${b.published.length}</strong><small>公開コマ</small></div></div><h3>提出した希望日時</h3>${lis(b.wishes)}<p class="muted">保護者から伝えたいこと：${esc(b.remarks || '（記入なし）')}</p>`;
   if (unpub > 0)
     h += '<div class="notice">確定済みで未公開の授業は、日時を表示していません。公開後に確認できます。</div>';
   if (b.published.length) {
@@ -381,8 +382,10 @@ function bind() {
   if (form)
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (busy) return;
       name = $('nameInput').value.trim();
       if (!name) return;
+      setBusy(true);
       notify('確認しています…');
       try {
         await reload();
@@ -391,6 +394,8 @@ function bind() {
         notify(message(error), true);
         name = '';
         render();
+      } finally {
+        setBusy(false);
       }
     });
   document.querySelectorAll('[data-slot]').forEach((b) =>
@@ -420,7 +425,7 @@ function bind() {
       }
       if (a === 'edit') {
         selected = new Set(data.booking.wishes);
-        remarks = data.booking.remarks;
+        remarks = data.booking.remarks ?? '';
         mode = 'edit';
         render();
         return;

@@ -1,5 +1,5 @@
 import { askCorrectionReason, lessonEnded } from './ranking-correction-ui.js?v=prod-ranking-20261126-a';
-import { mountQrPrintEditor } from './qr-print-editor.js?v=20261124-editor-v2';
+import { mountQrPrintEditor, parseQrSvg } from './qr-print-editor.js?v=20261124-editor-v2';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
@@ -692,22 +692,59 @@ async function confirmAction(title, text, action, options = {}) {
     return;
   return action();
 }
-function printLayoutBuild(items) {
-  return items
-    .map(
-      (x) =>
-        `<div class="printsheet"><div class="printitem"><h2>Shiftly-T｜${esc(datedCourseName(x.courseName, course?.startDate))}</h2><div class="studentname">${esc(x.studentName)} さん</div>${x.svg}<p>講習予約・確認用QRコード<br>受付締切：${esc(x.closingAt ? fmtTime(x.closingAt).replace('T', ' ') : '教室にご確認ください')}（日本時間）</p><p>スマートフォンで読み取り、生徒氏名を入力してください。<br>QRコードは他人に渡さないでください。</p></div></div>`,
-    )
-    .join('');
+function preparePrintItem(item) {
+  try {
+    return {
+      courseId: item.courseId || courseId,
+      courseName: item.courseName,
+      studentId: item.studentId,
+      studentName: String(item.studentName || ''),
+      deadline: item.closingAt ? fmtTime(item.closingAt).replace('T', ' ') : '教室にご確認ください',
+      art: parseQrSvg(item.svg),
+    };
+  } catch {
+    throw new BookingDiagnostic('getQr', '印刷データの形式を確認できません。運営に確認してください。');
+  }
+}
+
+function buildPrintLayout(items) {
+  const pages = document.createDocumentFragment();
+  for (const item of items) {
+    const page = document.createElement('div');
+    page.className = 'printsheet';
+    const card = document.createElement('div');
+    card.className = 'printitem';
+    const title = document.createElement('h2');
+    title.textContent = 'Shiftly-T｜' + datedCourseName(item.courseName, course?.startDate);
+    const name = document.createElement('div');
+    name.className = 'studentname';
+    name.textContent = item.studentName + ' さん';
+    const deadline = document.createElement('p');
+    deadline.append(
+      '講習予約・確認用QRコード',
+      document.createElement('br'),
+      `受付締切：${item.deadline}（日本時間）`,
+    );
+    const notice = document.createElement('p');
+    notice.append(
+      'スマートフォンで読み取り、生徒氏名を入力してください。',
+      document.createElement('br'),
+      'QRコードは他人に渡さないでください。',
+    );
+    card.append(title, name, document.importNode(item.art, true), deadline, notice);
+    page.append(card);
+    pages.append(page);
+  }
+  return pages;
 }
 function printAll(items) {
   if (!authorized) return;
-  printItems = items.map((x) => ({ ...x, courseId: x.courseId || courseId }));
   if (!items.length) {
     note('印刷対象の生徒がいません', true);
     return;
   }
-  $('printRoot').innerHTML = printLayoutBuild(items);
+  $('printRoot').replaceChildren(buildPrintLayout(items));
+  printItems = items;
   $('printReadyWrap').hidden = false;
   note(
     items.length +
@@ -720,13 +757,14 @@ async function qrAction(action) {
   clearPrintPreparation();
   const result = await guarded(
     action === 'issue' ? 'QR初回発行' : action === 'reissue' ? 'QR再発行' : 'QR取得',
-    () => api(action, { studentId }),
+    async () => preparePrintItem(await api(action, { studentId })),
   );
   if (result && epoch === authEpoch) printAll([result]);
 }
 async function bulkPrint() {
+  const epoch = authEpoch;
   clearPrintPreparation();
-  await guarded('全生徒のQRを取得', async () => {
+  const items = await guarded('全生徒のQRを取得', async () => {
     const all = [];
     for (const r of roster) {
       try {
@@ -736,9 +774,9 @@ async function bulkPrint() {
         all.push(await api('issue', { studentId: r.id }));
       }
     }
-    printAll(all);
-    return { ok: true };
+    return all.map(preparePrintItem);
   });
+  if (items && epoch === authEpoch) printAll(items);
 }
 async function runAction(a) {
   if (!canInteract()) return;
@@ -1076,9 +1114,7 @@ function populatePrintWindow(popup) {
   const items = printItems.slice();
   const ok = mountQrPrintEditor(popup, {
     items,
-    courseStart: course?.startDate,
     courseTitle: 'Shiftly-T｜' + datedCourseName(items[0]?.courseName, course?.startDate),
-    formatDeadline: (value) => (value ? fmtTime(value).replace('T', ' ') : '教室にご確認ください'),
     canPrint: () => authorized && epoch === authEpoch && popup === printWindow && !popup.closed,
     onClose: () => {
       if (popup === printWindow) closePrintWindow();
@@ -1112,7 +1148,7 @@ $('printReady').addEventListener('click', () => {
           if (!item.studentId) throw Error('生徒IDを確認できません');
           fresh.push(await api('getQr', { courseId: item.courseId, studentId: item.studentId }));
         }
-        return fresh;
+        return fresh.map(preparePrintItem);
       });
       if (refreshed && epoch === authEpoch && authorized) {
         printAll(refreshed);

@@ -10,6 +10,69 @@ const DEFAULTS = Object.freeze({
   showDeadline: true,
 });
 const LIMITS = { 1: 85, 2: 65, 4: 45 };
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const XMLNS_NAMESPACE = 'http://www.w3.org/2000/xmlns/';
+const SVG_ELEMENTS = new Set(['svg', 'path', 'rect', 'g', 'title', 'desc']);
+const SVG_ATTRIBUTES = new Set([
+  'width',
+  'height',
+  'viewBox',
+  'fill',
+  'stroke',
+  'stroke-width',
+  'd',
+  'x',
+  'y',
+  'rx',
+  'ry',
+  'shape-rendering',
+  'transform',
+  'version',
+  'preserveAspectRatio',
+  'fill-rule',
+  'clip-rule',
+  'opacity',
+]);
+const SOLID_PAINT = /^(?:#[\da-f]{3,8}|[a-z]+|(?:rgba?|hsla?)\([-+\d.% ,/]+\))$/i;
+
+export function parseQrSvg(source) {
+  if (typeof source !== 'string' || /<!DOCTYPE\b|<\?(?!xml\s)/i.test(source))
+    throw new Error('Invalid QR image');
+  const parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
+  const svg = parsed.documentElement;
+  if (svg?.localName !== 'svg' || svg.namespaceURI !== SVG_NAMESPACE || parsed.querySelector('parsererror'))
+    throw new Error('Invalid QR image');
+
+  // Validate the detached XML before importing any node into an application document.
+  const descendants = parsed.createTreeWalker(svg, NodeFilter.SHOW_ALL);
+  for (let node = svg; node; node = descendants.nextNode()) {
+    if (node.nodeType === Node.PROCESSING_INSTRUCTION_NODE) throw new Error('Invalid QR XML');
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+    if (node.namespaceURI !== SVG_NAMESPACE || !SVG_ELEMENTS.has(node.localName))
+      throw new Error('Invalid QR element');
+    for (const attribute of node.attributes) {
+      if (
+        attribute.namespaceURI === XMLNS_NAMESPACE &&
+        attribute.name === 'xmlns' &&
+        attribute.value === SVG_NAMESPACE
+      )
+        continue;
+      if (
+        attribute.namespaceURI !== null ||
+        !SVG_ATTRIBUTES.has(attribute.name) ||
+        /url\s*\(|javascript:|data:/i.test(attribute.value)
+      )
+        throw new Error('Invalid QR attribute');
+      if (
+        (attribute.name === 'fill' || attribute.name === 'stroke') &&
+        !SOLID_PAINT.test(attribute.value.trim())
+      )
+        throw new Error('Invalid QR paint');
+    }
+  }
+  return svg;
+}
+
 function normalize(value = {}) {
   const v = value && typeof value === 'object' ? value : {};
   const layout = [1, 2, 4].includes(Number(v.layout)) ? Number(v.layout) : 1;
@@ -84,55 +147,10 @@ textarea{resize:vertical;min-height:70px}
   body.print-blocked #pages{display:none!important}
 }
 `;
-export function mountQrPrintEditor(
-  popup,
-  { items, courseStart, courseTitle, formatDeadline, canPrint, onClose },
-) {
+export function mountQrPrintEditor(popup, { items, courseTitle, canPrint, onClose }) {
   const d = popup.document;
-  const data = items.map((x) => ({
-    name: String(x.studentName || ''),
-    deadline: formatDeadline(x.closingAt),
-    svg: String(x.svg || ''),
-  }));
-  if (!data.length || data.some((x) => !x.svg)) return false;
+  if (!items.length) return false;
   let prefs = readPrefs();
-  // Parse the server's QR SVG once; never place editor text into markup.
-  const arts = data.map((item) => {
-    const svg = new DOMParser().parseFromString(item.svg, 'image/svg+xml').documentElement;
-    if (svg.localName !== 'svg' || svg.namespaceURI !== 'http://www.w3.org/2000/svg')
-      throw Error('Invalid QR image');
-    // The QR generator emits only basic SVG geometry; do not import executable content.
-    const allowed = new Set(['svg', 'path', 'rect', 'g', 'title', 'desc']);
-    const attrs = new Set([
-      'xmlns',
-      'width',
-      'height',
-      'viewBox',
-      'fill',
-      'stroke',
-      'stroke-width',
-      'd',
-      'x',
-      'y',
-      'rx',
-      'ry',
-      'shape-rendering',
-      'transform',
-      'version',
-      'preserveAspectRatio',
-      'fill-rule',
-      'clip-rule',
-      'opacity',
-    ]);
-    for (const el of [svg, ...svg.querySelectorAll('*')]) {
-      if (!allowed.has(el.localName)) throw Error('Invalid QR element');
-      for (const a of [...el.attributes]) {
-        if (!attrs.has(a.name) || /url\s*\(|javascript:|data:/i.test(a.value))
-          throw Error('Invalid QR attribute');
-      }
-    }
-    return svg;
-  });
   d.documentElement.lang = 'ja';
   d.head.replaceChildren();
   d.body.replaceChildren();
@@ -249,7 +267,7 @@ export function mountQrPrintEditor(
   function checkFit() {
     const cards = [...pages.querySelectorAll('.qr-card')];
     fits =
-      cards.length === data.length &&
+      cards.length === items.length &&
       cards.every((c) => {
         const bounds = c.getBoundingClientRect(),
           children = [...c.children];
@@ -279,17 +297,17 @@ export function mountQrPrintEditor(
   function render() {
     pages.replaceChildren();
     pages.style.setProperty('--qr-size', prefs.size + 'mm');
-    for (let offset = 0; offset < data.length; offset += prefs.layout) {
+    for (let offset = 0; offset < items.length; offset += prefs.layout) {
       const page = el('section', 'qr-paper');
       page.dataset.layout = String(prefs.layout);
-      for (let i = offset; i < Math.min(offset + prefs.layout, data.length); i++) {
-        const x = data[i],
+      for (let i = offset; i < Math.min(offset + prefs.layout, items.length); i++) {
+        const x = items[i],
           card = el('article', 'qr-card');
         card.append(el('h2', 'qr-heading', prefs.title.trim() || courseTitle));
-        if (prefs.showName) card.append(el('p', 'qr-name', x.name + ' さん'));
+        if (prefs.showName) card.append(el('p', 'qr-name', x.studentName + ' さん'));
         if (prefs.intro.trim()) card.append(el('p', 'qr-copy', prefs.intro));
         const art = el('div', 'qr-art');
-        art.append(d.importNode(arts[i], true));
+        art.append(d.importNode(x.art, true));
         card.append(art);
         if (prefs.showDeadline)
           card.append(el('p', 'qr-deadline', '受付締切：' + x.deadline + '（日本時間）'));
@@ -299,9 +317,9 @@ export function mountQrPrintEditor(
       pages.append(page);
     }
     caption.textContent =
-      data.length +
+      items.length +
       '名分 ／ A4 ' +
-      Math.ceil(data.length / prefs.layout) +
+      Math.ceil(items.length / prefs.layout) +
       '枚（実寸QR ' +
       prefs.size +
       ' mm）';
