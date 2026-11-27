@@ -6,6 +6,7 @@ const { maintenanceReadFailure, sessionPrivacy } = require('./session-privacy.cj
 const { publicBookingResponseChecks } = require('./public-booking.cjs');
 const { qrPrint } = require('./qr-print.cjs');
 const { ranking } = require('./ranking.cjs');
+const { qaHosting } = require('./qa-hosting.cjs');
 const { staleDialogOperations } = require('./dialog-operations.cjs');
 const { adjust, browsers, condition, fixtureUrl, launch, openPage, startServer } = require('./harness.cjs');
 
@@ -294,6 +295,10 @@ for (const browserName of browsers) {
           await close();
         }
       });
+
+      await suite.test('QA Hosting pages use the isolated Firebase and Callable targets', (context) =>
+        qaHosting(browser, server, context),
+      );
 
       if (browserName === 'chromium') {
         await suite.test(

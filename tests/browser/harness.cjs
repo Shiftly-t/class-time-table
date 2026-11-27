@@ -20,27 +20,32 @@ const engines = { chromium, webkit };
 const selected = process.env.SHIFTLY_TEST_BROWSER;
 const browsers = selected ? [selected] : Object.keys(engines);
 
+async function localAsset(pathname, assetRoot = root) {
+  const file = pathname === '/' ? 'index.html' : pathname.slice(1);
+  const sdkPath = pathname === '/_tests/firebase-sdk.mjs';
+  if (!sdkPath && !/^[\w.-]+\.(html|css|js)$/.test(file)) return { status: 404 };
+  try {
+    const source = await fs.readFile(
+      sdkPath ? path.join(__dirname, 'firebase-sdk.mjs') : path.join(assetRoot, file),
+    );
+    return {
+      status: 200,
+      headers: {
+        'content-type': contentTypes[path.extname(file)],
+        'access-control-allow-origin': '*',
+      },
+      body: source,
+    };
+  } catch (error) {
+    return { status: error.code === 'ENOENT' ? 404 : 500 };
+  }
+}
+
 async function startServer() {
   const server = http.createServer(async (request, response) => {
     const pathname = new URL(request.url, 'http://localhost').pathname;
-    const file = pathname === '/' ? 'index.html' : pathname.slice(1);
-    const sdkPath = pathname === '/_tests/firebase-sdk.mjs';
-    if (!sdkPath && !/^[\w.-]+\.(html|css|js)$/.test(file)) {
-      response.writeHead(404).end();
-      return;
-    }
-    try {
-      const source = await fs.readFile(
-        sdkPath ? path.join(__dirname, 'firebase-sdk.mjs') : path.join(root, file),
-      );
-      response.writeHead(200, {
-        'content-type': contentTypes[path.extname(file)],
-        'access-control-allow-origin': '*',
-      });
-      response.end(source);
-    } catch (error) {
-      response.writeHead(error.code === 'ENOENT' ? 404 : 500).end();
-    }
+    const { status, headers, body } = await localAsset(pathname);
+    response.writeHead(status, headers).end(body);
   });
   await new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve));
   return {
@@ -55,7 +60,8 @@ async function launch(browserName) {
   return engines[browserName].launch({ executablePath });
 }
 
-async function openPage(browser, server, options) {
+async function openPage(browser, server, options, virtualSite) {
+  const siteOrigin = virtualSite?.origin || server.origin;
   const context = await browser.newContext({ serviceWorkers: 'block', ...options });
   const blocked = [];
   const pageErrors = [];
@@ -64,22 +70,26 @@ async function openPage(browser, server, options) {
     page.on('pageerror', (error) => pageErrors.push(error.stack || error.message)),
   );
   context.on('response', (response) => {
-    if (response.url().startsWith(`${server.origin}/`) && response.status() >= 400) {
+    if (response.url().startsWith(`${siteOrigin}/`) && response.status() >= 400) {
       localFailures.push(`${response.status()} ${new URL(response.url()).pathname}`);
     }
   });
   // Register the allowlist before creating a page. CDN modules are fulfilled locally.
-  await context.route('**/*', (route) => {
+  await context.route('**/*', async (route) => {
     const url = route.request().url();
+    const { origin, pathname } = new URL(url);
     if (sdkFiles.has(url)) {
       return route.fulfill({
         contentType: 'text/javascript',
         headers: { 'access-control-allow-origin': '*' },
-        body: `export * from ${JSON.stringify(`${server.origin}/_tests/firebase-sdk.mjs`)};`,
+        body: `export * from ${JSON.stringify(`${siteOrigin}/_tests/firebase-sdk.mjs`)};`,
       });
     }
-    if (new URL(url).origin === server.origin) return route.continue();
-    const { origin, pathname } = new URL(url);
+    if (origin === siteOrigin) {
+      // The synthetic Hosting origin is fulfilled from local files, never continued on the network.
+      if (virtualSite) return route.fulfill(await localAsset(pathname, virtualSite.assetRoot));
+      return route.continue();
+    }
     blocked.push(`${origin}${pathname}`);
     return route.abort();
   });

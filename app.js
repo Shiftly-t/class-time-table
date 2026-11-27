@@ -67,7 +67,7 @@ import {
   limit,
 } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import * as config from './config.js';
-import { firebaseTargetForPage } from './firebase-target.js';
+import { firebaseTargetForPage, resolveRankingCallableNames } from './firebase-target.js';
 import { bookingAppCheckSiteKey } from './booking-config.js';
 import { createNormalAuthorityClient } from './normal-authority-client.js?v=qa-errorui-20261119-01';
 import { installNormalEditor } from './normal-editor.js?v=prod-ui-20261124-schedule-first';
@@ -6836,22 +6836,22 @@ window.addEventListener('beforeunload', (event) => {
 });
 let authRecovery = null;
 
-// Isolated production ranking UI. Existing authentication and App Check are reused.
-if (
-  location.origin === 'https://shiftly-t.web.app' &&
-  firebaseConfig.projectId === 'shiftly-d02f6' &&
-  document.documentElement.dataset.shiftlyEnvironment === 'production' &&
-  !databaseId
-) {
+// Ranking uses the same Firebase app, session and App Check as the workspace.
+const rankingCallableNames = resolveRankingCallableNames({
+  origin: location.origin,
+  environment: document.documentElement.dataset.shiftlyEnvironment,
+  projectId: firebaseConfig.projectId,
+  databaseId,
+});
+if (rankingCallableNames) {
   import('./ranking-live.js?v=prod-ui-20261126-inline-metric')
     .then(({ installRankingLive }) => {
-      const rankingFunctions = getFunctions(fbApp, 'asia-northeast1');
       const ranking = installRankingLive({
         trigger: $('rankingButton'),
         dialog: $('rankingDialog'),
         host: $('rankingHost'),
-        call: httpsCallable(rankingFunctions, 'rankingReadApi'),
-        callAchievement: httpsCallable(rankingFunctions, 'rankingAchievementApi'),
+        call: httpsCallable(functions, rankingCallableNames.read),
+        callAchievement: httpsCallable(functions, rankingCallableNames.achievement),
         getSession: () => state.user?.uid,
         getRole: () => state.profile?.role,
         getAvailable: () =>

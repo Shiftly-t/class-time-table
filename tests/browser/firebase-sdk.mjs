@@ -2,6 +2,7 @@
 const records = new Map();
 const listeners = new Set();
 const authListeners = new Set();
+const connectionLog = [];
 const callLog = [];
 const directWrites = [];
 const callableHandlers = new Map();
@@ -63,7 +64,9 @@ function failSnapshot(path) {
   if (!failed.length) throw new Error(`Missing subscription: ${path}`);
   for (const listener of failed) {
     listeners.delete(listener);
-    queueMicrotask(() => listener.error(Object.assign(new Error('Fixture read failed'), { code: 'permission-denied' })));
+    queueMicrotask(() =>
+      listener.error(Object.assign(new Error('Fixture read failed'), { code: 'permission-denied' })),
+    );
   }
 }
 
@@ -97,12 +100,32 @@ function rejectWrite(...args) {
   throw new Error('Unexpected direct Firebase write in the read-only fixture');
 }
 
-export const initializeApp = () => ({});
-export const initializeAppCheck = () => ({});
+export function initializeApp({ projectId, authDomain } = {}) {
+  connectionLog.push({ method: 'initializeApp', projectId, authDomain });
+  return { projectId };
+}
+
+export function initializeAppCheck(app) {
+  connectionLog.push({ method: 'initializeAppCheck', projectId: app.projectId });
+  return {};
+}
+
 export class ReCaptchaEnterpriseProvider {}
-export const getAuth = () => auth;
-export const getFirestore = () => ({ path: '' });
-export const getFunctions = () => ({});
+
+export function getAuth(app) {
+  connectionLog.push({ method: 'getAuth', projectId: app.projectId });
+  return auth;
+}
+
+export function getFirestore(app, databaseId) {
+  connectionLog.push({ method: 'getFirestore', projectId: app.projectId, databaseId });
+  return { path: '' };
+}
+
+export function getFunctions(app, region) {
+  return { projectId: app.projectId, region };
+}
+
 export const collection = (...parts) => ({ path: pathOf(parts), type: 'collection' });
 export const doc = (first, ...parts) => ({
   path: pathOf([first, ...(parts.length ? parts : [`auto-${++sequence}`])]),
@@ -155,12 +178,20 @@ export function onSnapshot(ref, options, onNext, onError) {
   return () => listeners.delete(listener);
 }
 
-export const httpsCallable = (_functions, name) => async (request) => {
-  callLog.push({ name, request });
-  const handler = callableHandlers.get(name);
-  if (!handler) throw new Error(`Unexpected callable in browser fixture: ${name}`);
-  return { data: await handler(request) };
-};
+export function httpsCallable(functions, name) {
+  connectionLog.push({
+    method: 'httpsCallable',
+    projectId: functions?.projectId,
+    region: functions?.region,
+    name,
+  });
+  return async (request) => {
+    callLog.push({ name, request });
+    const handler = callableHandlers.get(name);
+    if (!handler) throw new Error(`Unexpected callable in browser fixture: ${name}`);
+    return { data: await handler(request) };
+  };
+}
 
 export const fixture = {
   setRecords,
@@ -169,6 +200,7 @@ export const fixture = {
   getRecord: (path) => structuredClone(records.get(path)),
   listenCount: () => listeners.size,
   listensTo: (path) => [...listeners].some((listener) => listener.ref.path === path),
+  connectionLog,
   callLog,
   directWrites,
   handleCallable: (name, handler) => callableHandlers.set(name, handler),

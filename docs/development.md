@@ -46,6 +46,8 @@ Firebase Web設定とreCAPTCHAサイトキーはブラウザに配布されま�
 
 対象ファイルの変更が `main` に入ると、GitHub Actionsで本番Hostingの検証と更新が開始されます。反映前にワークフローの対象ファイルと、公開予約・管理画面の両入口を確認してください。Firebaseの業務データやバックエンドの変更は別の運用手順で扱います。
 
+QA専用ビルド、実際のFirebase接続、定時集計と実機を確認する手順は [QA最終統合検証](qa-integration.md) を参照してください。
+
 ## 過去の開発記録
 
 - [Firestore変更ガイド（2026-11-12）](../FIRESTORE_CHANGE_GUIDE.md)

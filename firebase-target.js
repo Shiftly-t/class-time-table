@@ -15,6 +15,35 @@ const qaCallableNames = Object.freeze({
   seasonalAuthority: 'qaSeasonalAuthorityApi',
 });
 export const qaFunctionNames = Object.freeze([...Object.values(qaCallableNames), 'qaBookingStudentDeleted']);
+const productionRankingCallableNames = Object.freeze({
+  read: 'rankingReadApi',
+  achievement: 'rankingAchievementApi',
+});
+const qaRankingCallableNames = Object.freeze({
+  read: 'qaRankingReadApi',
+  achievement: 'qaRankingAchievementApi',
+});
+
+export function resolveRankingCallableNames({ origin, environment, projectId, databaseId }) {
+  // Each ranking deployment belongs to its own Hosting site and Firestore database.
+  if (
+    origin === 'https://shiftly-t.web.app' &&
+    environment === 'production' &&
+    projectId === productionProjectId &&
+    !databaseId
+  ) {
+    return productionRankingCallableNames;
+  }
+  if (
+    origin === 'https://shiftly-t-test.web.app' &&
+    environment === 'qa' &&
+    projectId === qaProjectId &&
+    databaseId === qaDatabaseId
+  ) {
+    return qaRankingCallableNames;
+  }
+  return null;
+}
 
 function configured(value) {
   return (
