@@ -302,6 +302,7 @@ for (const browserName of browsers) {
             const { context, page, close } = await openPage(browser, server, {
               viewport: { width: 1440, height: 900 },
             });
+            let fixture;
             try {
               const appRequests = [];
               page.on('requestfinished', (request) => {
@@ -313,6 +314,14 @@ for (const browserName of browsers) {
               const start = performance.now();
               await openApplication(page);
               const startupMs = Math.round(performance.now() - start);
+              // Keep the fixture rooted across the explicit GC. Synchronous fixture updates
+              // do not leave a dynamic-import promise held only by the DevTools protocol.
+              fixture = await page.evaluateHandle(async (url) => (await import(url)).fixture, fixtureUrl);
+              const setMaintenance = (maintenance) =>
+                fixture.evaluate(
+                  (records, value) => records.setRecords({ 'systemConfig/maintenance': value }),
+                  maintenance,
+                );
               const cdp = await context.newCDPSession(page);
               const afterGc = async () => {
                 await cdp.send('HeapProfiler.collectGarbage');
@@ -324,9 +333,9 @@ for (const browserName of browsers) {
                 await page.locator('.lesson-card').first().waitFor();
                 await page.locator('#scheduleDateOpen').click();
                 await page.locator('#scheduleDateDialog').getByRole('button', { name: 'キャンセル' }).click();
-                await adjust(page, { 'systemConfig/maintenance': { enabled: true } });
+                await setMaintenance({ enabled: true });
                 await page.locator('#maintenancePanel').waitFor();
-                await adjust(page, { 'systemConfig/maintenance': seed['systemConfig/maintenance'] });
+                await setMaintenance(seed['systemConfig/maintenance']);
                 await page.locator('#appPanel').waitFor();
                 await logOut(page);
               };
@@ -347,6 +356,7 @@ for (const browserName of browsers) {
               );
               await assertNoWrites(page);
             } finally {
+              await fixture?.dispose();
               await close();
             }
           },
