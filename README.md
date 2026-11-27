@@ -20,7 +20,9 @@ HTML / CSS / JavaScript（ES modules）を使用したブラウザアプリケ�
 
 | ファイル | 役割 |
 | --- | --- |
-| `index.html` / `app.js` / `style.css` | 管理画面の起点、状態管理、共通スタイル |
+| `index.html` / `app.js` / `style.css` | 管理画面の起点、機能の接続、共通スタイル |
+| `calendar-date.js` / `school-calendar.js` / `timetable.js` | 日付・休校カレンダー・授業の表示計算 |
+| `workspace-*.js` | ダッシュボード、状態初期化、購読、通知・ダイアログ・スクロール |
 | `normal-editor.*` | 通常授業の配置・振替 |
 | `teacher-work.*` | 講師勤務時間・日別例外 |
 | `course-booking-admin.*` / `course-booking.*` | 講習予約管理・公開予約画面 |
@@ -35,15 +37,17 @@ Cloud Functionsの実装および現行のFirestore Security Rulesの全文は�
 
 ## 開発・検証
 
-Node.js 22を推奨します。以下の検証はネットワーク接続や本番データを必要としません。
+Node.js 22を推奨します。静的検証と単体テストは本番データやFirebaseへの接続を必要としません。
 
 ```sh
-node tests/check-static.cjs
-node tests/workspace-ux.cjs
+npm ci
+npm test
+npx playwright install chromium webkit
+npm run test:browser
 ```
 
 本番設定で実データの登録・削除を試さないでください。動作検証はモックまたは隔離されたQA環境で行います。
 
 mainへの対象ファイルの変更はGitHub Actionsで検証された後、Firebase Hostingに反映されます。HostingのデプロイだけではFunctions、Firestore、Authentication、Security Rulesは更新されません。
 
-詳しくは [開発ガイド](docs/development.md) を参照してください。
+詳しい構成とテスト手順は [開発ガイド](docs/development.md)、作業時のルールは [AGENTS.md](AGENTS.md) を参照してください。

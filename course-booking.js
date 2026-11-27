@@ -1,177 +1,487 @@
-import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
-import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
-import {createBookingTransport} from './booking-transport.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import {
+  getFunctions,
+  httpsCallable,
+} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
+import { readPublicBookingView } from './booking-public-response.js';
+import { createBookingTransport } from './booking-transport.js';
 import * as config from './config.js';
-import {firebaseTargetForPage} from './firebase-target.js';
-import {bookingAppCheckSiteKey} from './booking-config.js';
-import {initializeAppCheck,ReCaptchaEnterpriseProvider} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
-const {firebaseConfig}=config;
-const {functionsRegion,callableNames}=firebaseTargetForPage(config,bookingAppCheckSiteKey);
-const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const params=new URLSearchParams(location.hash.slice(1));
-const ids={courseId:params.get('c')||'',studentId:params.get('s')||'',token:params.get('t')||''};
-const okIds=/^[a-zA-Z0-9_-]{1,150}$/;
-const validQR=okIds.test(ids.courseId)&&okIds.test(ids.studentId)&&/^[A-Za-z0-9_-]{42,64}$/.test(ids.token);
-let name='',data=null,selected=new Set(),remarks='',mode='home',calendarMode='list',busy=false,refreshRequired=false;
-const fbApp=initializeApp(firebaseConfig);
-if(bookingAppCheckSiteKey && !bookingAppCheckSiteKey.startsWith('REPLACE_'))initializeAppCheck(fbApp,{provider:new ReCaptchaEnterpriseProvider(bookingAppCheckSiteKey),isTokenAutoRefreshEnabled:true});
-const fns=getFunctions(fbApp,functionsRegion),call=httpsCallable(fns,callableNames.bookingPublic);
-const transport=createBookingTransport({call,getSession:()=>validQR&&name?ids.courseId+':'+ids.studentId+':'+name:null});
-function getBookingNotice(){
-  let d=document.getElementById('bookingNotice');
-  if(d)return d;
-  d=document.createElement('dialog');
-  d.id='bookingNotice';
-  d.setAttribute('aria-labelledby','bookingNoticeTitle');
-  d.style.cssText='width:min(480px,calc(100% - 32px));max-height:85dvh;overflow:auto;box-sizing:border-box;border:0;border-radius:20px;padding:26px;text-align:center;box-shadow:0 20px 70px #0005';
-  d.innerHTML=`
+import { firebaseTargetForPage } from './firebase-target.js';
+import { bookingAppCheckSiteKey } from './booking-config.js';
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check.js';
+const { firebaseConfig } = config;
+const { functionsRegion, callableNames } = firebaseTargetForPage(config, bookingAppCheckSiteKey);
+const $ = (id) => document.getElementById(id),
+  esc = (s) =>
+    String(s ?? '').replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+    );
+const params = new URLSearchParams(location.hash.slice(1));
+const ids = {
+  courseId: params.get('c') || '',
+  studentId: params.get('s') || '',
+  token: params.get('t') || '',
+};
+const okIds = /^[a-zA-Z0-9_-]{1,150}$/;
+const validQR =
+  okIds.test(ids.courseId) && okIds.test(ids.studentId) && /^[A-Za-z0-9_-]{42,64}$/.test(ids.token);
+let name = '',
+  data = null,
+  selected = new Set(),
+  remarks = '',
+  mode = 'home',
+  calendarMode = 'list',
+  busy = false,
+  refreshRequired = false;
+const fbApp = initializeApp(firebaseConfig);
+if (bookingAppCheckSiteKey && !bookingAppCheckSiteKey.startsWith('REPLACE_'))
+  initializeAppCheck(fbApp, {
+    provider: new ReCaptchaEnterpriseProvider(bookingAppCheckSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+const fns = getFunctions(fbApp, functionsRegion),
+  call = httpsCallable(fns, callableNames.bookingPublic);
+const transport = createBookingTransport({
+  call,
+  getSession: () => (validQR && name ? ids.courseId + ':' + ids.studentId + ':' + name : null),
+});
+function getBookingNotice() {
+  let d = document.getElementById('bookingNotice');
+  if (d) return d;
+  d = document.createElement('dialog');
+  d.id = 'bookingNotice';
+  d.setAttribute('aria-labelledby', 'bookingNoticeTitle');
+  d.style.cssText =
+    'width:min(480px,calc(100% - 32px));max-height:85dvh;overflow:auto;box-sizing:border-box;border:0;border-radius:20px;padding:26px;text-align:center;box-shadow:0 20px 70px #0005';
+  d.innerHTML = `
     <div style="font-size:42px;color:#dc2626">⚠</div>
     <h2 id="bookingNoticeTitle" style="font-size:23px">操作をご確認ください</h2>
     <p id="bookingNoticeText" style="font-size:17px;line-height:1.8;overflow-wrap:anywhere" aria-live="assertive"></p>
     <div id="bookingNoticeActions" style="display:grid;gap:12px;margin:20px 0"></div>
     <button id="bookingNoticeClose" type="button" class="secondary" style="width:100%;min-height:48px">閉じる</button>`;
-  const style=document.createElement('style');
-  style.textContent='#bookingNotice::backdrop{background:rgba(15,23,42,.65)}';
+  const style = document.createElement('style');
+  style.textContent = '#bookingNotice::backdrop{background:rgba(15,23,42,.65)}';
   document.head.append(style);
   document.body.append(d);
-  d.querySelector('#bookingNoticeClose').addEventListener('click',()=>{
-    if(!busy)d.close();
+  d.querySelector('#bookingNoticeClose').addEventListener('click', () => {
+    if (!busy) d.close();
   });
-  d.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
+  d.addEventListener('cancel', (e) => {
+    if (busy) e.preventDefault();
+  });
   return d;
 }
 
-function notify(s,error=false,showSuccess=false){
-  $('message').textContent=s;
-  $('message').className='status'+(error?' error':'');
+function notify(s, error = false, showSuccess = false) {
+  $('message').textContent = s;
+  $('message').className = 'status' + (error ? ' error' : '');
   document.getElementById('bookingResultCheck')?.remove();
   document.getElementById('bookingNoticeReopen')?.remove();
 
-  const old=document.getElementById('bookingNotice');
-  if(old?.open)old.close();
+  const old = document.getElementById('bookingNotice');
+  if (old?.open) old.close();
 
-  if(!error&&!transport.hasPending()&&!showSuccess)return;
+  if (!error && !transport.hasPending() && !showSuccess) return;
 
-  const d=getBookingNotice();
-  const success=showSuccess&&!error&&!transport.hasPending();
-  d.firstElementChild.textContent=success?'✓':'⚠';
-  d.firstElementChild.style.color=success?'#16a34a':'#dc2626';
-  d.querySelector('#bookingNoticeTitle').textContent=success?'保存が完了しました':'操作をご確認ください';
-  d.querySelector('#bookingNoticeClose').textContent=success?'OK':'閉じる';
-  d.querySelector('#bookingNoticeText').textContent=s;
-  const actions=d.querySelector('#bookingNoticeActions');
+  const d = getBookingNotice();
+  const success = showSuccess && !error && !transport.hasPending();
+  d.firstElementChild.textContent = success ? '✓' : '⚠';
+  d.firstElementChild.style.color = success ? '#16a34a' : '#dc2626';
+  d.querySelector('#bookingNoticeTitle').textContent = success
+    ? '保存が完了しました'
+    : '操作をご確認ください';
+  d.querySelector('#bookingNoticeClose').textContent = success ? 'OK' : '閉じる';
+  d.querySelector('#bookingNoticeText').textContent = s;
+  const actions = d.querySelector('#bookingNoticeActions');
   actions.replaceChildren();
 
-  if(transport.hasPending()){
-    const b=document.createElement('button');
-    b.id='bookingResultCheck';
-    b.type='button';
-    b.className='primary';
-    b.textContent='送信結果を確認';
-    b.style.cssText='min-height:48px;font-size:16px';
-    b.addEventListener('click',async()=>{
-      if(busy)return;
+  if (transport.hasPending()) {
+    const b = document.createElement('button');
+    b.id = 'bookingResultCheck';
+    b.type = 'button';
+    b.className = 'primary';
+    b.textContent = '送信結果を確認';
+    b.style.cssText = 'min-height:48px;font-size:16px';
+    b.addEventListener('click', async () => {
+      if (busy) return;
       setBusy(true);
-      try{
+      try {
         await transport.confirmPending();
-        refreshRequired=true;
-        mode='home';
+        refreshRequired = true;
+        mode = 'home';
         await reload();
-        refreshRequired=false;
-        notify('保存済みであることを確認しました。',false,true);
-      }catch(e){
-        notify(refreshRequired?'保存済みですが、最新情報を取得できません。再読み込みしてください。':message(e),true);
-      }finally{setBusy(false);}
+        refreshRequired = false;
+        notify('保存済みであることを確認しました。', false, true);
+      } catch (e) {
+        notify(
+          refreshRequired ? '保存済みですが、最新情報を取得できません。再読み込みしてください。' : message(e),
+          true,
+        );
+      } finally {
+        setBusy(false);
+      }
     });
     actions.append(b);
   }
 
-  const reopen=document.createElement('button');
-  reopen.id='bookingNoticeReopen';
-  reopen.type='button';
-  reopen.className='secondary';
-  reopen.textContent='お知らせを確認';
-  reopen.addEventListener('click',()=>{
-    if(!busy&&!d.open)d.showModal();
+  const reopen = document.createElement('button');
+  reopen.id = 'bookingNoticeReopen';
+  reopen.type = 'button';
+  reopen.className = 'secondary';
+  reopen.textContent = 'お知らせを確認';
+  reopen.addEventListener('click', () => {
+    if (!busy && !d.open) d.showModal();
   });
-  if(!success)$('message').after(reopen);
+  if (!success) $('message').after(reopen);
 
   d.showModal();
-  if(busy)setBusy(true);
+  if (busy) setBusy(true);
 }
 
-async function api(action,fields={}){return (await transport.call({...ids,studentName:name,action,...fields})).data;}
-const busyDisabledButtons=new WeakSet();
+async function api(action, fields = {}) {
+  return (await transport.call({ ...ids, studentName: name, action, ...fields }))?.data;
+}
+const busyDisabledButtons = new WeakSet();
 
-function setBusy(b){
-  busy=b;
-  document.querySelectorAll('button').forEach(x=>{
-    if(b&&!x.disabled){
+function setBusy(b) {
+  busy = b;
+  document.querySelectorAll('button').forEach((x) => {
+    if (b && !x.disabled) {
       busyDisabledButtons.add(x);
-      x.disabled=true;
-    }else if(!b&&busyDisabledButtons.has(x)){
+      x.disabled = true;
+    } else if (!b && busyDisabledButtons.has(x)) {
       busyDisabledButtons.delete(x);
-      x.disabled=x.dataset.disabled==='1';
+      x.disabled = x.dataset.disabled === '1';
     }
   });
 }
-async function act(action,fields={},success){if(busy)return false;let saved=false;setBusy(true);notify('処理しています…');try{if(refreshRequired){await reload();refreshRequired=false;mode='home';render();notify('最新の内容を確認しました。予約内容を確認してから操作してください。');return false;}await api(action,fields);saved=true;await reload();if(success)notify(success,false,true);return true;}catch(e){if(saved)refreshRequired=true;notify(saved?'保存は完了しましたが、最新表示を取得できませんでした。同じ操作を再送せず、再読み込みして確認してください。':message(e),true);return false;}finally{setBusy(false);}}
-function message(e){const text=String(e?.message||'通信に失敗しました');return text.replace(/^.*?functions\//,'').slice(0,240);}
+async function act(action, fields = {}, success) {
+  if (busy) return false;
+  let saved = false;
+  setBusy(true);
+  notify('処理しています…');
+  try {
+    if (refreshRequired) {
+      await reload();
+      refreshRequired = false;
+      mode = 'home';
+      render();
+      notify('最新の内容を確認しました。予約内容を確認してから操作してください。');
+      return false;
+    }
+    await api(action, fields);
+    saved = true;
+    await reload();
+    if (success) notify(success, false, true);
+    return true;
+  } catch (e) {
+    if (saved) refreshRequired = true;
+    notify(
+      saved
+        ? '保存は完了しましたが、最新表示を取得できませんでした。同じ操作を再送せず、再読み込みして確認してください。'
+        : message(e),
+      true,
+    );
+    return false;
+  } finally {
+    setBusy(false);
+  }
+}
+function message(e) {
+  const text = String(e?.message || '通信に失敗しました');
+  return text.replace(/^.*?functions\//, '').slice(0, 240);
+}
 
-function datedCourseName(name,startDate){
-  const n=String(name||'').trim();
-  const [y,m]=String(startDate||'').split('-').map(Number);
-  if(!y||!m)return n;
-  const year=m<4?y-1:y;
-  const base=n
+function datedCourseName(name, startDate) {
+  const n = String(name || '').trim();
+  const [y, m] = String(startDate || '')
+    .split('-')
+    .map(Number);
+  if (!y || !m) return n;
+  const year = m < 4 ? y - 1 : y;
+  const base = n
     .replace(/^[0-9]{4}(?:年度|年)?[ 　]*/, '')
     .replace(/[ 　]*[（(]?[0-9]{4}(?:年度|年)?[）)]?$/, '')
     .trim();
-  return year+'年度'+base;
+  return year + '年度' + base;
 }
-function dateText(d){const p=d.split('-').map(Number),day=new Date(p[0],p[1]-1,p[2]).getDay();return `${p[0]}年${p[1]}月${p[2]}日（${'日月火水木金土'[day]}）`;}
-function datetime(x){if(!x)return'未設定';return new Date(x).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});}
-const slots=()=>new Map((data?.slots||[]).map(x=>[x.id,x]));
-function label(id){const s=slots().get(id);if(s)return `${dateText(s.date)} ${s.start}〜${s.end}`;const m=/__(\d{4}-\d{2}-\d{2})__(\d+)$/.exec(id);if(m&&data?.course?.periods?.[+m[2]]){const p=data.course.periods[+m[2]];return `${dateText(m[1])} ${p.start}〜${p.end}`;}return id;}
-function btn(action,title,cls='secondary',disabled=false){return `<button type="button" class="${cls}" data-act="${esc(action)}" ${disabled?'disabled data-disabled="1"':''}>${esc(title)}</button>`;}
-function lis(arr){return `<ul class="entrylist">${arr.map(id=>`<li>${esc(label(id))}</li>`).join('')}</ul>`;}
-async function reload(){data=await api('view');$('title').textContent=`${datedCourseName(data.course.name,data.course.startDate)}｜予約・確認`;render();}
-function login(){return `<h2>生徒情報の確認</h2><p class="muted">QRコードに記載されている生徒のお名前を入力してください。</p><form id="nameForm"><label class="field">生徒氏名<input id="nameInput" type="text" autocomplete="name" required maxlength="100" placeholder="例：山田 太郎"></label><div class="actions"><button class="primary">確認して次へ</button></div></form><p class="hint">氏名入力は確認用です。QRコードは他人と共有しないでください。</p>`;}
-function home(){const b=data.booking;const phase=data.phase,answered=b.status==='submitted',declined=b.status==='declined';let h=`<div class="row"><h2>${esc(datedCourseName(data.course.name,data.course.startDate))}</h2><span class="badge ${phase==='open'?'ok':'gray'}">${phase==='open'?'受付中':phase==='before'?'受付開始前':'受付終了'}</span></div><p class="muted">${esc(name)} さん｜講習期間 ${esc(dateText(data.course.startDate))}〜${esc(dateText(data.course.endDate))}</p>`;
- if(phase==='before')return h+`<div class="notice">受付開始：${esc(datetime(data.openingAt))}。事前に日程は確認できますが、空き枠数や予約操作は受付開始後に表示されます。</div>`+calendar(false);
- if(declined)return h+`<div class="divider"></div><span class="badge gray">不参加で回答済み</span><h3>今回は講習に参加しない回答を受け付けています。</h3>${phase==='open'?`<div class="actions">${btn('join','参加に変更して希望日時を選ぶ','primary')}</div>`:'<p class="muted">締切後の変更は教室へ直接お問い合わせください。</p>'}`;
- if(answered)return h+submitted();
- if(phase==='closed')return h+'<div class="notice">受付期間は終了しました。未回答の場合は教室へ直接ご連絡ください。</div>';
- return h+`<div class="divider"></div><h2>講習への参加について</h2><div class="grid2" style="margin-top:12px"><button type="button" data-act="join" class="choice"><strong>参加する</strong><small>希望する日時を自由に選択する</small></button><button type="button" data-act="declineReview" class="choice"><strong>今回は参加しない</strong><small>不参加として回答する</small></button></div>`;
+function dateText(d) {
+  const p = d.split('-').map(Number),
+    day = new Date(p[0], p[1] - 1, p[2]).getDay();
+  return `${p[0]}年${p[1]}月${p[2]}日（${'日月火水木金土'[day]}）`;
 }
-function calendar(choose){if(!data?.slots?.length)return '<div class="notice">現在、QRから予約できる日程はありません。休校日・日曜日・祝日は自動的に除外されています。教室へお問い合わせください。</div>';const grouped=new Map();for(const s of data.slots){if(!grouped.has(s.date))grouped.set(s.date,[]);grouped.get(s.date).push(s);}const curr=new Set(data.booking.wishes||[]);return [...grouped.entries()].map(([d,ss])=>`<div class="slotday"><div class="daytitle">${esc(dateText(d))}</div><div class="slotgrid">${ss.map(s=>{const checked=selected.has(s.id),was=curr.has(s.id),full=(s.remaining??0)<1&&!was,disabled=s.disabled||!choose||full;return choose?`<button type="button" class="slot ${full?'full':''}" data-slot="${esc(s.id)}" aria-pressed="${checked}" ${disabled?'disabled':''}><strong>${esc(s.start)}〜${esc(s.end)}</strong><small>${checked?'✓ 選択中':s.disabled?'休講':full?'満席':'残り'+s.remaining+'枠'}</small></button>`:`<div class="slot ${s.disabled?'full':''}"><strong>${esc(s.start)}〜${esc(s.end)}</strong>${!s.disabled&&data.phase!=='before'?`<small>残り${s.remaining}枠</small>`:''}</div>`}).join('')}</div></div>`).join('');}
-function choose(){const editing=mode==='edit';const n=selected.size;return `<div class="row"><h2>${editing?'希望日時を変更':'希望日時を選択'}</h2><span class="badge">${n}コマ選択中</span></div><p class="muted">希望日時を1コマ以上選んでください。最低コマ数・必須コマ数の指定はありません。</p>${editing?'<div class="notice">変更を確定するまで、以前に提出した希望枠は保持されます。</div>':''}${calendar(true)}<label class="field">保護者から伝えたいこと（任意）<textarea id="remarks" maxlength="1000" placeholder="希望科目や教室への連絡事項など">${esc(remarks)}</textarea></label><div class="actions">${btn('home','戻る')}${btn('review',editing?'変更内容を確認':'提出内容を確認','primary',n===0)}</div>`;}
-function review(){const before=mode==='reviewEdit'?`<h3>変更前の希望日時</h3>${lis(data.booking.wishes)}`:'';return `<h2>${mode==='reviewEdit'?'希望変更の最終確認':'提出内容の最終確認'}</h2><div class="notice"><strong>生徒：</strong>${esc(name)}<br><strong>講習：</strong>${esc(datedCourseName(data.course.name,data.course.startDate))}<br><strong>希望コマ数：</strong>${selected.size}コマ</div>${before}<h3>${mode==='reviewEdit'?'変更後':'希望する日時'}</h3>${lis([...selected].sort())}<h3>保護者から伝えたいこと</h3><p class="muted">${esc(remarks||'（記入なし）')}</p><div class="actions">${btn('backToSelect','選択に戻る')}${btn('submit',mode==='reviewEdit'?'希望変更を確定':'希望日時を提出する','primary')}</div>`;}
-function submitted(){const b=data.booking;const unpub=b.confirmedCount-b.published.length;let h=`<div class="divider"></div><span class="badge ok">希望提出済み</span><div class="statrow"><div class="stat"><strong>${b.wishes.length}</strong><small>希望コマ</small></div><div class="stat"><strong>${b.confirmedCount}</strong><small>確定コマ</small></div><div class="stat"><strong>${b.published.length}</strong><small>公開コマ</small></div></div><h3>提出した希望日時</h3>${lis(b.wishes)}<p class="muted">保護者から伝えたいこと：${esc(b.remarks||'（記入なし）')}</p>`;
- if(unpub>0)h+='<div class="notice">確定済みで未公開の授業は、日時を表示していません。公開後に確認できます。</div>';
- if(b.published.length){h+=`<div class="divider"></div><h2>公開済みの確定授業</h2><div class="actions">${btn('showList','一覧表示',calendarMode==='list'?'primary':'secondary')}${btn('showCalendar','カレンダー表示',calendarMode==='calendar'?'primary':'secondary')}</div>`+ (calendarMode==='list'?`<ul class="entrylist">${b.published.map(x=>`<li><strong>${esc(label(x.slotId))}</strong><br>教科：${esc(x.subject)}</li>`).join('')}</ul>`:publishedCalendar(b.published));}
- const pending=b.changes.filter(c=>!c.ack);if(pending.length){h+='<div class="divider"></div><h2>授業変更のお知らせ</h2>'+pending.map(c=>`<div class="notice"><strong>変更前：</strong>${esc(label(c.from))}<br><strong>変更後：</strong>${esc(label(c.to))}<div class="actions">${btn('ack:'+c.id,'変更内容を確認しました','primary')}</div></div>`).join('');}
- if(data.phase==='open'&&b.confirmedCount===0)h+=`<div class="actions">${btn('edit','希望日時・連絡事項を変更する','secondary')}</div>`;
- return h;}
-function publishedCalendar(entries){
- // Closed dates disappear from NEW QR choices; previously published lessons must
- // remain visible in the student's history, including calendar mode.
- const byDate=new Map();
- for(const x of entries){
-   const found=slots().get(x.slotId);
-   const m=/__(\d{4}-\d{2}-\d{2})__(\d+)$/.exec(x.slotId);
-   const date=found?.date||m?.[1];
-   const start=found?.start||(m&&data?.course?.periods?.[Number(m[2])]?.start);
-   if(!date||!start)continue;
-   if(!byDate.has(date))byDate.set(date,[]);
-   byDate.get(date).push(start);
- }
- const days=[...new Set([...data.slots.map(x=>x.date),...byDate.keys()])].sort();
- return `<div class="slotgrid" style="margin-top:12px">${days.map(d=>`<div class="slotday" style="margin:0"><div class="daytitle">${dateText(d)}</div><div style="padding:8px;font-size:12px">${(byDate.get(d)||[]).map(x=>`<div class="badge ok" style="margin:3px">${esc(x)}</div>`).join('')||'<span class="muted">授業なし</span>'}</div></div>`).join('')}</div>`;
+function datetime(x) {
+  if (!x) return '未設定';
+  return new Date(x).toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
-function declineReview(){return `<h2>不参加回答の最終確認</h2><p class="muted">今回は講習に参加しない内容で回答します。よろしいですか？</p><div class="notice">不参加の場合、希望日時の選択は不要です。受付締切前なら後から参加に変更できます。</div><div class="actions">${btn('home','戻る')}${btn('decline','不参加で回答する','primary')}</div>`;}
-function render(){if(!validQR){$('root').innerHTML='<h2>QRコードが確認できません</h2><p class="muted">教室から配布されたQRコードをもう一度読み取ってください。</p>';return;}$('root').innerHTML=!name?login():!data?'<p class="muted">読み込んでいます…</p>':mode==='choose'||mode==='edit'?choose():mode==='review'||mode==='reviewEdit'?review():mode==='declineReview'?declineReview():home();bind();if(busy)setBusy(true);}
-function bind(){const form=$('nameForm');if(form)form.addEventListener('submit',async e=>{e.preventDefault();name=$('nameInput').value.trim();if(!name)return;notify('確認しています…');try{await reload();notify('');}catch(error){notify(message(error),true);name='';render();}});
- document.querySelectorAll('[data-slot]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.slot;if(selected.has(k))selected.delete(k);else selected.add(k);const t=$('remarks');if(t)remarks=t.value;render();}));
- document.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',async()=>{const a=b.dataset.act;if(a==='home'){mode='home';render();return;}if(a==='join'){selected=new Set();remarks='';mode='choose';render();return;}if(a==='edit'){selected=new Set(data.booking.wishes);remarks=data.booking.remarks;mode='edit';render();return;}if(a==='review'){const x=$('remarks');if(x)remarks=x.value;if(!selected.size){notify('1コマ以上選択してください',true);return;}mode=mode==='edit'?'reviewEdit':'review';render();return;}if(a==='backToSelect'){mode=mode==='reviewEdit'?'edit':'choose';render();return;}if(a==='declineReview'){mode='declineReview';render();return;}if(a==='showCalendar'||a==='showList'){calendarMode=a==='showCalendar'?'calendar':'list';render();return;}if(a==='submit'){const edit=mode==='reviewEdit';const done=await act(edit?'change':'submit',{slots:[...selected],remarks},edit?'希望を変更しました。':'希望日時を提出しました。');if(done){mode='home';render();}return;}if(a==='decline'){const done=await act('decline',{},'不参加で回答しました。');if(done){mode='home';render();}return;}if(a.startsWith('ack:')){await act('ack',{changeId:a.slice(4)},'変更を確認済みにしました。');return;}}));}
+const slots = () => new Map((data?.slots || []).map((x) => [x.id, x]));
+function label(id) {
+  const s = slots().get(id);
+  if (s) return `${dateText(s.date)} ${s.start}〜${s.end}`;
+  const m = /__(\d{4}-\d{2}-\d{2})__(\d+)$/.exec(id);
+  if (m && data?.course?.periods?.[+m[2]]) {
+    const p = data.course.periods[+m[2]];
+    return `${dateText(m[1])} ${p.start}〜${p.end}`;
+  }
+  return id;
+}
+function btn(action, title, cls = 'secondary', disabled = false) {
+  return `<button type="button" class="${cls}" data-act="${esc(action)}" ${disabled ? 'disabled data-disabled="1"' : ''}>${esc(title)}</button>`;
+}
+function lis(arr) {
+  return `<ul class="entrylist">${arr.map((id) => `<li>${esc(label(id))}</li>`).join('')}</ul>`;
+}
+async function reload() {
+  data = readPublicBookingView(await api('view'));
+  $('title').textContent = `${datedCourseName(data.course.name, data.course.startDate)}｜予約・確認`;
+  render();
+}
+function login() {
+  return `<h2>生徒情報の確認</h2><p class="muted">QRコードに記載されている生徒のお名前を入力してください。</p><form id="nameForm"><label class="field">生徒氏名<input id="nameInput" type="text" autocomplete="name" required maxlength="100" placeholder="例：山田 太郎"></label><div class="actions"><button class="primary">確認して次へ</button></div></form><p class="hint">氏名入力は確認用です。QRコードは他人と共有しないでください。</p>`;
+}
+function home() {
+  const b = data.booking;
+  const phase = data.phase,
+    answered = b.status === 'submitted',
+    declined = b.status === 'declined';
+  let h = `<div class="row"><h2>${esc(datedCourseName(data.course.name, data.course.startDate))}</h2><span class="badge ${phase === 'open' ? 'ok' : 'gray'}">${phase === 'open' ? '受付中' : phase === 'before' ? '受付開始前' : '受付終了'}</span></div><p class="muted">${esc(name)} さん｜講習期間 ${esc(dateText(data.course.startDate))}〜${esc(dateText(data.course.endDate))}</p>`;
+  if (phase === 'before')
+    return (
+      h +
+      `<div class="notice">受付開始：${esc(datetime(data.openingAt))}。事前に日程は確認できますが、空き枠数や予約操作は受付開始後に表示されます。</div>` +
+      calendar(false)
+    );
+  if (declined)
+    return (
+      h +
+      `<div class="divider"></div><span class="badge gray">不参加で回答済み</span><h3>今回は講習に参加しない回答を受け付けています。</h3>${phase === 'open' ? `<div class="actions">${btn('join', '参加に変更して希望日時を選ぶ', 'primary')}</div>` : '<p class="muted">締切後の変更は教室へ直接お問い合わせください。</p>'}`
+    );
+  if (answered) return h + submitted();
+  if (phase === 'closed')
+    return h + '<div class="notice">受付期間は終了しました。未回答の場合は教室へ直接ご連絡ください。</div>';
+  return (
+    h +
+    `<div class="divider"></div><h2>講習への参加について</h2><div class="grid2" style="margin-top:12px"><button type="button" data-act="join" class="choice"><strong>参加する</strong><small>希望する日時を自由に選択する</small></button><button type="button" data-act="declineReview" class="choice"><strong>今回は参加しない</strong><small>不参加として回答する</small></button></div>`
+  );
+}
+function calendar(choose) {
+  if (!data?.slots?.length)
+    return '<div class="notice">現在、QRから予約できる日程はありません。休校日・日曜日・祝日は自動的に除外されています。教室へお問い合わせください。</div>';
+  const grouped = new Map();
+  for (const s of data.slots) {
+    if (!grouped.has(s.date)) grouped.set(s.date, []);
+    grouped.get(s.date).push(s);
+  }
+  const curr = new Set(data.booking.wishes || []);
+  return [...grouped.entries()]
+    .map(
+      ([d, ss]) =>
+        `<div class="slotday"><div class="daytitle">${esc(dateText(d))}</div><div class="slotgrid">${ss
+          .map((s) => {
+            const checked = selected.has(s.id),
+              was = curr.has(s.id),
+              full = (s.remaining ?? 0) < 1 && !was,
+              disabled = s.disabled || !choose || full;
+            return choose
+              ? `<button type="button" class="slot ${full ? 'full' : ''}" data-slot="${esc(s.id)}" aria-pressed="${checked}" ${disabled ? 'disabled' : ''}><strong>${esc(s.start)}〜${esc(s.end)}</strong><small>${checked ? '✓ 選択中' : s.disabled ? '休講' : full ? '満席' : '残り' + esc(s.remaining ?? 0) + '枠'}</small></button>`
+              : `<div class="slot ${s.disabled ? 'full' : ''}"><strong>${esc(s.start)}〜${esc(s.end)}</strong>${!s.disabled && data.phase !== 'before' ? `<small>残り${esc(s.remaining)}枠</small>` : ''}</div>`;
+          })
+          .join('')}</div></div>`,
+    )
+    .join('');
+}
+function choose() {
+  const editing = mode === 'edit';
+  const n = selected.size;
+  return `<div class="row"><h2>${editing ? '希望日時を変更' : '希望日時を選択'}</h2><span class="badge">${n}コマ選択中</span></div><p class="muted">希望日時を1コマ以上選んでください。最低コマ数・必須コマ数の指定はありません。</p>${editing ? '<div class="notice">変更を確定するまで、以前に提出した希望枠は保持されます。</div>' : ''}${calendar(true)}<label class="field">保護者から伝えたいこと（任意）<textarea id="remarks" maxlength="1000" placeholder="希望科目や教室への連絡事項など">${esc(remarks)}</textarea></label><div class="actions">${btn('home', '戻る')}${btn('review', editing ? '変更内容を確認' : '提出内容を確認', 'primary', n === 0)}</div>`;
+}
+function review() {
+  const before = mode === 'reviewEdit' ? `<h3>変更前の希望日時</h3>${lis(data.booking.wishes)}` : '';
+  return `<h2>${mode === 'reviewEdit' ? '希望変更の最終確認' : '提出内容の最終確認'}</h2><div class="notice"><strong>生徒：</strong>${esc(name)}<br><strong>講習：</strong>${esc(datedCourseName(data.course.name, data.course.startDate))}<br><strong>希望コマ数：</strong>${selected.size}コマ</div>${before}<h3>${mode === 'reviewEdit' ? '変更後' : '希望する日時'}</h3>${lis([...selected].sort())}<h3>保護者から伝えたいこと</h3><p class="muted">${esc(remarks || '（記入なし）')}</p><div class="actions">${btn('backToSelect', '選択に戻る')}${btn('submit', mode === 'reviewEdit' ? '希望変更を確定' : '希望日時を提出する', 'primary')}</div>`;
+}
+function submitted() {
+  const b = data.booking;
+  const unpub = b.confirmedCount - b.published.length;
+  let h = `<div class="divider"></div><span class="badge ok">希望提出済み</span><div class="statrow"><div class="stat"><strong>${b.wishes.length}</strong><small>希望コマ</small></div><div class="stat"><strong>${esc(b.confirmedCount)}</strong><small>確定コマ</small></div><div class="stat"><strong>${b.published.length}</strong><small>公開コマ</small></div></div><h3>提出した希望日時</h3>${lis(b.wishes)}<p class="muted">保護者から伝えたいこと：${esc(b.remarks || '（記入なし）')}</p>`;
+  if (unpub > 0)
+    h += '<div class="notice">確定済みで未公開の授業は、日時を表示していません。公開後に確認できます。</div>';
+  if (b.published.length) {
+    h +=
+      `<div class="divider"></div><h2>公開済みの確定授業</h2><div class="actions">${btn('showList', '一覧表示', calendarMode === 'list' ? 'primary' : 'secondary')}${btn('showCalendar', 'カレンダー表示', calendarMode === 'calendar' ? 'primary' : 'secondary')}</div>` +
+      (calendarMode === 'list'
+        ? `<ul class="entrylist">${b.published.map((x) => `<li><strong>${esc(label(x.slotId))}</strong><br>教科：${esc(x.subject)}</li>`).join('')}</ul>`
+        : publishedCalendar(b.published));
+  }
+  const pending = b.changes.filter((c) => !c.ack);
+  if (pending.length) {
+    h +=
+      '<div class="divider"></div><h2>授業変更のお知らせ</h2>' +
+      pending
+        .map(
+          (c) =>
+            `<div class="notice"><strong>変更前：</strong>${esc(label(c.from))}<br><strong>変更後：</strong>${esc(label(c.to))}<div class="actions">${btn('ack:' + c.id, '変更内容を確認しました', 'primary')}</div></div>`,
+        )
+        .join('');
+  }
+  if (data.phase === 'open' && b.confirmedCount === 0)
+    h += `<div class="actions">${btn('edit', '希望日時・連絡事項を変更する', 'secondary')}</div>`;
+  return h;
+}
+function publishedCalendar(entries) {
+  // Closed dates disappear from NEW QR choices; previously published lessons must
+  // remain visible in the student's history, including calendar mode.
+  const byDate = new Map();
+  for (const x of entries) {
+    const found = slots().get(x.slotId);
+    const m = /__(\d{4}-\d{2}-\d{2})__(\d+)$/.exec(x.slotId);
+    const date = found?.date || m?.[1];
+    const start = found?.start || (m && data?.course?.periods?.[Number(m[2])]?.start);
+    if (!date || !start) continue;
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date).push(start);
+  }
+  const days = [...new Set([...data.slots.map((x) => x.date), ...byDate.keys()])].sort();
+  return `<div class="slotgrid" style="margin-top:12px">${days.map((d) => `<div class="slotday" style="margin:0"><div class="daytitle">${dateText(d)}</div><div style="padding:8px;font-size:12px">${(byDate.get(d) || []).map((x) => `<div class="badge ok" style="margin:3px">${esc(x)}</div>`).join('') || '<span class="muted">授業なし</span>'}</div></div>`).join('')}</div>`;
+}
+function declineReview() {
+  return `<h2>不参加回答の最終確認</h2><p class="muted">今回は講習に参加しない内容で回答します。よろしいですか？</p><div class="notice">不参加の場合、希望日時の選択は不要です。受付締切前なら後から参加に変更できます。</div><div class="actions">${btn('home', '戻る')}${btn('decline', '不参加で回答する', 'primary')}</div>`;
+}
+function render() {
+  if (!validQR) {
+    $('root').innerHTML =
+      '<h2>QRコードが確認できません</h2><p class="muted">教室から配布されたQRコードをもう一度読み取ってください。</p>';
+    return;
+  }
+  $('root').innerHTML = !name
+    ? login()
+    : !data
+      ? '<p class="muted">読み込んでいます…</p>'
+      : mode === 'choose' || mode === 'edit'
+        ? choose()
+        : mode === 'review' || mode === 'reviewEdit'
+          ? review()
+          : mode === 'declineReview'
+            ? declineReview()
+            : home();
+  bind();
+  if (busy) setBusy(true);
+}
+function bind() {
+  const form = $('nameForm');
+  if (form)
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (busy) return;
+      name = $('nameInput').value.trim();
+      if (!name) return;
+      setBusy(true);
+      notify('確認しています…');
+      try {
+        await reload();
+        notify('');
+      } catch (error) {
+        notify(message(error), true);
+        name = '';
+        render();
+      } finally {
+        setBusy(false);
+      }
+    });
+  document.querySelectorAll('[data-slot]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const k = b.dataset.slot;
+      if (selected.has(k)) selected.delete(k);
+      else selected.add(k);
+      const t = $('remarks');
+      if (t) remarks = t.value;
+      render();
+    }),
+  );
+  document.querySelectorAll('[data-act]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const a = b.dataset.act;
+      if (a === 'home') {
+        mode = 'home';
+        render();
+        return;
+      }
+      if (a === 'join') {
+        selected = new Set();
+        remarks = '';
+        mode = 'choose';
+        render();
+        return;
+      }
+      if (a === 'edit') {
+        selected = new Set(data.booking.wishes);
+        remarks = data.booking.remarks ?? '';
+        mode = 'edit';
+        render();
+        return;
+      }
+      if (a === 'review') {
+        const x = $('remarks');
+        if (x) remarks = x.value;
+        if (!selected.size) {
+          notify('1コマ以上選択してください', true);
+          return;
+        }
+        mode = mode === 'edit' ? 'reviewEdit' : 'review';
+        render();
+        return;
+      }
+      if (a === 'backToSelect') {
+        mode = mode === 'reviewEdit' ? 'edit' : 'choose';
+        render();
+        return;
+      }
+      if (a === 'declineReview') {
+        mode = 'declineReview';
+        render();
+        return;
+      }
+      if (a === 'showCalendar' || a === 'showList') {
+        calendarMode = a === 'showCalendar' ? 'calendar' : 'list';
+        render();
+        return;
+      }
+      if (a === 'submit') {
+        const edit = mode === 'reviewEdit';
+        const done = await act(
+          edit ? 'change' : 'submit',
+          { slots: [...selected], remarks },
+          edit ? '希望を変更しました。' : '希望日時を提出しました。',
+        );
+        if (done) {
+          mode = 'home';
+          render();
+        }
+        return;
+      }
+      if (a === 'decline') {
+        const done = await act('decline', {}, '不参加で回答しました。');
+        if (done) {
+          mode = 'home';
+          render();
+        }
+        return;
+      }
+      if (a.startsWith('ack:')) {
+        await act('ack', { changeId: a.slice(4) }, '変更を確認済みにしました。');
+        return;
+      }
+    }),
+  );
+}
 render();
